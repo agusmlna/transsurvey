@@ -1,0 +1,654 @@
+/* ==================================
+   TRANSSURVEY
+   ================================== */
+
+:root {
+    --ts-red: #c8102e;
+    --ts-red-dark: #a30d26;
+    --ts-soft: #fff1f3;
+    --ts-dark: #25252b;
+
+    --ts-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+        "Segoe UI", Roboto, Helvetica, Arial, system-ui, sans-serif;
+
+    --teal: var(--ts-red);
+    --navy: var(--ts-dark);
+    --ink: #303038;
+    --paper: #f6f7f9;
+    --line: #e5e7eb;
+}
+
+body {
+    font-family: var(--ts-font);
+    font-size: 14px;
+    background: var(--paper);
+}
+
+/* LOGO */
+.ts-brand-link {
+    display: block;
+    flex-shrink: 0;
+    margin: -30px -18px 24px;
+    background: #fff;
+    border-bottom: 3px solid var(--ts-red);
+    text-decoration: none;
+}
+
+.ts-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 16px;
+    background: #fff;
+    text-align: center;
+}
+
+.ts-brand-logo {
+    display: block;
+    width: 140px;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+.ts-brand-name {
+    color: #303038;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+    line-height: 1.3;
+}
+
+.ts-brand-caption {
+    color: #777780;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+}
+
+/* SIDEBAR */
+.sidebar {
+    background: var(--ts-dark);
+    overflow-y: auto;
+}
+
+.nav-label {
+    color: #aaaab5;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+}
+
+.nav-item {
+    height: 44px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    color: #d8d8e0;
+    font-size: 14px;
+}
+
+.nav-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex-shrink: 0;
+    font-size: 18px;
+}
+
+.nav-item:hover {
+    color: #fff;
+    background: #35353e;
+}
+
+.nav-item.active {
+    color: #fff;
+    background: var(--ts-red);
+}
+
+.nav-item.active::before {
+    background: #fff;
+}
+
+.sidebar-note {
+    background: #303038;
+    border-color: #45454f;
+}
+
+.sidebar-note > span {
+    color: #ffabb9;
+}
+
+.sidebar-note strong,
+.profile strong {
+    color: #f5f5f7;
+}
+
+.sidebar-note p,
+.profile small {
+    color: #b8b8c2;
+}
+
+.profile {
+    border-color: #45454f;
+}
+
+/* JUDUL DAN PANEL */
+.page-heading {
+    margin-bottom: 24px;
+}
+
+.page-heading h1 {
+    font-size: 28px;
+    letter-spacing: -.7px;
+    line-height: 1.3;
+}
+
+.page-heading p {
+    margin-top: 7px;
+    color: #737986;
+    font-size: 14px;
+}
+
+.panel {
+    border-color: #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgb(25 30 45 / 3%);
+}
+
+/* TOMBOL DAN INPUT */
+.btn {
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.btn.primary {
+    color: #fff;
+    background: var(--ts-red);
+    border-color: var(--ts-red);
+    box-shadow: none;
+}
+
+.btn.primary:hover {
+    background: var(--ts-red-dark);
+    border-color: var(--ts-red-dark);
+}
+
+.text-button,
+.tabs a.selected,
+.legend {
+    color: var(--ts-red);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--ts-red);
+    box-shadow: 0 0 0 3px rgb(200 16 46 / 10%);
+}
+
+button:focus-visible,
+a:focus-visible {
+    outline-color: var(--ts-red);
+}
+
+.avatar {
+    color: var(--ts-red);
+    background: #ffe5ea;
+}
+
+.topbar-meta i {
+    background: var(--ts-red);
+}
+
+/* KARTU STATISTIK */
+.metrics {
+    gap: 16px;
+    align-items: stretch;
+}
+
+.metric {
+    min-height: 170px;
+    padding: 22px;
+    border-radius: 12px;
+    box-shadow: 0 3px 12px rgb(25 30 45 / 3%);
+}
+
+.metric > strong {
+    font-size: 36px;
+    line-height: 1.2;
+}
+
+.metric.featured {
+    background: var(--ts-red);
+    border-color: var(--ts-red);
+}
+
+.featured > span,
+.featured small,
+.featured > p {
+    color: #ffe4e9 !important;
+}
+
+.bar-track i {
+    background: var(--ts-red);
+}
+
+.demo-label {
+    color: #86652c;
+    font-size: 12px;
+    margin-bottom: 16px;
+}
+
+/* GRAFIK */
+.trend-chart svg polyline,
+.trend-chart svg circle {
+    stroke: var(--ts-red);
+}
+
+.trend-chart svg stop {
+    stop-color: var(--ts-red);
+}
+
+/* TABEL */
+th {
+    background: #f9fafb;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+td {
+    font-size: 13px;
+}
+
+tbody tr:hover {
+    background: #fafbfc;
+}
+
+.badge {
+    border-radius: 6px;
+}
+
+/* FILTER RINGKAS */
+.ts-filters {
+    margin-bottom: 22px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+
+.ts-filter-main {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.ts-filters label {
+    min-width: 0;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #596170;
+}
+
+.ts-filters input,
+.ts-filters select {
+    min-width: 0;
+    font-weight: 400;
+}
+
+.ts-filter-extra {
+    margin-top: 16px;
+}
+
+.ts-filter-extra summary {
+    width: fit-content;
+    cursor: pointer;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.ts-filter-extra[open] summary {
+    margin-bottom: 14px;
+}
+
+.ts-filter-secondary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.ts-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+/* RINGKASAN TINDAK LANJUT */
+.ts-attention {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 0 22px;
+    padding: 16px 20px;
+    border: 1px solid #f0ccd3;
+    border-radius: 10px;
+    background: var(--ts-soft);
+}
+
+.ts-attention strong {
+    display: block;
+    color: #92213a;
+    font-size: 14px;
+}
+
+.ts-attention p {
+    margin-top: 3px;
+    color: #806770;
+    font-size: 12px;
+}
+
+.follow-card,
+.detail-score {
+    background: var(--ts-soft);
+    border-color: #f0ccd3;
+    color: #92213a;
+}
+
+.follow-card h2,
+.follow-card p strong,
+.follow-card .btn {
+    color: #92213a;
+}
+
+.follow-card p {
+    color: #806770;
+}
+
+.follow-symbol {
+    background: #ffe5ea;
+    color: var(--ts-red);
+}
+
+.workspace-footer strong,
+.workspace-footer strong span {
+    color: var(--ts-red);
+}
+
+/* MOBILE */
+@media (max-width: 767px) {
+    .ts-filter-main {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ts-filters {
+        padding: 16px;
+    }
+
+    .page-heading h1 {
+        font-size: 24px;
+    }
+
+    .metric {
+        min-height: 155px;
+        padding: 16px;
+    }
+
+    .metric > strong {
+        font-size: 30px;
+    }
+
+    .ts-attention {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 420px) {
+    .ts-filter-main,
+    .ts-filter-secondary {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media print {
+    .ts-attention {
+        display: none;
+    }
+
+    .metric.featured {
+        background: #fff;
+        color: #92213a;
+    }
+
+    .featured > span,
+    .featured small,
+    .featured > p {
+        color: #92213a !important;
+    }
+
+    .panel,
+    .metric {
+        box-shadow: none;
+    }
+}
+
+html,
+body {
+    font-family: var(--ts-font);
+}
+
+button,
+input,
+textarea,
+select {
+    font-family: var(--ts-font);
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+    font-family: var(--ts-font);
+    font-weight: 600;
+}
+
+.metric > strong,
+.detail-score > strong {
+    font-variant-numeric: tabular-nums;
+}
+
+/* HALAMAN LOGIN */
+.login-page {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: #fff;
+}
+
+.login-brand {
+    padding: 48px;
+    background: linear-gradient(145deg, #25252b, #351f28);
+}
+
+.ts-login-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    align-self: flex-start;
+    max-width: 100%;
+    padding: 18px 24px;
+    background: #fff;
+    border-radius: 12px;
+    text-decoration: none;
+}
+
+.ts-login-logo img {
+    display: block;
+    width: 140px;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+}
+
+.ts-login-logo strong {
+    color: #303038;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.4px;
+    line-height: 1.3;
+}
+
+.login-brand .eyebrow {
+    color: #ffb0bf;
+    font-size: 11px;
+    letter-spacing: 1.7px;
+}
+
+.login-brand h1 {
+    margin-top: 14px;
+    color: #fff;
+    font-size: clamp(30px, 3vw, 44px);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -1.3px;
+}
+
+.login-brand p {
+    max-width: 360px;
+    margin-top: 22px;
+    color: #cec6cb;
+    font-size: 15px;
+    line-height: 1.8;
+}
+
+.login-brand > small {
+    color: #b7a9b1;
+    font-size: 12px;
+}
+
+.login-main {
+    padding: 48px;
+    background: #fff;
+}
+
+.login-form {
+    width: 100%;
+    max-width: 400px;
+}
+
+.login-form > .eyebrow {
+    color: #8a8d98;
+    font-size: 10px;
+    letter-spacing: 1.6px;
+}
+
+.login-form h1 {
+    margin-top: 10px;
+    color: #25252b;
+    font-size: 29px;
+    font-weight: 650;
+    line-height: 1.3;
+    letter-spacing: -.8px;
+}
+
+.login-form > p {
+    color: #767b87;
+    line-height: 1.7;
+}
+
+.login-form label {
+    margin-bottom: 20px;
+    color: #404550;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.login-form input {
+    min-height: 48px;
+    padding: 12px 14px;
+    background: #fafbfc;
+    border: 1px solid #e0e3e8;
+    border-radius: 10px;
+    color: #303038;
+    font-size: 15px;
+    font-weight: 400;
+}
+
+.login-form input::placeholder {
+    color: #9a9eaa;
+}
+
+.login-form input:focus {
+    background: #fff;
+    border-color: #c8102e;
+    box-shadow: 0 0 0 4px rgb(200 16 46 / 8%);
+}
+
+.login-form .btn.primary {
+    width: 100%;
+    min-height: 48px;
+    background: #c8102e;
+    border-color: #c8102e;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: none;
+}
+
+.login-form .btn.primary:hover {
+    background: #a30d26;
+    border-color: #a30d26;
+}
+
+.login-form .footnote {
+    margin-top: 22px;
+    font-size: 12px;
+}
+
+/* LOGIN PADA HP */
+@media (max-width: 767px) {
+    .login-page {
+        display: block;
+    }
+
+    .login-brand {
+        min-height: auto;
+        padding: 24px;
+    }
+
+    .login-brand .ts-login-message,
+    .login-brand > small {
+        display: none;
+    }
+
+    .ts-login-logo {
+        align-self: center;
+        padding: 14px 22px;
+    }
+
+    .ts-login-logo img {
+        width: 125px;
+    }
+
+    .login-main {
+        padding: 36px 24px;
+    }
+
+    .login-form h1 {
+        font-size: 25px;
+    }
+
+    .login-form input {
+        font-size: 16px;
+    }
+}

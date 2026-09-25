@@ -1,0 +1,6 @@
+@extends('layouts.app')
+@section('title','Klien')
+@section('heading','Klien Anda')
+@section('subtitle','Kelola kontak dan proyek penerima survei.')
+@section('actions')<a class="btn primary" href="{{ route('clients.create') }}">＋ Tambah klien</a>@endsection
+@section('content')<form method="get" class="search list-toolbar"><input name="q" placeholder="Cari klien atau proyek…" value="{{ request('q') }}" aria-label="Cari klien"><button class="btn">Cari</button></form><section class="panel"><div class="table-wrap"><table><thead><tr><th>Klien</th><th>PIC / email</th><th>Proyek</th><th>Status</th><th>Undangan</th><th></th></tr></thead><tbody>@forelse($clients as $c)<tr><td><strong>{{ $c->name }}</strong>@if($c->is_demo)<small>Data contoh</small>@endif</td><td>{{ $c->contact }}<small>{{ $c->email }}</small></td><td>{{ $c->project }}</td><td><span class="badge {{ $c->active?'green':'gray' }}">{{ $c->active?'Aktif':'Nonaktif' }}</span></td><td>{{ $c->invitations_count }}</td><td><a href="{{ route('clients.edit',$c) }}" class="text-button">Edit</a></td></tr>@empty<tr><td colspan="6" class="empty">Tambahkan klien untuk memulai distribusi survei.</td></tr>@endforelse</tbody></table></div></section>{{ $clients->links() }}@endsection

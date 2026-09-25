@@ -1,0 +1,4 @@
+@extends('layouts.app')
+@section('title','Data Klien')
+@section('heading',$client->exists?'Edit klien':'Tambah klien')
+@section('content')<form method="post" action="{{ $client->exists?route('clients.update',$client):route('clients.store') }}" class="panel form-panel narrow">@csrf @if($client->exists)@method('put')@endif @foreach(['name'=>'Nama perusahaan','contact'=>'Nama PIC','email'=>'Email','project'=>'Proyek / layanan'] as $field=>$label)<label>{{ $label }}<input type="{{ $field==='email'?'email':'text' }}" name="{{ $field }}" value="{{ old($field,$client->$field) }}" required maxlength="255"></label>@endforeach<label class="check-row"><input type="hidden" name="active" value="0"><input type="checkbox" name="active" value="1" @checked(old('active',$client->active))> Klien aktif</label><div class="form-actions"><a class="btn" href="{{ route('clients.index') }}">Kembali</a><button class="btn primary">Simpan klien</button></div></form>@endsection
