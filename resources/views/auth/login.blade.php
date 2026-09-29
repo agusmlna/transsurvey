@@ -7,6 +7,7 @@
     <link rel="icon" href="{{ asset('favicon.svg') }}">
     <link rel="stylesheet" href="{{ asset('assets/app.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/transsurvey.css') }}?v={{ filemtime(public_path('assets/transsurvey.css')) }}">
+    <link rel="stylesheet" href="{{ asset('assets/transsurvey-motion.css') }}?v={{ filemtime(public_path('assets/transsurvey-motion.css')) }}">
     <script defer src="{{ asset('assets/transsurvey.js') }}?v={{ filemtime(public_path('assets/transsurvey.js')) }}"></script>
 </head>
 <body class="login-page">
@@ -24,6 +25,9 @@
         <div class="login-form">
             <span class="eyebrow">SELAMAT DATANG KEMBALI</span>
             <h1>Login ke TransSurvey</h1><p>Masuk untuk mengelola survei dan melihat hasilnya.</p>
+            @if (session('success'))
+                <div class="notice success" role="status" data-success-message><p>{{ session('success') }}</p></div>
+            @endif
             @if ($errors->any())<div class="notice error" role="alert">{{ $errors->first() }}</div>@endif
             <form method="post" action="{{ route('login.submit') }}">@csrf
                 <label for="email">Email<input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="nama@perusahaan.co.id" autocomplete="username" required autofocus></label>

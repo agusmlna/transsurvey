@@ -1,12 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
 /* TransSurvey — tema antarmuka. Dimuat SETELAH app.css. */
 :root {
   --ts-red: #c8102e;
   --ts-red-dark: #a30d26;
   --ts-soft: #fff1f3;
   --ts-dark: #202a36;
-  --ts-font:
-    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-    "Segoe UI", Roboto, Helvetica, Arial, system-ui, sans-serif;
+  --ts-font: 'Inter', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Arial, sans-serif;
+  --ts-font-heading: 'Space Grotesk', 'Inter', sans-serif;
   --teal: var(--ts-red);
   --navy: var(--ts-dark);
   --ink: #202936;
@@ -1862,4 +1864,108 @@ tbody tr:hover {
   .ts-submit-progress {
     display: none !important;
   }
+}
+
+/* Font judul dan nama aplikasi */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.ts-brand-name {
+    font-family: var(--ts-font-heading);
+}
+
+/* Font angka statistik */
+.metric > div > strong,
+.ts-ring strong,
+.num {
+    font-family: var(--ts-font-heading);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Tampilan tab filter */
+.tabs {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 100%;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid #e6e9ee;
+    border-radius: 14px;
+    box-shadow: 0 3px 12px rgb(32 41 54 / 4%);
+}
+
+.tabs > a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 9px 20px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: #586475;
+    font-family: var(--ts-font);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: none;
+    transition:
+        background-color 180ms ease,
+        color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+/* Saat kursor diarahkan ke tab */
+.tabs > a:hover {
+    background: #fff1f3;
+    color: #a30d26;
+}
+
+/* Tab yang sedang dipilih */
+.tabs > a.selected {
+    background: var(--ts-red, #c8102e);
+    border-color: var(--ts-red, #c8102e);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 3px 8px rgb(200 16 46 / 18%);
+}
+
+.tabs > a.selected:hover {
+    background: var(--ts-red-dark, #a30d26);
+    border-color: var(--ts-red-dark, #a30d26);
+    color: #fff;
+}
+
+/* Fokus saat menggunakan keyboard */
+.tabs > a:focus-visible {
+    outline: 2px solid var(--ts-red, #c8102e);
+    outline-offset: 2px;
+}
+
+/* Tetap rapi pada layar kecil */
+@media (max-width: 575px) {
+    .list-toolbar .tabs {
+        width: 100%;
+        max-width: 100%;
+        gap: 4px;
+    }
+
+    .tabs > a {
+        flex: 1 1 auto;
+        padding: 9px 12px;
+        font-size: 12px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tabs > a {
+        transition: none;
+    }
 }

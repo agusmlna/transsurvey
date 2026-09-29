@@ -1,0 +1,73 @@
+/* Muat setelah transsurvey.css. Tidak mengubah font atau warna tema. */
+
+/* Pemberitahuan muncul di kanan atas pada desktop maupun ponsel. */
+.toast {
+    top: max(20px, env(safe-area-inset-top));
+    right: max(20px, env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgb(32 41 54 / 16%);
+}
+
+.toast[hidden] {
+    display: none !important;
+}
+
+.toast:not([hidden]) {
+    animation: ts-notice-enter 260ms ease-out;
+}
+
+.ts-toast-body {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.toast button {
+    flex-shrink: 0;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+/* Link tetap menggunakan navigasi Laravel biasa, tanpa menunda klik. */
+#main-content,
+.login-form {
+    animation: ts-content-enter 220ms ease-out;
+}
+
+@keyframes ts-notice-enter {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ts-content-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 767px) {
+    .toast {
+        top: max(12px, env(safe-area-inset-top));
+        right: max(16px, env(safe-area-inset-right));
+        bottom: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #main-content,
+    .login-form,
+    .toast:not([hidden]) {
+        animation: none;
+    }
+}
+
+@media print {
+    #main-content,
+    .login-form {
+        animation: none;
+    }
+    .toast { display: none !important; }
+}
