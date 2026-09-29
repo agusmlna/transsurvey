@@ -9,7 +9,8 @@
     <link rel="icon" href="{{ asset('favicon.svg') }}">
     <link rel="stylesheet" href="{{ asset('assets/app.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/transsurvey.css') }}?v={{ filemtime(public_path('assets/transsurvey.css')) }}">
-    <script defer src="{{ asset('assets/app.js') }}"></script>
+    <script defer src="{{ asset('assets/transsurvey.js') }}?v={{ filemtime(public_path('assets/transsurvey.js')) }}"></script>
+    <script defer src="{{ asset('assets/app.js') }}?v={{ filemtime(public_path('assets/app.js')) }}"></script>
 </head>
 
 <body class="respondent-page">
@@ -30,10 +31,10 @@
             <p class="muted">Untuk <strong>{{ $invitation->client->name }}</strong></p>
         @endif
         @if (session('success'))
-            <div class="notice success" role="status">{{ session('success') }}</div>
+            <div class="notice success" role="status" data-success-message>{{ session('success') }}</div>
         @endif
         @if ($errors->any())
-            <div class="notice error" role="alert"><strong>Jawaban belum dikirim.</strong>
+            <div class="notice error" role="alert" data-error-message><strong>Jawaban belum dikirim.</strong>
                 <ul>
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -54,7 +55,7 @@
                     wajib</span><span>± 3 menit</span></div><progress class="survey-progress" id="survey-progress"
                 value="0" max="100" aria-label="Progres pengisian"></progress>
             <form method="post" action="{{ $preview ? '#' : route('survey.submit', $invitation->token) }}"
-                class="respondent-form" @if ($preview) data-preview @endif>@csrf
+                class="respondent-form" data-submit-feedback data-busy-text="Sedang menyimpan jawaban…" @if ($preview) data-preview @endif>@csrf
                 @foreach ($survey->questions as $q)
                     @php($answer = $answers[$q->id] ?? [])
                     <section class="survey-question" data-question data-type="{{ $q->type }}"
@@ -70,7 +71,7 @@
                                     <label class="rating-option"><input type="radio"
                                             name="answers[{{ $q->id }}][value]" value="{{ $n }}"
                                             @checked((string) ($answer['value'] ?? '') === (string) $n)
-                                            @required($q->required)><strong>{{ $n }}</strong><span>{{ $text }}</span></label>
+                                            @required($q->required)><span class="ts-rating-star" aria-hidden="true">★</span><strong>{{ $n }}</strong><span>{{ $text }}</span></label>
                                 @endforeach
                             </fieldset>
                             <label class="low-comment">Apa yang bisa kami tingkatkan? <small>Komentar wajib jika memilih
@@ -100,7 +101,7 @@
                             <button class="btn" type="submit" name="action" value="draft" formnovalidate>Simpan
                                 draf</button>
                         @endunless
-                        <button class="btn primary" type="submit" name="action" value="submit">
+                        <button class="btn primary" type="submit" name="action" value="submit" @unless($preview) data-confirm="Pastikan jawaban Anda sudah sesuai. Jawaban yang sudah dikirim tidak dapat diubah melalui tautan ini." data-confirm-title="Kirim jawaban survei?" data-confirm-button="Ya, kirim" @endunless>
                             {{ $preview ? 'Coba kirim' : 'Kirim respons' }} →</button>
                     </div>
                 </div>
