@@ -1,0 +1,606 @@
+.sw {
+    --r: var(--ts-red, #c8102e);
+    --soft: var(--ts-soft, #fff1f3);
+    --line: #e5e7eb;
+    --muted: #737986;
+    font-size: 16px;
+}
+
+/* ---------- Form dasar (tipografi lebih besar) ---------- */
+.sw label {
+    font-size: 15px;
+    font-weight: 600;
+    color: #404550;
+}
+
+.sw input,
+.sw select,
+.sw textarea {
+    font-size: 16px;
+    min-height: 48px;
+    padding: 12px 14px;
+    border-radius: 10px;
+}
+
+.sw small {
+    font-size: 13.5px;
+}
+
+.sw-label {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #404550;
+}
+
+/* ---------- Layout ---------- */
+.sw-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 24px;
+    align-items: start;
+}
+
+.sw-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 20px;
+}
+
+.sw-card h2 {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.sw-hint {
+    color: var(--muted);
+    font-size: 15px;
+    margin-bottom: 22px;
+}
+
+.sw-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 20px;
+}
+
+.sw-grid .full {
+    grid-column: 1 / -1;
+}
+
+.sw-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.sw-actions .btn {
+    min-height: 50px;
+    font-size: 16px;
+    padding: 12px 22px;
+}
+
+/* ---------- Stepper & panel ---------- */
+.sw-stepper {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.sw-step {
+    flex: 1;
+    min-width: 190px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 12px;
+    text-align: left;
+    font-size: 16px;
+    font-weight: 600;
+    color: #6b7280;
+    transition: 0.2s;
+}
+
+.sw-step i {
+    font-style: normal;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: #eef0f3;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.sw-step small {
+    display: block;
+    font-weight: 400;
+    color: #9aa0ab;
+}
+
+.sw-step[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.sw-step.is-active {
+    border-color: var(--r);
+    color: #25252b;
+    box-shadow: 0 0 0 3px rgb(200 16 46 / 10%);
+}
+
+.sw-step.is-active i {
+    background: var(--r);
+    color: #fff;
+}
+
+.sw-step.is-done i {
+    background: #e8f6ee;
+    color: #2f855a;
+}
+
+.sw-panel {
+    display: none;
+    animation: sw-in 0.28s ease;
+}
+
+.sw-panel.is-active {
+    display: block;
+}
+
+@keyframes sw-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ---------- Langkah 1 ---------- */
+.sw-chips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: -8px 0 20px;
+}
+
+.sw-chips-label {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.sw-chip {
+    padding: 8px 14px;
+    border: 1px dashed #d4d7dd;
+    border-radius: 999px;
+    font-size: 14px;
+    color: #596170;
+    background: #fafbfc;
+}
+
+.sw-chip:hover {
+    border-color: var(--r);
+    color: var(--r);
+}
+
+.sw-status {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.sw-status label {
+    margin: 0;
+    cursor: pointer;
+}
+
+.sw-status input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+}
+
+.sw-status span {
+    display: block;
+    padding: 14px 16px;
+    border: 1px solid #e0e3e8;
+    border-radius: 12px;
+    font-size: 16px;
+    transition: 0.15s;
+}
+
+.sw-status span small {
+    display: block;
+    font-weight: 400;
+    color: #8a8d98;
+    margin-top: 2px;
+}
+
+.sw-status input:checked+span {
+    border-color: var(--r);
+    background: var(--soft);
+    box-shadow: 0 0 0 1px var(--r);
+}
+
+.sw-status input:focus-visible+span {
+    outline: 3px solid rgb(200 16 46 / 30%);
+}
+
+.sw-switch {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 12px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.sw-switch input {
+    width: 20px;
+    height: 20px;
+    min-height: 0;
+}
+
+.sw-switch-inline {
+    align-self: center;
+    margin-top: 8px;
+}
+
+/* ---------- Langkah 2: kartu pertanyaan ---------- */
+.sw-q {
+    border: 1px solid #e0e3e8;
+    border-radius: 14px;
+    background: #fff;
+    margin-bottom: 14px;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.sw-q:focus-within {
+    border-color: var(--r);
+    box-shadow: 0 0 0 3px rgb(200 16 46 / 8%);
+}
+
+.sw-q-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+}
+
+.sw-q-no {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--soft);
+    color: var(--r);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.sw-q-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sw-q-title small {
+    display: block;
+    font-weight: 400;
+    color: #8a8d98;
+}
+
+.sw-q-tools {
+    display: flex;
+    gap: 2px;
+}
+
+.sw-q-tools button {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 17px;
+    color: #6b7280;
+}
+
+.sw-q-tools button:hover:not(:disabled) {
+    background: #f3f4f6;
+    color: var(--r);
+}
+
+.sw-q-body {
+    padding: 20px 18px;
+    border-top: 1px solid #f0f1f4;
+}
+
+.sw-q.is-collapsed .sw-q-body {
+    display: none;
+}
+
+.sw-types {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.sw-types button {
+    padding: 10px 16px;
+    border: 1px solid #e0e3e8;
+    border-radius: 10px;
+    font-size: 15px;
+    background: #fff;
+}
+
+.sw-types button[aria-pressed="true"] {
+    background: var(--r);
+    border-color: var(--r);
+    color: #fff;
+}
+
+.sw-add {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
+
+.sw-add .btn,
+.sw-add select {
+    min-height: 48px;
+    font-size: 15px;
+}
+
+.sw-add select {
+    flex: 1;
+    min-width: 220px;
+    width: auto;
+}
+
+.sw-empty {
+    text-align: center;
+    padding: 40px 20px;
+    border: 2px dashed #e0e3e8;
+    border-radius: 14px;
+    color: #8a8d98;
+    font-size: 16px;
+    margin-bottom: 14px;
+}
+
+.sw-locked-q {
+    padding: 14px 0;
+    border-top: 1px solid #f0f1f4;
+    font-size: 16px;
+}
+
+/* ---------- Validasi ---------- */
+.sw-invalid input,
+.sw-invalid textarea,
+.sw-invalid select {
+    border-color: #d92d20 !important;
+    background: #fff8f7;
+}
+
+.sw-err {
+    color: #b42318;
+    font-size: 14px;
+    margin-top: -10px;
+    margin-bottom: 14px;
+    font-weight: 500;
+}
+
+.sw-alert {
+    position: sticky;
+    top: 12px;
+    z-index: 5;
+    margin-bottom: 16px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    background: #fff2ef;
+    border: 1px solid #efd6d1;
+    color: #b42318;
+    font-size: 15.5px;
+    font-weight: 500;
+}
+
+/* ---------- Langkah 3: tinjau ---------- */
+.sw-review dl {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 12px 16px;
+    font-size: 16px;
+    margin: 0 0 20px;
+}
+
+.sw-review dt {
+    color: var(--muted);
+}
+
+.sw-review dd {
+    margin: 0;
+    font-weight: 600;
+}
+
+.sw-review ol {
+    padding-left: 22px;
+    font-size: 16px;
+    line-height: 1.9;
+    margin: 0;
+}
+
+.sw-review-title {
+    font-size: 17px;
+    margin-bottom: 10px;
+}
+
+.sw-pill {
+    display: inline-block;
+    font-size: 13px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #596170;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+.sw-pill.req {
+    background: var(--soft);
+    color: var(--r);
+}
+
+/* ---------- Pratinjau langsung ---------- */
+.sw-aside {
+    position: sticky;
+    top: 20px;
+}
+
+.sw-aside .sw-card {
+    padding: 22px;
+}
+
+.sw-aside h3 {
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    color: #8a8d98;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+
+.sw-pv h4 {
+    font-size: 20px;
+    margin: 0 0 6px;
+}
+
+.sw-pv p {
+    font-size: 15px;
+    color: var(--muted);
+    margin: 0 0 16px;
+}
+
+.sw-pv-q {
+    padding: 14px 0;
+    border-top: 1px solid #f0f1f4;
+}
+
+.sw-pv-q b {
+    display: block;
+    font-size: 15.5px;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.sw-pv-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.sw-pv-dots i {
+    flex: 1;
+    height: 34px;
+    border: 1px solid #e0e3e8;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-style: normal;
+    font-size: 14px;
+    color: #6b7280;
+}
+
+.sw-pv-opt {
+    display: block;
+    padding: 9px 12px;
+    border: 1px solid #e0e3e8;
+    border-radius: 8px;
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+
+.sw-pv-txt {
+    height: 54px;
+    border: 1px solid #e0e3e8;
+    border-radius: 8px;
+    background: #fafbfc;
+}
+
+/* ---------- Lain-lain ---------- */
+.sw-draft {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 15px;
+}
+
+.sw-spin {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgb(255 255 255 / 50%);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: sw-spin 0.7s linear infinite;
+}
+
+@keyframes sw-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ---------- Responsif ---------- */
+@media (max-width: 1100px) {
+    .sw-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .sw-aside {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+
+    .sw-grid,
+    .sw-status {
+        grid-template-columns: 1fr;
+    }
+
+    .sw-review dl {
+        grid-template-columns: 1fr;
+    }
+
+    .sw-card {
+        padding: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sw-panel {
+        animation: none;
+    }
+}
