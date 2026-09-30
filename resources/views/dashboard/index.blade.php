@@ -98,6 +98,7 @@
         </section>
     </div>
     @include('layouts.client-scores')
+    @include('dashboard.rating-summary')
     <div class="bottom-grid">
         <section class="panel">
             <div class="panel-heading">
