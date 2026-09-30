@@ -3,6 +3,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\{AuthController,DashboardController,SurveyController,ClientController,InvitationController,PublicSurveyController,ResponseController,BankController,FollowUpController,ReportController};
 Route::middleware('guest')->group(function(){Route::get('/login',[AuthController::class,'form'])->name('login');Route::post('/login',[AuthController::class,'login'])->middleware('throttle:login')->name('login.submit');});
 Route::get('/s/{token}',[PublicSurveyController::class,'show'])->where('token','[A-Za-z0-9]{64}')->middleware('throttle:respond')->name('survey.public');
+Route::post('/s/{token}/verify',[PublicSurveyController::class,'verify'])->where('token','[A-Za-z0-9]{64}')->middleware('throttle:respond')->name('survey.verify');
 Route::post('/s/{token}',[PublicSurveyController::class,'submit'])->where('token','[A-Za-z0-9]{64}')->middleware('throttle:respond')->name('survey.submit');
 Route::middleware('auth')->group(function(){
  Route::post('/logout',[AuthController::class,'logout'])->name('logout');
