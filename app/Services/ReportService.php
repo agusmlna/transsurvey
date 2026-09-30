@@ -26,7 +26,33 @@ class ReportService {
   $ratings=$responses->flatMap->answers->filter(fn($a)=>$a->type==='rating' && $a->value!==null && $a->value!=='');
   $categories=$ratings->groupBy('category')->map(fn($rows)=>round($rows->avg(fn($a)=>(int)$a->value),2))->sortDesc();
   $trends=$responses->whereNotNull('score')->groupBy(fn($r)=>$r->submitted_at->format('Y-m'))->sortKeys()->map(fn($rows)=>round($rows->avg('score'),2));
-  return compact('responses','categories','trends','invCount','complete')+['average'=>$responses->whereNotNull('score')->avg('score'),'rate'=>$invCount?round(100*$complete/$invCount):0,'active'=>Survey::where('status','active')->whereDate('starts_at','<=',today())->whereDate('ends_at','>=',today())->count(),'openFollow'=>FollowUp::where('status','!=','resolved')->count()];
+  // Count individual rating answers, not response averages or comment sentiment.
+  $validRatings=$ratings->filter(fn($answer)=>in_array((string)$answer->value,['1','2','3','4','5'],true));
+  $totalRatings=$validRatings->count();
+  $highRatings=$validRatings->filter(fn($answer)=>(int)$answer->value>=4)->count();
+  $attentionRatings=$totalRatings-$highRatings;
+  $feedback=[
+   'total'=>$totalRatings,
+   'high'=>$highRatings,
+   'attention'=>$attentionRatings,
+   'highPercent'=>$totalRatings?round(100*$highRatings/$totalRatings,1):null,
+   'attentionPercent'=>$totalRatings?round(100*$attentionRatings/$totalRatings,1):null,
+  ];
+  return compact('responses','categories','trends','invCount','complete','feedback')+['average'=>$responses->whereNotNull('score')->avg('score'),'rate'=>$invCount?round(100*$complete/$invCount):0,'active'=>$this->activeSurveys($r),'openFollow'=>FollowUp::where('status','!=','resolved')->count()];
+ }
+ public function activeSurveys(Request $r): int {
+  // Active means open today. The response-date filter does not change this clock.
+  $surveys=Survey::query()->where('status','active')->whereDate('starts_at','<=',today())->whereDate('ends_at','>=',today());
+  if($r->filled('survey_id'))$surveys->whereKey($r->integer('survey_id'));
+  if($r->filled('client_id') || $r->filled('project') || in_array($r->input('source'),['real','demo'],true)){
+   // All assignment filters must match the same invitation; each survey counts once.
+   $assignments=Invitation::query()->select('survey_id');
+   if($r->filled('client_id'))$assignments->where('client_id',$r->integer('client_id'));
+   if($r->filled('project'))$assignments->whereHas('client',fn($client)=>$client->where('project',$r->input('project')));
+   if(in_array($r->input('source'),['real','demo'],true))$assignments->where('is_demo',$r->input('source')==='demo');
+   $surveys->whereIn('id',$assignments);
+  }
+  return $surveys->count();
  }
  public function validateFilters(Request $r):void{$r->validate(['client_id'=>'nullable|integer|exists:clients,id','survey_id'=>'nullable|integer|exists:surveys,id','project'=>'nullable|string|max:255','from'=>'nullable|date_format:Y-m-d','to'=>array_filter(['nullable','date_format:Y-m-d',$r->filled('from')?'after_or_equal:from':null]),'source'=>'nullable|in:real,demo']);}
 }
