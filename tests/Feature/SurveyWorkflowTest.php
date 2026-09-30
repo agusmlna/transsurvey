@@ -4,8 +4,9 @@ namespace Tests\Feature;
 use App\Models\{User, Client, Survey, Invitation, SurveyResponse};
 use App\Jobs\SendSurveyEmail;
 use App\Services\DeliveryService;
+use App\Services\SurveyAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\{Mail, Queue};
+use Illuminate\Support\Facades\{DB, Mail, Queue};
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -24,6 +25,13 @@ class SurveyWorkflowTest extends TestCase
         $choice = $survey->questions()->create(['text'=>'Kanal?','category'=>'Preferensi','type'=>'choice','options'=>['Email','Telepon'],'required'=>false,'position'=>3]);
         $token = Str::random(64);
         $invitation = Invitation::create(['survey_id'=>$survey->id,'client_id'=>$client->id,'token'=>$token,'token_hash'=>hash('sha256',$token),'recipient_name'=>$client->contact,'recipient_email'=>$client->email]);
+        DB::transaction(function () use ($invitation) {
+            $locked = Invitation::lockForUpdate()->findOrFail($invitation->id);
+            app(SurveyAccessService::class)->prepareForEmail($locked);
+        });
+        $invitation->refresh();
+        $this->post('/s/'.$token.'/verify', ['access_code' => $invitation->access_code])
+            ->assertSessionHasNoErrors()->assertRedirect('/s/'.$token);
         return compact('user','client','survey','rating','second','choice','token','invitation');
     }
 

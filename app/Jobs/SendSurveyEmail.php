@@ -2,6 +2,7 @@
 namespace App\Jobs;
 use App\Models\{EmailDelivery,Invitation};
 use App\Mail\SurveyInvitationMail;
+use App\Services\SurveyAccessService;
 use Illuminate\Contracts\Queue\{ShouldQueue,ShouldBeUnique};
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\{DB,Mail};
@@ -18,6 +19,7 @@ class SendSurveyEmail implements ShouldQueue,ShouldBeUnique {
    if(in_array($delivery->status,['sent','skipped']))return;
    $inv=Invitation::with('survey')->lockForUpdate()->findOrFail($delivery->invitation_id);
    if($inv->completed_at || $inv->is_demo || !$inv->survey->isOpen() || ($delivery->kind==='reminder' && $inv->reminder_count>=config('survey.max_reminders'))){$delivery->update(['status'=>'skipped']);return;}
+   app(SurveyAccessService::class)->prepareForEmail($inv);
    Mail::to($inv->recipient_email)->send(new SurveyInvitationMail($inv,$delivery->kind==='reminder'));
    $delivery->update(['status'=>'sent','sent_at'=>now(),'last_error'=>null]);
    $inv->sent_at ??= now();if($delivery->kind==='reminder')$inv->reminder_count++;
