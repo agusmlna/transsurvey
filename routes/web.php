@@ -10,6 +10,8 @@ Route::middleware('auth')->group(function(){
  Route::get('/',DashboardController::class)->name('dashboard');
  Route::get('/responses',[ResponseController::class,'index'])->name('responses.index');Route::get('/responses/{response}',[ResponseController::class,'show'])->name('responses.show');
  Route::get('/reports',[ReportController::class,'index'])->name('reports.index');Route::get('/reports/export.csv',[ReportController::class,'csv'])->name('reports.csv');
+ Route::get('/reports/export.pdf',[ReportController::class,'pdf'])->name('reports.pdf');
+ Route::get('/reports/export.xlsx',[ReportController::class,'xlsx'])->name('reports.xlsx');
  Route::get('/followups',[FollowUpController::class,'index'])->name('followups.index');
  Route::middleware('admin')->group(function(){
   Route::resource('surveys',SurveyController::class)->except(['show','destroy']);
