@@ -12,7 +12,7 @@ class ReportController
     public function index(Request $r, ReportService $reports, ReportPresentation $presentation)
     {
         $reports->validateFilters($r);
-        return view('reports.index', $presentation->data($r, $reports) + ['clients' => Client::orderBy('name')->get(), 'surveys' => Survey::latest()->get()]);
+        return view('reports.index', $presentation->data($r, $reports) + ['clients' => Client::orderBy('name')->get(), 'surveys' => Survey::latest()->get(), 'categoryOptions' => $reports->categories()]);
     }
     public function csv(Request $r, ReportService $reports)
     {
@@ -21,7 +21,8 @@ class ReportController
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['Klien', 'Proyek', 'Kuesioner', 'Tanggal', 'Skor', 'Persentase', 'Kategori', 'Pertanyaan', 'Jawaban', 'Komentar'], ',', '"', '');
-            $reports->responses($r)->orderBy('id')->chunkById(100, function ($rows) use ($out) {
+            $reports->responses($r)->orderBy('id')->chunkById(100, function ($rows) use ($out, $r, $reports) {
+                $reports->applyCategoryScores($rows, $r);
                 foreach ($rows as $row) {
                     foreach ($row->answers as $a) {
                         $cells = [$row->client->name, $row->client->project, $row->survey->title, $row->submitted_at->toIso8601String(), $row->score, $row->score === null ? '' : round($row->score / 5 * 100, 2), $a->category, $a->question_text, $a->value, $a->comment];
@@ -87,6 +88,7 @@ class ReportController
             'Laporan TransSurvey',
             $filters['Klien'] ?? null,
             $filters['Kuesioner'] ?? null,
+            $filters['Kategori'] ?? null,
             $filters['Periode respons'] ?? null,
         ])
             ->map(fn ($part) => $this->cleanName((string) $part))

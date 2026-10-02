@@ -8,8 +8,10 @@
     <a class="btn" href="{{ route('reports.csv', request()->query()) }}">CSV</a>
 @endsection
 @section('content')
-    <link rel="stylesheet" href="{{ asset('assets/transsurvey-reports.css') }}?v={{ filemtime(public_path('assets/transsurvey-reports.css')) }}">
+    <link rel="stylesheet"
+        href="{{ asset('assets/transsurvey-reports.css') }}?v={{ filemtime(public_path('assets/transsurvey-reports.css')) }}">
     @include('layouts.filters')
-    <p class="rs-download-note">PDF berisi ringkasan dan daftar respons. Excel memuat ringkasan serta detail jawaban dan komentar. Hasil unduhan mengikuti filter yang sudah diterapkan.</p>
+    <p class="rs-download-note">PDF berisi ringkasan dan daftar respons. Excel memuat ringkasan serta detail jawaban dan
+        komentar. Hasil unduhan mengikuti filter yang sudah diterapkan.</p>
     @include('reports.document')
 @endsection

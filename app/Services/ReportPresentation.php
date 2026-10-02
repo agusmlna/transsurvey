@@ -14,6 +14,7 @@ class ReportPresentation
         $data['reportFilters'] = [
             'Klien' => $request->filled('client_id') ? Client::findOrFail($request->integer('client_id'))->name : 'Semua klien',
             'Kuesioner' => $request->filled('survey_id') ? Survey::findOrFail($request->integer('survey_id'))->title : 'Semua kuesioner',
+            'Kategori' => $request->input('category') ?: 'Semua kategori',
             'Proyek' => $request->input('project') ?: 'Semua proyek',
             'Sumber data' => ['real' => 'Operasional', 'demo' => 'Contoh'][$request->input('source')] ?? 'Semua data',
             'Periode respons' => $this->period($request),

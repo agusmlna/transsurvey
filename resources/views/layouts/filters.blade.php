@@ -53,11 +53,29 @@
 
     <details
         class="ts-filter-extra"
-        @if(request()->filled('project') || request()->filled('source')) open @endif
+        @if(request()->filled('project') || request()->filled('source') || request()->filled('category')) open @endif
     >
-        <summary>Filter lainnya: proyek dan sumber data</summary>
+        <summary>Filter lainnya: kategori, proyek, dan sumber data</summary>
 
         <div class="ts-filter-secondary">
+            @isset($categoryOptions)
+                <label>
+                    Kategori
+                    <select name="category">
+                        <option value="">Semua kategori</option>
+
+                        @foreach ($categoryOptions as $category)
+                            <option
+                                value="{{ $category }}"
+                                @selected(request('category') === $category)
+                            >
+                                {{ $category }}
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+            @endisset
+
             <label>
                 Proyek
                 <select name="project">
