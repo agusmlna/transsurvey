@@ -17,7 +17,7 @@ Route::middleware('auth')->group(function(){
   Route::resource('surveys',SurveyController::class)->except(['show','destroy']);
   Route::get('/surveys/{survey}/preview',[SurveyController::class,'preview'])->name('surveys.preview');Route::post('/surveys/{survey}/duplicate',[SurveyController::class,'duplicate'])->name('surveys.duplicate');
   Route::resource('clients',ClientController::class)->except(['show','destroy']);
-  Route::get('/invitations',[InvitationController::class,'index'])->name('invitations.index');Route::post('/invitations',[InvitationController::class,'store'])->name('invitations.store');Route::post('/invitations/{invitation}/send',[InvitationController::class,'send'])->name('invitations.send');
+  Route::get('/invitations',[InvitationController::class,'index'])->name('invitations.index');Route::post('/invitations',[InvitationController::class,'store'])->name('invitations.store');Route::post('/invitations/{invitation}/send',[InvitationController::class,'send'])->name('invitations.send');Route::post('/invitations/{invitation}/reminder',[InvitationController::class,'remind'])->name('invitations.remind');
   Route::get('/bank',[BankController::class,'index'])->name('bank.index');Route::post('/bank',[BankController::class,'store'])->name('bank.store');
   Route::get('/followups/{followup}/edit',[FollowUpController::class,'edit'])->name('followups.edit');Route::put('/followups/{followup}',[FollowUpController::class,'update'])->name('followups.update');
  });

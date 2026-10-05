@@ -34,6 +34,7 @@ class ResponseService {
    foreach($questions as $q){$response->answers()->create(['question_id'=>$q->id,'question_text'=>$q->text,'category'=>$q->category,'type'=>$q->type,'value'=>$answers[$q->id]['value'],'comment'=>$answers[$q->id]['comment']]);}
    $inv->forceFill(['completed_at'=>now(),'draft_answers'=>null])->save();
    if($hasLow){FollowUp::create(['survey_response_id'=>$response->id,'status'=>'open','due_at'=>today()->addDays(3)]);}
+   app(SurveyCompletionNotifier::class)->record($response);
    return $response;
   },3);
  }
