@@ -54,6 +54,7 @@
         </main>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    {{-- <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script> --}}
     @stack('scripts')
 </body>
 </html>
