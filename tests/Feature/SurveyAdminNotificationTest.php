@@ -252,10 +252,10 @@ class SurveyAdminNotificationTest extends TestCase
     {
         $inv = $this->invitation(); $this->submit($inv);
         $id = AdminSurveyNotification::firstOrFail()->id;
-        $this->withFileDatabase(function ($other) use ($id) {
+        $this->withFileDatabase(function (&$other) use ($id) {
             $pending = \Mockery::mock(\Illuminate\Mail\PendingMail::class);
             Mail::shouldReceive('to')->once()->andReturn($pending);
-            $pending->shouldReceive('send')->once()->andReturnUsing(function () use ($other, $id) {
+            $pending->shouldReceive('send')->once()->andReturnUsing(function () use (&$other, $id) {
                 $this->assertSame(0, DB::transactionLevel(), 'SMTP must run outside database transactions.');
                 $other->exec("INSERT INTO cache (key, value, expiration) VALUES ('concurrent-write', 'ok', 999999999)");
                 (new SendSurveyCompletionEmail($id))->handle();
@@ -270,10 +270,10 @@ class SurveyAdminNotificationTest extends TestCase
     {
         $inv = $this->invitation(); $this->submit($inv);
         $id = AdminSurveyNotification::firstOrFail()->id;
-        $this->withFileDatabase(function ($other) use ($id) {
+        $this->withFileDatabase(function (&$other) use ($id) {
             $pending = \Mockery::mock(\Illuminate\Mail\PendingMail::class);
             Mail::shouldReceive('to')->once()->andReturn($pending);
-            $pending->shouldReceive('send')->once()->andReturnUsing(function () use ($other) {
+            $pending->shouldReceive('send')->once()->andReturnUsing(function () use (&$other) {
                 $other->beginTransaction();
                 $other->exec("INSERT INTO cache (key, value, expiration) VALUES ('held-lock', 'ok', 999999999)");
             });
