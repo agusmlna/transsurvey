@@ -8,4 +8,4 @@
         <div class="panel-heading">
             <h2>Semua respons <span class="count">{{ $responses->total() }}</span></h2>
         </div>@include('layouts.response-table', ['rows' => $responses, 'showAction' => true])
-    </section>{{ $responses->links() }}@endsection
+    </section><div data-table-fallback="responses-table">{{ $responses->links() }}</div>@endsection

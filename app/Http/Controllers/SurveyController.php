@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DataTableService;
+
 use App\Models\{Survey, BankQuestion};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,11 +11,12 @@ use Illuminate\Validation\ValidationException;
 
 class SurveyController
 {
-    public function index(Request $r)
+    public function index(Request $r, DataTableService $tables)
     {
         $q = Survey::withCount(['invitations', 'responses'])->latest();
         if (in_array($r->input('status'), ['draft', 'active', 'closed'])) $q->where('status', $r->input('status'));
         if ($r->boolean('template')) $q->where('is_template', true);
+        if ($r->boolean('_table')) return $tables->respond($r, $q, 'surveys');
         if ($r->filled('q')) $q->where('title', 'like', '%' . $r->input('q') . '%');
         return view('surveys.index', ['surveys' => $q->paginate(12)->withQueryString()]);
     }

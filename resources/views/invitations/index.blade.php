@@ -37,7 +37,7 @@
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" id="client-check-all"
-                                            aria-label="Pilih semua klien yang tampil"></th>
+                                            aria-label="Pilih semua klien hasil pencarian, lintas halaman"></th>
                                     <th>Klien</th>
                                     <th>PIC</th>
                                     <th>Email</th>
@@ -83,181 +83,34 @@
             </div>
         </div>
         <div class="table-wrap">
-            <table>
+            <table id="invitations-table" class="ts-data-table" data-ts-table data-server-table="invitations" data-search="{{ request('q', '') }}" aria-label="Daftar undangan">
                 <thead>
                     <tr>
                         <th>Klien / survei</th>
                         <th>PIC penerima</th>
                         <th>Pengisian</th>
-                        <th>Email terakhir</th>
+                        <th data-dt-order="disable">Email terakhir</th>
                         <th>Reminder</th>
-                        <th>Kirim email</th>
-                        <th>Tautan</th>
+                        <th data-dt-order="disable">Kirim email</th>
+                        <th data-dt-order="disable">Tautan</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse ($invitations as $i)
-                        @php
-                            $delivery = $i->deliveries->sortByDesc('id')->first();
-                            $isReminder = (bool) $i->sent_at;
-                            $pending = $i->deliveries->contains(fn($d) => $d->status === 'pending');
-                            $buttonText = $delivery?->status === 'failed' ? 'Coba kirim lagi' : 'Kirim email';
-                            $blockedReason = null;
-                            if ($i->completed_at) {
-                                $blockedReason = 'Survei sudah selesai diisi.';
-                            } elseif ($i->is_demo) {
-                                $blockedReason = 'Email untuk data contoh dinonaktifkan.';
-                            } elseif (!$emailEnabled) {
-                                $blockedReason = 'Pengiriman email belum diaktifkan.';
-                            } elseif (!$i->survey->isOpen()) {
-                                $blockedReason = 'Di luar periode survei aktif.';
-                            } elseif ($isReminder && $i->reminder_count >= config('survey.max_reminders')) {
-                                $blockedReason = 'Batas reminder sudah tercapai.';
-                            } elseif ($pending) {
-                                $blockedReason = 'Email sedang menunggu proses pengiriman.';
-                            }
-                            $deliveryLabels = [
-                                'pending' => 'Dalam antrean',
-                                'sent' => 'Terkirim',
-                                'failed' => 'Gagal',
-                                'skipped' => 'Dibatalkan',
-                            ];
-                            $deliveryColors = [
-                                'pending' => 'amber',
-                                'sent' => 'green',
-                                'failed' => 'gray',
-                                'skipped' => 'gray',
-                            ];
-                        @endphp
-                        <tr>
-                            <td><strong>{{ $i->client->name }}</strong><small>{{ $i->survey->title }}</small>
-                                @if ($i->is_demo)
-                                    <span class="badge gray">Data contoh</span>
-                                @endif
-                            </td>
-                            <td><strong>{{ $i->recipient_name }}</strong><small>{{ $i->recipient_email }}</small></td>
-                            <td><span
-                                    class="badge {{ $i->completed_at ? 'green' : 'amber' }}">{{ $i->completed_at ? 'Selesai' : ($i->started_at ? 'Draf tersimpan' : 'Belum mengisi') }}</span>
-                            </td>
-                            <td><span
-                                    class="badge {{ $delivery ? $deliveryColors[$delivery->status] ?? 'gray' : 'gray' }}">{{ $delivery ? $deliveryLabels[$delivery->status] ?? $delivery->status : 'Belum dikirim' }}</span>
-                                @if ($delivery?->sent_at)
-                                    <small>{{ $delivery->sent_at->format('d M Y H:i') }}</small>
-                                    @endif @if ($delivery?->last_error)
-                                        <small>{{ $delivery->last_error }}</small>
-                                    @endif
-                            </td>
-                            <td>
-                                <strong>{{ $i->reminder_count }} / {{ config('survey.max_reminders') }}</strong>
-                                <small>{{ !$i->completed_at && $i->reminder_count < config('survey.max_reminders') ? $i->reminder_at?->format('d M Y H:i') ?? 'Setelah email pertama' : '—' }}</small>
-                                <form method="post" action="{{ route('invitations.remind', $i) }}"
-                                    data-confirm="Kirim email pengingat ke {{ $i->recipient_name }} ({{ $i->recipient_email }})? Tautan dan kode akses tetap sama."
-                                    data-confirm-title="Kirim reminder ke PIC?" data-confirm-button="Ya, kirim reminder"
-                                    data-busy-text="Memproses reminder…">
-                                    @csrf
-                                    <button type="submit" class="btn" @disabled($blockedReason !== null || !$isReminder)
-                                        title="{{ $blockedReason ?? (!$isReminder ? 'Kirim email undangan pertama terlebih dahulu.' : 'Kirim ke PIC yang tercantum') }}">Kirim
-                                        reminder ke PIC</button>
-                                </form>
-                                @if ($blockedReason)
-                                    <small>{{ $blockedReason }}</small>
-                                @elseif (!$isReminder)
-                                <small>Kirim undangan pertama terlebih dahulu.</small>@else<small>Maksimal satu reminder
-                                        per hari.</small>
-                                @endif
-                            </td>
-                            <td>
-                                @if ($isReminder)
-                                    <span class="badge green">Undangan sudah dikirim</span>
-                                    <small>Untuk mengingatkan PIC, gunakan tombol di kolom Reminder.</small>
-                                @else
-                                    <form method="post" action="{{ route('invitations.send', $i) }}"
-                                        data-confirm="Kirim undangan survei ke {{ $i->recipient_name }} ({{ $i->recipient_email }})?"
-                                        data-confirm-title="Kirim email undangan?" data-confirm-button="Ya, kirim email"
-                                        data-busy-text="Memproses email…">
-                                        @csrf
-                                        <button type="submit" class="btn primary" @disabled($blockedReason !== null)
-                                            title="{{ $blockedReason ?? 'Kirim undangan pertama ke PIC' }}">{{ $pending && !$i->completed_at ? 'Dalam antrean' : $buttonText }}</button>
-                                    </form>
-                                @endif
-                            </td>
-                            <td>
-                                <div class="row-actions"><button class="text-button" type="button"
-                                        data-copy="{{ $i->surveyUrl() }}">Salin tautan</button><a class="text-button"
-                                        href="{{ $i->surveyUrl() }}" target="_blank" rel="noopener">Buka ↗</a></div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td class="empty" colspan="7">Belum ada undangan. Buat undangan survei untuk klien terlebih
-                                dahulu.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
+@include('invitations.rows')
+</tbody>
             </table>
         </div>
     </section>
     <p class="footnote">Email dikirim ke alamat PIC yang tersimpan pada undangan. Setelah konfirmasi, email masuk antrean.
         Muat ulang halaman untuk melihat status terbaru. Status Terkirim berarti pesan diterima server email, bukan
         konfirmasi bahwa email sudah dibaca.</p>
-    {{ $invitations->links() }}
+    <div data-table-fallback="invitations-table">{{ $invitations->links() }}</div>
 @endsection
 @push('scripts')
-    <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.min.css">
-    <style>
-        #client-table th:first-child,
-        #client-table td:first-child {
-            min-width: 0;
-            width: 44px;
-            text-align: center;
-        }
-
-        .client-table-wrap {
-            margin-bottom: 8px;
-            font-size: 13px;
-        }
-
-        .client-table-wrap .dt-search label,
-        .client-table-wrap .dt-length label {
-            display: inline-flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 8px;
-            margin: 0;
-        }
-
-        .client-table-wrap .dt-search input,
-        .client-table-wrap .dt-length select {
-            width: auto;
-            min-height: 34px;
-            padding: 6px 10px;
-        }
-
-        .client-table-wrap .dt-paging-button {
-            padding: 4px 10px;
-            border: 1px solid var(--line);
-            border-radius: 6px;
-            margin-left: 4px;
-            background: #fff;
-        }
-
-        .client-table-wrap .dt-paging-button.current {
-            background: var(--ts-red);
-            color: #fff;
-            border-color: var(--ts-red);
-        }
-
-        .client-table-wrap .dt-paging-button.disabled {
-            opacity: .45;
-            cursor: not-allowed;
-        }
-    </style>
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             var tableEl = document.getElementById('client-table');
-            if (!tableEl) return;
+            if (!tableEl || !window.TransSurveyTables) return;
 
             var form = tableEl.closest('form');
             var checkAll = document.getElementById('client-check-all');
@@ -292,20 +145,11 @@
                 syncHidden();
             }
 
-            dt = new DataTable(tableEl, {
+            dt = window.TransSurveyTables.create(tableEl, {
                 pageLength: 10,
-                lengthMenu: [5, 10, 25, 50],
+                lengthMenu: [10, 25, 50, 100],
                 order: [[1, 'asc']],
                 columnDefs: [{ targets: 0, orderable: false, searchable: false }],
-                language: {
-                    search: 'Cari:',
-                    lengthMenu: 'Tampilkan _MENU_ klien',
-                    info: '_START_–_END_ dari _TOTAL_ klien',
-                    infoEmpty: 'Tidak ada klien',
-                    infoFiltered: '(difilter dari _MAX_ klien)',
-                    zeroRecords: 'Klien tidak ditemukan',
-                    paginate: { previous: '‹', next: '›' }
-                },
                 drawCallback: function () {
                     tableEl.querySelectorAll('tbody .client-check').forEach(function (cb) {
                         cb.checked = selected.has(cb.value);
@@ -335,10 +179,10 @@
 
             // Validasi minimal 1 klien (capture, supaya jalan sebelum handler konfirmasi lain)
             form.addEventListener('submit', function (e) {
-                if (!selected.size) {
+                if (!selected.size || selected.size > 100) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
-                    alert('Pilih minimal satu klien.');
+                    window.TransSurveyUI.toast(!selected.size ? 'Pilih minimal satu klien.' : 'Maksimal 100 klien per pembuatan undangan.', 'error');
                 }
             }, true);
 

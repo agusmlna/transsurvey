@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DataTableService;
+
 use App\Models\{FollowUp, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -9,10 +11,11 @@ use Illuminate\Validation\ValidationException;
 
 class FollowUpController
 {
-    public function index(Request $r)
+    public function index(Request $r, DataTableService $tables)
     {
         $q = FollowUp::with(['response.client', 'response.survey', 'assignee'])->latest();
         if (in_array($r->input('status'), ['open', 'in_progress', 'resolved'])) $q->where('status', $r->input('status'));
+        if ($r->boolean('_table')) return $tables->respond($r, $q, 'followups');
         return view('followups.index', ['followups' => $q->paginate(20)->withQueryString()]);
     }
     public function edit(FollowUp $followup)

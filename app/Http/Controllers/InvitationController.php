@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DataTableService;
+
 use App\Models\{Invitation, Survey, Client};
 use App\Services\DeliveryService;
 use Illuminate\Http\Request;
@@ -11,11 +13,12 @@ use Illuminate\Validation\ValidationException;
 
 class InvitationController
 {
-    public function index(Request $r)
+    public function index(Request $r, DataTableService $tables)
     {
         $q = Invitation::with(['survey', 'client', 'deliveries'])->latest();
         if ($r->input('status') === 'completed') $q->whereNotNull('completed_at');
         if ($r->input('status') === 'pending') $q->whereNull('completed_at');
+        if ($r->boolean('_table')) return $tables->respond($r, $q, 'invitations');
         return view('invitations.index', ['invitations' => $q->paginate(20)->withQueryString(), 'surveys' => Survey::where('status', 'active')->get(), 'clients' => Client::where('active', true)->orderBy('name')->get()]);
     }
     public function store(Request $r)
