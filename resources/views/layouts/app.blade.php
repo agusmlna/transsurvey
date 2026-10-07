@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="{{ asset('assets/transsurvey-motion.css') }}?v={{ filemtime(public_path('assets/transsurvey-motion.css')) }}">
     <script defer src="{{ asset('assets/transsurvey.js') }}?v={{ filemtime(public_path('assets/transsurvey.js')) }}"></script>
     <script defer src="{{ asset('assets/app.js') }}?v={{ filemtime(public_path('assets/app.js')) }}"></script>
+    <link rel="stylesheet" href="{{ asset('assets/vendor/datatables/dataTables.dataTables.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/transsurvey-tables.css') }}?v={{ filemtime(public_path('assets/transsurvey-tables.css')) }}">
     @stack('styles')
 </head>
 <body>
@@ -54,7 +56,9 @@
         </main>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-    {{-- <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script> --}}
+    <script src="{{ asset('assets/vendor/datatables/jquery-3.7.1.min.js') }}"></script>
+    <script src="{{ asset('assets/vendor/datatables/dataTables.min.js') }}"></script>
+    <script src="{{ asset('assets/transsurvey-tables.js') }}?v={{ filemtime(public_path('assets/transsurvey-tables.js')) }}"></script>
     @stack('scripts')
 </body>
 </html>

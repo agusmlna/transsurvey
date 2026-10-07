@@ -43,7 +43,7 @@
         <p>{{ $summaryText }}</p>
     </section>
     <h2 class="rs-section-title">Kepuasan per klien</h2>
-    <table class="rs-table">
+    <table class="rs-table" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
                 <th style="width:29%">Klien</th>
@@ -59,9 +59,9 @@
                     <td>{{ $client['name'] }}</td>
                     <td>{{ $client['project'] }}</td>
                     <td class="rs-num">{{ $client['responses'] }}</td>
-                    <td class="rs-num">
+                    <td class="rs-num" data-order="{{ $client['score'] ?? -1 }}">
                         {{ $client['score'] === null ? '-' : number_format($client['score'], 2, ',', '.') }}</td>
-                    <td class="rs-num">
+                    <td class="rs-num" data-order="{{ $client['percentage'] ?? -1 }}">
                         {{ $client['percentage'] === null ? '-' : number_format($client['percentage'] * 100, 1, ',', '.') . '%' }}
                     </td>
                 </tr>
@@ -72,11 +72,11 @@
         </tbody>
     </table>
     <h2 class="rs-section-title">Skor per kategori</h2>
-    <table class="rs-table rs-categories">
+    <table class="rs-table rs-categories" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
                 <th style="width:40%">Kategori</th>
-                <th style="width:40%">Perbandingan skor</th>
+                <th style="width:40%" data-dt-order="disable">Perbandingan skor</th>
                 <th class="rs-num">Skor / 5</th>
             </tr>
         </thead>
@@ -89,7 +89,7 @@
                             <div class="rs-fill" style="width:{{ max(0, min(100, ($value / 5) * 100)) }}%"></div>
                         </div>
                     </td>
-                    <td class="rs-num">{{ number_format($value, 2, ',', '.') }}</td>
+                    <td class="rs-num" data-order="{{ $value }}">{{ number_format($value, 2, ',', '.') }}</td>
                 </tr>
             @empty<tr>
                     <td colspan="3" class="rs-empty">Belum ada jawaban rating pada filter ini.</td>
@@ -98,7 +98,7 @@
         </tbody>
     </table>
     <h2 class="rs-section-title">Detail respons</h2>
-    <table class="rs-table">
+    <table class="rs-table" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
                 <th style="width:28%">Klien / proyek</th>
@@ -113,9 +113,9 @@
                     <td><strong>{{ $response->client?->name ?? 'Klien tidak tersedia' }}</strong><small>{{ $response->client?->project ?: '-' }}</small>
                     </td>
                     <td>{{ $response->survey?->title ?? 'Kuesioner tidak tersedia' }}</td>
-                    <td class="rs-num">
+                    <td class="rs-num" data-order="{{ $response->score ?? -1 }}">
                         {{ $response->score === null ? '-' : number_format($response->score, 2, ',', '.') }}</td>
-                    <td>{{ $response->submitted_at?->copy()->timezone('Asia/Jakarta')->format('d/m/Y H:i') ?? '-' }}
+                    <td data-order="{{ $response->submitted_at?->timestamp ?? 0 }}">{{ $response->submitted_at?->copy()->timezone('Asia/Jakarta')->format('d/m/Y H:i') ?? '-' }}
                     </td>
                 </tr>
             @empty<tr>

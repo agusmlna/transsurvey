@@ -12,6 +12,6 @@
         href="{{ asset('assets/transsurvey-reports.css') }}?v={{ filemtime(public_path('assets/transsurvey-reports.css')) }}">
     @include('layouts.filters')
     <p class="rs-download-note">PDF berisi ringkasan dan daftar respons. Excel memuat ringkasan serta detail jawaban dan
-        komentar. Hasil unduhan mengikuti filter yang sudah diterapkan.</p>
-    @include('reports.document')
+        komentar. Hasil unduhan mengikuti filter yang sudah diterapkan. Pencarian pada masing-masing tabel hanya mengatur tampilan tabel dan tidak membatasi isi unduhan.</p>
+    @include('reports.document', ['interactiveTables' => true])
 @endsection

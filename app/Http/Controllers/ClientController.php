@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DataTableService;
+
 use App\Models\Client;
 use Illuminate\Http\Request;
 
 class ClientController
 {
-    public function index(Request $r)
+    public function index(Request $r, DataTableService $tables)
     {
         $q = Client::withCount('invitations')->orderBy('name');
+        if ($r->boolean('_table')) return $tables->respond($r, $q, 'clients');
         if ($r->filled('q')) $q->where(fn($x) => $x->where('name', 'like', '%' . $r->input('q') . '%')->orWhere('project', 'like', '%' . $r->input('q') . '%'));
         return view('clients.index', ['clients' => $q->paginate(20)->withQueryString()]);
     }

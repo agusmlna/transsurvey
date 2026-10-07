@@ -145,16 +145,18 @@
     }
     const serverError = document.querySelector('[data-error-message]');
     if (serverError) toast('Data belum tersimpan. Periksa pesan kesalahan pada form.', 'error');
-    document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+    document.addEventListener('click', async event => {
+        const button = event.target.closest('[data-copy]');
+        if (!button) return;
         try { await navigator.clipboard.writeText(button.dataset.copy); toast('Tautan survei berhasil disalin.'); }
         catch { await dialog('Pilih tautan berikut, lalu salin dengan Ctrl+C atau fitur salin di perangkat Anda.', button.dataset.copy); }
-    }));
+    });
 
     // Progressive enhancement: the original select remains the submitted control.
     let selectId = 0, activeSelect = null;
     const controllers = new WeakMap();
     function enhance(select) {
-        if (controllers.has(select) || select.multiple || select.size > 1 || select.closest('template') || select.hasAttribute('data-native-select')) return;
+        if (controllers.has(select) || select.multiple || select.size > 1 || select.closest('template') || select.hasAttribute('data-native-select') || select.closest('.dt-container')) return;
         const labelText = select.labels?.[0] ? [...select.labels[0].childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent.trim()).filter(Boolean).join(' ') : '';
         const label = select.getAttribute('aria-label') || labelText || 'Pilih opsi';
         const wrap = document.createElement('span'); wrap.className = 'ts-select';

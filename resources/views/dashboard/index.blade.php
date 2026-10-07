@@ -106,7 +106,7 @@
                     <h2>Respons terbaru <span class="count">{{ $responses->count() }}</span></h2>
                     <p>Masukan terbaru dari klien Anda</p>
                 </div><a class="text-button" href="{{ route('responses.index', request()->query()) }}">Lihat semua →</a>
-            </div>@include('layouts.response-table', ['rows' => $responses->take(5)])
+            </div>@include('layouts.response-table', ['rows' => $responses])
         </section>
         <section class="follow-card"><span class="follow-symbol">✓</span>
             <h2>Tindak lanjut</h2>
