@@ -30,7 +30,9 @@ class LowRatingNotificationTest extends TestCase
         $response=$this->response([['type'=>'rating','value'=>'3','comment'=>'Mohon lebih cepat.'],['type'=>'rating','value'=>'5'],['type'=>'rating','value'=>'5']]);
         $this->assertGreaterThan(4,$response->score);
         $mail=new SurveyCompletedMail($response,'Admin Uji');$html=$mail->render();
-        $this->assertStringStartsWith('[Perlu tindak lanjut]',$mail->subject);
+        $this->assertSame('Survei selesai: Survei Layanan',$mail->subject);
+        $this->assertStringContainsString('Survei sudah selesai diisi',$html);
+        $this->assertStringContainsString('Catatan untuk ditindaklanjuti',$html);
         $this->assertStringContainsString('1 jawaban rating bernilai di bawah 4',$html);
         $this->assertStringContainsString('Nilai: 3 / 5',$html);
         $this->assertStringContainsString('Mohon lebih cepat.',$html);
@@ -43,7 +45,7 @@ class LowRatingNotificationTest extends TestCase
         $response=$this->response([['type'=>'rating','value'=>'4'],['type'=>'rating','value'=>'5']]);
         $mail=new SurveyCompletedMail($response,'Admin Uji');$html=$mail->render();
         $this->assertSame('Survei selesai: Survei Layanan',$mail->subject);
-        $this->assertStringNotContainsString('Ada rating di bawah standar',$html);
+        $this->assertStringNotContainsString('Catatan untuk ditindaklanjuti',$html);
         $this->assertStringContainsString('Survei sudah selesai diisi',$html);
     }
     public function test_text_choice_and_unanswered_ratings_do_not_trigger_alerts(): void
@@ -51,7 +53,7 @@ class LowRatingNotificationTest extends TestCase
         $response=$this->response([['type'=>'text','value'=>'1'],['type'=>'choice','value'=>'3'],['type'=>'rating','value'=>'']]);
         $mail=new SurveyCompletedMail($response,'Admin Uji');$html=$mail->render();
         $this->assertSame('Survei selesai: Survei Layanan',$mail->subject);
-        $this->assertStringNotContainsString('Ada rating di bawah standar',$html);
+        $this->assertStringNotContainsString('Catatan untuk ditindaklanjuti',$html);
     }
     public function test_all_low_ratings_are_included_and_comments_are_escaped(): void
     {

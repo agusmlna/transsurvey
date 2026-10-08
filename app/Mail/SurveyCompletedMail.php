@@ -19,9 +19,7 @@ class SurveyCompletedMail extends Mailable
             ->orderBy('id')
             ->get();
 
-        $subject = $lowRatings->isNotEmpty()
-            ? '[Perlu tindak lanjut] Rating di bawah 4: '.$this->response->survey->title
-            : 'Survei selesai: '.$this->response->survey->title;
+        $subject = 'Survei selesai: '.$this->response->survey->title;
 
         // Reuse the existing per-response/admin notification and its duplicate protection.
         return $this->subject($subject)

@@ -1,20 +1,14 @@
 <!doctype html>
 <html lang="id">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ $lowRatings->isNotEmpty() ? 'Rating di bawah standar' : 'Survei selesai' }}</title></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Survei selesai</title></head>
 <body style="margin:0;background:#f5f6f8;font-family:Arial,sans-serif;color:#263238;line-height:1.6">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:32px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;margin:auto;background:white;border:1px solid #e5e7eb;border-radius:12px">
 <tr><td style="padding:24px 28px;border-bottom:3px solid #c8102e;font-size:22px;font-weight:bold">Trans<span style="color:#c8102e">Survey</span></td></tr>
 <tr><td style="padding:28px">
 <p style="margin-top:0">Halo {{ $adminName }},</p>
-@if($lowRatings->isNotEmpty())
-<h1 style="font-size:22px;margin:0 0 16px;color:#b42318">Ada rating di bawah standar</h1>
-<p>PIC sudah menyelesaikan survei. Terdapat <strong>{{ $lowRatings->count() }} jawaban rating bernilai di bawah 4</strong> yang perlu diperiksa dan ditindaklanjuti.</p>
-<p style="padding:12px 16px;background:#fff1f2;border-left:4px solid #c8102e;border-radius:4px;font-size:14px">Batas standar: 4 dari 5. Pemberitahuan ini berdasarkan nilai tiap pertanyaan, bukan hanya skor rata-rata survei.</p>
-@else
 <h1 style="font-size:22px;margin:0 0 16px">Survei sudah selesai diisi</h1>
 <p>PIC berikut sudah mengirimkan jawaban survei. Responsnya dapat dilihat di TransSurvey.</p>
-@endif
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f9fafb;border-radius:8px">
 @foreach ([
     'Klien' => $response->client->name,
@@ -27,7 +21,11 @@
 @endforeach
 </table>
 @if($lowRatings->isNotEmpty())
-<h2 style="font-size:17px;margin:24px 0 12px">Ringkasan jawaban yang perlu perhatian</h2>
+<div style="margin:24px 0 16px;padding:16px;background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #ea580c;border-radius:8px">
+    <p style="margin:0 0 6px;font-weight:bold;color:#9a3412">Catatan untuk ditindaklanjuti</p>
+    <p style="margin:0;font-size:14px;color:#7c2d12">Terdapat <strong>{{ $lowRatings->count() }} jawaban rating bernilai di bawah 4</strong>. Mohon tinjau jawaban dan komentar PIC berikut untuk menentukan tindak lanjut yang diperlukan.</p>
+</div>
+<h2 style="font-size:17px;margin:20px 0 12px">Detail rating di bawah standar</h2>
 @foreach($lowRatings as $answer)
 <div style="margin-bottom:12px;padding:16px;border:1px solid #fecdd3;border-radius:8px">
     <p style="margin:0 0 6px;font-size:12px;color:#64748b">{{ $answer->category }}</p>

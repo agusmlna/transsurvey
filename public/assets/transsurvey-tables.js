@@ -1,20 +1,19 @@
 (() => {
     'use strict';
-    if (!window.DataTable) return; // Original HTML and Laravel pagination remain usable.
+    if (!window.DataTable) { window.TransSurveyTableBoot?.finish(); return; }
     DataTable.ext.errMode = 'none';
     const language = {
         search: 'Cari', searchPlaceholder: 'Ketik kata kunci…', lengthMenu: 'Tampilkan _MENU_ baris',
         info: 'Menampilkan _START_–_END_ dari _TOTAL_ data', infoEmpty: 'Menampilkan 0 data',
         infoFiltered: '(dari _MAX_ data sebelum pencarian)', zeroRecords: 'Tidak ada data yang cocok. Coba kata kunci lain.',
-        emptyTable: 'Belum ada data untuk filter ini.', processing: 'Memuat data…', loadingRecords: 'Memuat data…',
+        emptyTable: 'Belum ada data untuk filter ini.', processing: '<span class="ts-table-loading-label">Memuat data…</span>', loadingRecords: 'Memuat data…',
         paginate: { first: 'Awal', previous: '‹', next: '›', last: 'Akhir' },
-        aria: {
-            orderable: 'Urutkan kolom ini', orderableReverse: 'Balik urutan kolom', orderableRemove: 'Hapus pengurutan',
-            paginate: { first: 'Halaman pertama', previous: 'Halaman sebelumnya', next: 'Halaman berikutnya', last: 'Halaman terakhir' }
-        }
+        aria: { orderable: 'Urutkan kolom ini', orderableReverse: 'Balik urutan kolom', orderableRemove: 'Hapus pengurutan',
+            paginate: { first: 'Halaman pertama', previous: 'Halaman sebelumnya', next: 'Halaman berikutnya', last: 'Halaman terakhir' } }
     };
     function decorate(api) {
         const container = api.table().container();
+        if (container.classList.contains('ts-table-container')) return;
         container.classList.add('ts-table-container');
         const table = api.table().node();
         if (!table.parentElement.classList.contains('ts-table-scroll')) {
@@ -23,6 +22,8 @@
             scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', table.getAttribute('aria-label') || 'Tabel data, geser untuk melihat kolom lainnya');
             table.before(scroll); scroll.append(table);
         }
+        const processing = container.querySelector('.dt-processing');
+        if (processing) { processing.setAttribute('role', 'status'); processing.setAttribute('aria-live', 'polite'); }
         container.querySelectorAll('.dt-length select').forEach(select => select.setAttribute('data-native-select', ''));
         container.querySelectorAll('.dt-search input').forEach(input => {
             input.maxLength = 255;
@@ -41,8 +42,17 @@
             ['data-order', 'data-sort', 'data-filter', 'data-search'].forEach(attr => cell.removeAttribute(attr));
         });
         const disabled = [...table.tHead.rows[0].cells].flatMap((th, i) => th.dataset.dtOrder === 'disable' ? [i] : []);
+        // Apply our layout before the first Ajax request, not after it returns.
+        window.jQuery(table).one('preInit.dt.tsTables', (_event, settings) => {
+            decorate(new DataTable.Api(settings));
+        });
+        window.jQuery(table).on('processing.dt.tsTables', (_event, settings, busy) => {
+            table.setAttribute('aria-busy', String(busy));
+            const container = settings.nTableWrapper;
+            if (container) container.classList.toggle('ts-table-busy', busy);
+        });
         return new DataTable(table, {
-            pageLength: 10, lengthMenu: [5, 10, 25, 50, 100], order: [], orderMulti: false,
+            pageLength: 5, lengthMenu: [5, 10, 25, 50, 100], order: [], orderMulti: false,
             autoWidth: false, language,
             layout: { topStart: 'pageLength', topEnd: 'search', bottomStart: 'info', bottomEnd: { paging: { type: 'simple_numbers' } } },
             columnDefs: [{ targets: disabled, orderable: false, searchable: false }],
@@ -75,10 +85,8 @@
                     url.searchParams.set('order[0][dir]', request.order[0].dir);
                 }
                 try {
-                    const response = await fetch(url, {
-                        signal: controller.signal, credentials: 'same-origin',
-                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                    });
+                    const response = await fetch(url, { signal: controller.signal, credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
                     if (!response.ok) throw new Error(response.status === 401 || response.status === 419 ? 'Sesi berakhir. Muat ulang halaman lalu masuk kembali.' : 'Tabel belum berhasil dimuat. Coba lagi atau muat ulang halaman.');
                     const result = await response.json();
                     if (request.draw !== latestDraw) return;
@@ -107,5 +115,6 @@
             try { create(table, table.dataset.serverTable ? serverOptions(table) : {}); }
             catch { window.TransSurveyUI?.toast('Tabel interaktif belum aktif. Muat ulang halaman.', 'error'); }
         });
+        window.TransSurveyTableBoot?.finish();
     });
 })();

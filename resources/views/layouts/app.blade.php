@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="{{ asset('assets/vendor/datatables/dataTables.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('assets/transsurvey-tables.css') }}?v={{ filemtime(public_path('assets/transsurvey-tables.css')) }}">
     @stack('styles')
+    <script src="{{ asset('assets/transsurvey-tables-boot.js') }}"></script>
 </head>
 <body>
     <a class="ts-skip" href="#main-content">Lewati ke konten</a>
