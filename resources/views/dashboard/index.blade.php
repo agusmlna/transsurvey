@@ -2,10 +2,10 @@
 @section('title', 'Dashboard')
 @section('heading', 'Dashboard')
 @section('subtitle', 'Pantau hasil survei, tingkat respons, dan masukan yang perlu ditindaklanjuti.')
-@section('actions')@if (auth()->user()->role === 'admin')
+{{-- @section('actions')@if (auth()->user()->role === 'admin')
     <a class="btn primary" href="{{ route('surveys.create') }}">
         ＋ Buat kuesioner</a>
-@endif @endsection
+@endif @endsection --}}
 @section('content')
     <details class="ts-dashboard-filters no-print" @if(request()->query()) open @endif>
         <summary>Filter dashboard</summary>
