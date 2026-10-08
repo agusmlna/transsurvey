@@ -2024,3 +2024,23 @@ h6,
 .modal-box .answer-detail blockquote {
     font-size: 15px;
 }
+
+.modal-respondent {
+    padding: 14px 26px;
+    background: var(--ts-soft);
+    border-bottom: 1px solid var(--line);
+}
+
+.modal-respondent .eyebrow {
+    margin-bottom: 4px;
+}
+
+.modal-respondent strong {
+    display: block;
+    font-size: 17px;
+    color: var(--ts-dark);
+}
+
+.modal-respondent small {
+    font-size: 14px;
+}
