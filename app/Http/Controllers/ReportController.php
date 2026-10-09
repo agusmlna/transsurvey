@@ -20,7 +20,7 @@ class ReportController
         return response()->streamDownload(function () use ($r, $reports) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Klien', 'Proyek', 'Kuesioner', 'Tanggal', 'Skor', 'Persentase', 'Kategori', 'Pertanyaan', 'Jawaban', 'Komentar'], ',', '"', '');
+            fputcsv($out, [__('Klien'), __('Proyek'), __('Kuesioner'), __('Tanggal'), __('Skor'), __('Persentase'), __('Kategori'), __('Pertanyaan'), __('Jawaban'), __('Komentar')], ',', '"', '');
             $reports->responses($r)->orderBy('id')->chunkById(100, function ($rows) use ($out, $r, $reports) {
                 $reports->applyCategoryScores($rows, $r);
                 foreach ($rows as $row) {
@@ -66,7 +66,7 @@ class ReportController
         }
         $path = tempnam($tmpDir, 'transsurvey-');
         if ($path === false) {
-            throw new \RuntimeException('Tidak dapat membuat file sementara laporan.');
+            throw new \RuntimeException(__('Tidak dapat membuat file sementara laporan.'));
         }
         try {
             $exporter->write($data, $path);
@@ -85,11 +85,11 @@ class ReportController
         $filters = $data['reportFilters'];
 
         $name = collect([
-            'Laporan TransSurvey',
-            $filters['Klien'] ?? null,
-            $filters['Kuesioner'] ?? null,
-            $filters['Kategori'] ?? null,
-            $filters['Periode respons'] ?? null,
+            __('Laporan TransSurvey'),
+            $filters[__('Klien')] ?? null,
+            $filters[__('Kuesioner')] ?? null,
+            $filters[__('Kategori')] ?? null,
+            $filters[__('Periode respons')] ?? null,
         ])
             ->map(fn ($part) => $this->cleanName((string) $part))
             ->filter()

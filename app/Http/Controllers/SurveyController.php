@@ -39,16 +39,16 @@ class SurveyController
     public function store(Request $r)
     {
         $survey = DB::transaction(fn() => $this->persist($r, new Survey(['created_by' => $r->user()->id])));
-        return redirect()->route('surveys.edit', $survey)->with('success', 'Kuesioner berhasil dibuat.');
+        return redirect()->route('surveys.edit', $survey)->with('success', __('Kuesioner berhasil dibuat.'));
     }
     public function update(Request $r, Survey $survey)
     {
         DB::transaction(function () use ($r, $survey) {
             $locked = Survey::lockForUpdate()->findOrFail($survey->id);
-            if ($locked->version !== $r->integer('version')) throw ValidationException::withMessages(['survey' => 'Kuesioner sudah berubah. Muat ulang sebelum menyimpan.']);
+            if ($locked->version !== $r->integer('version')) throw ValidationException::withMessages(['survey' => __('Kuesioner sudah berubah. Muat ulang sebelum menyimpan.')]);
             $this->persist($r, $locked);
         });
-        return back()->with('success', 'Kuesioner berhasil disimpan.');
+        return back()->with('success', __('Kuesioner berhasil disimpan.'));
     }
     private function persist(Request $r, Survey $survey): Survey
     {
@@ -59,7 +59,7 @@ class SurveyController
             $r->validate(['questions' => 'required|array|min:1|max:100', 'questions.*.text' => 'required|string|max:2000', 'questions.*.category' => 'required|string|max:100', 'questions.*.type' => 'required|in:rating,choice,text', 'questions.*.required' => 'nullable|boolean', 'questions.*.options' => 'nullable|string|max:5000']);
             foreach (array_values($r->input('questions')) as $i => $q) {
                 $options = array_values(array_filter(array_map('trim', preg_split('/\R/', $q['options'] ?? '')), fn($x) => $x !== ''));
-                if ($q['type'] === 'choice' && (count($options) < 2 || count($options) !== count(array_unique($options)))) throw ValidationException::withMessages(['questions' => 'Pilihan ganda memerlukan minimal dua opsi yang berbeda.']);
+                if ($q['type'] === 'choice' && (count($options) < 2 || count($options) !== count(array_unique($options)))) throw ValidationException::withMessages(['questions' => __('Pilihan ganda memerlukan minimal dua opsi yang berbeda.')]);
                 $questions[] = ['text' => $q['text'], 'category' => $q['category'], 'type' => $q['type'], 'required' => filter_var($q['required'] ?? false, FILTER_VALIDATE_BOOLEAN), 'options' => $q['type'] === 'choice' ? $options : [], 'position' => $i + 1];
             }
         }
@@ -88,6 +88,6 @@ class SurveyController
             }
             return $copy;
         });
-        return redirect()->route('surveys.edit', $copy)->with('success', 'Salinan dibuat. Silakan sesuaikan periode dan pertanyaannya.');
+        return redirect()->route('surveys.edit', $copy)->with('success', __('Salinan dibuat. Silakan sesuaikan periode dan pertanyaannya.'));
     }
 }

@@ -30,7 +30,7 @@ class ReportPdfExporter
         $font = $pdf->getFontMetrics()->getFont('DejaVu Sans', 'normal');
 
         $canvas->page_text(36, 811, 'TransSurvey | PT Transcosmos Indonesia', $font, 8, [0.40, 0.44, 0.49]);
-        $canvas->page_text(471, 811, 'Halaman {PAGE_NUM}/{PAGE_COUNT}', $font, 8, [0.40, 0.44, 0.49]);
+        $canvas->page_text(471, 811, __('Halaman {PAGE_NUM}/{PAGE_COUNT}'), $font, 8, [0.40, 0.44, 0.49]);
 
         return $pdf->output();
     }

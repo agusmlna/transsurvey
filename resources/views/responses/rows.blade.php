@@ -11,7 +11,7 @@
             @php($low = $r->answers->filter(fn($a) => $a->type === 'rating' && $a->value !== null && $a->value !== '' && (int) $a->value <= 3)->values())
             <td>
                 <button type="button" class="btn" data-modal-open="low-{{ $r->id }}">
-                    Lihat rating rendah ({{ $low->count() }})
+                    {{ __('Lihat rating rendah (') }}{{ $low->count() }})
                 </button>
 
                 <div class="modal-overlay" id="low-{{ $r->id }}" hidden>
@@ -21,11 +21,11 @@
                                 <h2>{{ $r->client->name }}</h2>
                                 <small>{{ $r->survey->title }} · {{ $r->submitted_at->format('d M Y H:i') }}</small>
                             </div>
-                            <button type="button" class="icon-link" data-modal-close aria-label="Tutup">✕</button>
+                            <button type="button" class="icon-link" data-modal-close aria-label="{{ __('Tutup') }}">✕</button>
                         </div>
 
                         <div class="modal-respondent">
-                            <span class="eyebrow">DIISI OLEH</span>
+                            <span class="eyebrow">{{ __('DIISI OLEH') }}</span>
                             <strong>{{ $r->invitation?->recipient_name ?? '—' }}</strong>
                             @if ($r->invitation?->recipient_email)
                                 <small>{{ $r->invitation->recipient_email }}</small>
@@ -43,7 +43,7 @@
                                     @endif
                                 </div>
                             @empty
-                                <div class="empty">Tidak ada rating rendah pada respons ini.</div>
+                                <div class="empty">{{ __('Tidak ada rating rendah pada respons ini.') }}</div>
                             @endforelse
                         </div>
                     </div>
@@ -51,10 +51,10 @@
             </td>
         @endif
 
-        <td><a class="icon-link" aria-label="Detail respons" href="{{ route('responses.show', $r) }}">↗</a></td>
+        <td><a class="icon-link" aria-label="{{ __('Detail respons') }}" href="{{ route('responses.show', $r) }}">↗</a></td>
     </tr>
 @empty
     <tr>
-        <td colspan="{{ $showAction ? 6 : 5 }}" class="empty">Belum ada respons untuk filter ini.</td>
+        <td colspan="{{ $showAction ? 6 : 5 }}" class="empty">{{ __('Belum ada respons untuk filter ini.') }}</td>
     </tr>
 @endforelse

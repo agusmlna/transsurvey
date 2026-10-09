@@ -27,12 +27,12 @@ class ClientController
     public function store(Request $r)
     {
         Client::create($this->data($r));
-        return redirect()->route('clients.index')->with('success', 'Klien berhasil ditambahkan.');
+        return redirect()->route('clients.index')->with('success', __('Klien berhasil ditambahkan.'));
     }
     public function update(Request $r, Client $client)
     {
         $client->update($this->data($r));
-        return redirect()->route('clients.index')->with('success', 'Data klien disimpan. Email pada undangan lama tidak berubah.');
+        return redirect()->route('clients.index')->with('success', __('Data klien disimpan. Email pada undangan lama tidak berubah.'));
     }
     private function data(Request $r)
     {

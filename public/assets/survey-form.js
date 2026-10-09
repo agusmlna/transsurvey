@@ -26,8 +26,8 @@
     const DRAFT_KEY = 'ts-survey-draft-v1';
     const TYPES = {
         rating: 'Rating 1–5',
-        choice: 'Pilihan ganda',
-        text: 'Teks terbuka',
+        choice: window.TransSurveyI18n.t("Pilihan ganda"),
+        text: window.TransSurveyI18n.t("Teks terbuka"),
     };
 
     let step = 1;
@@ -47,7 +47,7 @@
     function formatDate(value) {
         if (!value) return '—';
 
-        return new Date(value + 'T00:00').toLocaleDateString('id-ID', {
+        return new Date(value + 'T00:00').toLocaleDateString(window.TransSurveyI18n.locale === 'en' ? 'en-GB' : 'id-ID', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
@@ -108,11 +108,11 @@
         const start = $('#sw-start');
         const end = $('#sw-end');
 
-        if (!title.value.trim()) return fail(title, 'Judul kuesioner wajib diisi.');
-        if (!start.value) return fail(start, 'Tanggal mulai wajib diisi.');
-        if (!end.value) return fail(end, 'Tanggal selesai wajib diisi.');
+        if (!title.value.trim()) return fail(title, window.TransSurveyI18n.t("Judul kuesioner wajib diisi."));
+        if (!start.value) return fail(start, window.TransSurveyI18n.t("Tanggal mulai wajib diisi."));
+        if (!end.value) return fail(end, window.TransSurveyI18n.t("Tanggal selesai wajib diisi."));
         if (end.value < start.value) {
-            return fail(end, 'Tanggal selesai tidak boleh sebelum tanggal mulai.');
+            return fail(end, window.TransSurveyI18n.t("Tanggal selesai tidak boleh sebelum tanggal mulai."));
         }
         return true;
     }
@@ -123,7 +123,7 @@
 
         const cards = $$('.sw-q', list);
         if (!cards.length) {
-            showAlert('Tambahkan minimal satu pertanyaan.');
+            showAlert(window.TransSurveyI18n.t("Tambahkan minimal satu pertanyaan."));
             return false;
         }
 
@@ -134,17 +134,17 @@
             const options = $('[data-f=options]', card);
 
             if (!text.value.trim()) {
-                return fail(text, `Pertanyaan ${no}: teks pertanyaan wajib diisi.`);
+                return fail(text, window.TransSurveyI18n.t("Pertanyaan :no: teks pertanyaan wajib diisi.", {no}));
             }
             if (!category.value.trim()) {
-                return fail(category, `Pertanyaan ${no}: kategori wajib diisi.`);
+                return fail(category, window.TransSurveyI18n.t("Pertanyaan :no: kategori wajib diisi.", {no}));
             }
 
             if ($('[data-f=type]', card).value === 'choice') {
                 const values = toOptions(options.value);
                 const invalid = values.length < 2 || new Set(values).size !== values.length;
                 if (invalid) {
-                    return fail(options, `Pertanyaan ${no}: isi minimal dua pilihan yang berbeda.`);
+                    return fail(options, window.TransSurveyI18n.t("Pertanyaan :no: isi minimal dua pilihan yang berbeda.", {no}));
                 }
             }
         }
@@ -241,11 +241,11 @@
     function refreshCard(card) {
         const q = readCard(card);
 
-        $('[data-title]', card).textContent = q.text.trim() || 'Pertanyaan baru';
+        $('[data-title]', card).textContent = q.text.trim() || window.TransSurveyI18n.t("Pertanyaan baru");
         $('[data-meta]', card).textContent = [
             TYPES[q.type],
-            q.category.trim() || 'tanpa kategori',
-            q.required ? 'Wajib' : 'Opsional',
+            q.category.trim() || window.TransSurveyI18n.t("tanpa kategori"),
+            q.required ? window.TransSurveyI18n.t("Wajib") : window.TransSurveyI18n.t("Opsional"),
         ].join(' · ');
     }
 
@@ -278,7 +278,7 @@
         });
 
         $('#sw-empty').hidden = cards.length > 0;
-        $('#sw-count-label').textContent = `${cards.length} pertanyaan`;
+        $('#sw-count-label').textContent = window.TransSurveyI18n.t(":count pertanyaan", {count: cards.length});
     }
 
     function addQuestion(q, options) {
@@ -286,7 +286,7 @@
         const opts = Object.assign({ after: null, open: true }, options);
 
         if ($$('.sw-q', list).length >= MAX_QUESTIONS) {
-            showAlert(`Maksimal ${MAX_QUESTIONS} pertanyaan.`);
+            showAlert(window.TransSurveyI18n.t("Maksimal :count pertanyaan.", {count: MAX_QUESTIONS}));
             return null;
         }
 
@@ -350,7 +350,7 @@
                 return;
 
             case 'del':
-                if (!$('[data-f=text]', card).value.trim() || confirm('Hapus pertanyaan ini?')) {
+                if (!$('[data-f=text]', card).value.trim() || confirm(window.TransSurveyI18n.t("Hapus pertanyaan ini?"))) {
                     card.remove();
                 }
                 break;
@@ -410,12 +410,12 @@
         const box = $('#sw-preview');
         box.replaceChildren();
 
-        box.append(make('h4', '', $('#sw-title').value.trim() || 'Judul kuesioner'));
-        box.append(make('p', '', $('#sw-desc').value.trim() || 'Pengantar akan tampil di sini.'));
+        box.append(make('h4', '', $('#sw-title').value.trim() || window.TransSurveyI18n.t("Judul kuesioner")));
+        box.append(make('p', '', $('#sw-desc').value.trim() || window.TransSurveyI18n.t("Pengantar akan tampil di sini.")));
 
         getQuestions().forEach((q, i) => {
             const wrap = make('div', 'sw-pv-q');
-            const label = `${i + 1}. ${q.text.trim() || 'Pertanyaan baru'}${q.required ? ' *' : ''}`;
+            const label = `${i + 1}. ${q.text.trim() || window.TransSurveyI18n.t("Pertanyaan baru")}${q.required ? ' *' : ''}`;
             wrap.append(make('b', '', label));
 
             if (q.type === 'rating') {
@@ -423,7 +423,7 @@
                 [1, 2, 3, 4, 5].forEach((n) => dots.append(make('i', '', n)));
                 wrap.append(dots);
             } else if (q.type === 'choice') {
-                const opts = q.options.length ? q.options : ['Pilihan 1', 'Pilihan 2'];
+                const opts = q.options.length ? q.options : [window.TransSurveyI18n.t("Pilihan 1"), window.TransSurveyI18n.t("Pilihan 2")];
                 opts.forEach((o) => wrap.append(make('span', 'sw-pv-opt', '○ ' + o)));
             } else {
                 wrap.append(make('div', 'sw-pv-txt'));
@@ -442,11 +442,11 @@
             : '';
 
         const rows = [
-            ['Judul', $('#sw-title').value.trim() || '—'],
-            ['Periode', `${formatDate($('#sw-start').value)} – ${formatDate($('#sw-end').value)}`],
+            [window.TransSurveyI18n.t("Judul"), $('#sw-title').value.trim() || '—'],
+            [window.TransSurveyI18n.t("Periode"), `${formatDate($('#sw-start').value)} – ${formatDate($('#sw-end').value)}`],
             ['Status', statusLabel || '—'],
-            ['Template', $('input[type=checkbox][name=is_template]').checked ? 'Ya' : 'Tidak'],
-            ['Jumlah pertanyaan', String(questions.length)],
+            ['Template', $('input[type=checkbox][name=is_template]').checked ? window.TransSurveyI18n.t("Ya") : window.TransSurveyI18n.t("Tidak")],
+            [window.TransSurveyI18n.t("Jumlah pertanyaan"), String(questions.length)],
         ];
 
         const info = $('#sw-review-info');
@@ -460,7 +460,7 @@
             const li = make('li', '', q.text.trim());
             li.append(
                 make('span', 'sw-pill', TYPES[q.type]),
-                make('span', 'sw-pill' + (q.required ? ' req' : ''), q.required ? 'Wajib' : 'Opsional')
+                make('span', 'sw-pill' + (q.required ? ' req' : ''), q.required ? window.TransSurveyI18n.t("Wajib") : window.TransSurveyI18n.t("Opsional"))
             );
             ol.append(li);
         });
@@ -580,7 +580,7 @@
        ========================================================== */
     function init() {
         if (locked) {
-            $('#sw-count-label').textContent = `${initial.length} pertanyaan (dikunci)`;
+            $('#sw-count-label').textContent = window.TransSurveyI18n.t(":count pertanyaan (dikunci)", {count: initial.length});
         } else {
             bindQuestionEditor();
 

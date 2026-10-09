@@ -8,9 +8,9 @@ class ResponseService {
  public function save(Invitation $invitation, array $input, bool $draft=false): ?SurveyResponse {
   return DB::transaction(function() use($invitation,$input,$draft){
    $inv=Invitation::query()->lockForUpdate()->findOrFail($invitation->id);
-   if($inv->completed_at){throw ValidationException::withMessages(['survey'=>'Respons Anda sudah tercatat.']);}
+   if($inv->completed_at){throw ValidationException::withMessages(['survey'=>__('Respons Anda sudah tercatat.')]);}
    $survey=$inv->survey()->firstOrFail();
-   if(!$survey->isOpen()){throw ValidationException::withMessages(['survey'=>'Survei sedang tidak menerima respons.']);}
+   if(!$survey->isOpen()){throw ValidationException::withMessages(['survey'=>__('Survei sedang tidak menerima respons.')]);}
    $questions=$survey->questions; $rules=[];
    foreach($questions as $q){
     $prefix='answers.'.$q->id;
@@ -20,7 +20,7 @@ class ResponseService {
     $low=$q->type==='rating' && in_array((string)data_get($input,$prefix.'.value'),['1','2','3'],true);
     $rules[$prefix.'.comment']=[(!$draft && $low)?'required':'nullable','string','max:5000'];
    }
-   Validator::make($input,$rules,['required'=>'Pertanyaan wajib atau komentar untuk skor 1–3 belum diisi.','in'=>'Pilihan jawaban tidak valid.'])->validate();
+   Validator::make($input,$rules,['required'=>__('Pertanyaan wajib atau komentar untuk skor 1–3 belum diisi.'),'in'=>__('Pilihan jawaban tidak valid.')])->validate();
    $answers=[];$scores=[];$hasLow=false;
    foreach($questions as $q){
     $value=trim((string)data_get($input,'answers.'.$q->id.'.value',''));

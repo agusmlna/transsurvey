@@ -11,9 +11,9 @@
         box.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
         const icon = document.createElement('span'); icon.className = 'ts-toast-icon'; icon.textContent = kind === 'error' ? '!' : '✓'; icon.setAttribute('aria-hidden', 'true');
         const body = document.createElement('div'); body.className = 'ts-toast-body';
-        const title = document.createElement('strong'); title.textContent = kind === 'error' ? 'Perlu diperiksa' : 'Berhasil';
+        const title = document.createElement('strong'); title.textContent = kind === 'error' ? window.TransSurveyI18n.t("Perlu diperiksa") : window.TransSurveyI18n.t("Berhasil");
         const text = document.createElement('p'); text.textContent = message;
-        const close = document.createElement('button'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', 'Tutup pemberitahuan');
+        const close = document.createElement('button'); close.type = 'button'; close.textContent = '×'; close.setAttribute('aria-label', window.TransSurveyI18n.t("Tutup pemberitahuan"));
         close.addEventListener('click', () => { clearTimeout(toastTimer); box.hidden = true; });
         body.append(title, text); box.append(icon, body, close); box.hidden = false;
         const schedule = () => { clearTimeout(toastTimer); if (kind !== 'error') toastTimer = setTimeout(() => { box.hidden = true; }, 6500); };
@@ -52,9 +52,9 @@
     document.querySelectorAll('[data-toggle-password]').forEach(button => button.addEventListener('click', () => {
         const input = document.getElementById(button.dataset.togglePassword); if (!input) return;
         const show = input.type === 'password'; input.type = show ? 'text' : 'password';
-        button.textContent = show ? 'Sembunyikan' : 'Lihat';
+        button.textContent = show ? window.TransSurveyI18n.t("Sembunyikan") : window.TransSurveyI18n.t("Lihat");
         button.setAttribute('aria-pressed', String(show));
-        button.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+        button.setAttribute('aria-label', show ? window.TransSurveyI18n.t("Sembunyikan password") : window.TransSurveyI18n.t("Tampilkan password"));
     }));
     document.querySelectorAll('[data-brand-logo]').forEach(img => {
         const hideMissing = () => { img.hidden = true; };
@@ -72,14 +72,14 @@
             const el = document.createElement('dialog'); el.className = 'ts-dialog';
             const id = 'ts-dialog-' + (++dialogSequence);
             const symbol = document.createElement('span'); symbol.className = 'ts-dialog-symbol'; symbol.textContent = copyValue === undefined ? '?' : '↗'; symbol.setAttribute('aria-hidden', 'true');
-            const title = document.createElement('h2'); title.id = id + '-title'; title.textContent = options.title || (copyValue === undefined ? 'Simpan perubahan?' : 'Salin tautan survei');
+            const title = document.createElement('h2'); title.id = id + '-title'; title.textContent = options.title || (copyValue === undefined ? window.TransSurveyI18n.t("Simpan perubahan?") : window.TransSurveyI18n.t("Salin tautan survei"));
             const description = document.createElement('p'); description.id = id + '-description'; description.textContent = message;
             el.setAttribute('aria-labelledby', title.id); el.setAttribute('aria-describedby', description.id); el.append(symbol, title, description);
             let input;
-            if (copyValue !== undefined) { input = document.createElement('input'); input.value = copyValue; input.readOnly = true; input.setAttribute('aria-label', 'Tautan survei'); el.append(input); }
+            if (copyValue !== undefined) { input = document.createElement('input'); input.value = copyValue; input.readOnly = true; input.setAttribute('aria-label', window.TransSurveyI18n.t("Tautan survei")); el.append(input); }
             const actions = document.createElement('div'); actions.className = 'ts-dialog-actions';
-            const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = copyValue === undefined ? 'Batal' : 'Tutup';
-            const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'btn primary'; confirm.textContent = options.confirmText || 'Ya, simpan';
+            const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = copyValue === undefined ? window.TransSurveyI18n.t("Batal") : window.TransSurveyI18n.t("Tutup");
+            const confirm = document.createElement('button'); confirm.type = 'button'; confirm.className = 'btn primary'; confirm.textContent = options.confirmText || window.TransSurveyI18n.t("Ya, simpan");
             cancel.addEventListener('click', () => el.close('cancel'));
             confirm.addEventListener('click', () => el.close('confirm'));
             actions.append(cancel); if (copyValue === undefined) actions.append(confirm); el.append(actions); document.body.append(el);
@@ -95,7 +95,7 @@
         let indicator;
         if (submitter?.tagName === 'BUTTON') {
             indicator = document.createElement('span'); indicator.className = 'ts-submit-progress';
-            indicator.textContent = form.dataset.busyText || 'Sedang memproses…'; indicator.setAttribute('role', 'status');
+            indicator.textContent = form.dataset.busyText || window.TransSurveyI18n.t("Sedang memproses…"); indicator.setAttribute('role', 'status');
             submitter.after(indicator);
         }
         form.setAttribute('aria-busy', 'true');
@@ -126,8 +126,8 @@
         let ok = false;
         try {
             ok = await dialog(message, undefined, {
-                title: submitter?.dataset.confirmTitle || form.dataset.confirmTitle || 'Konfirmasi tindakan',
-                confirmText: submitter?.dataset.confirmButton || form.dataset.confirmButton || 'Ya, lanjutkan'
+                title: submitter?.dataset.confirmTitle || form.dataset.confirmTitle || window.TransSurveyI18n.t("Konfirmasi tindakan"),
+                confirmText: submitter?.dataset.confirmButton || form.dataset.confirmButton || window.TransSurveyI18n.t("Ya, lanjutkan")
             });
         } finally { pending.delete(form); }
         if (ok && form.isConnected) {
@@ -144,12 +144,12 @@
         if (message) { toast(message); success.hidden = true; }
     }
     const serverError = document.querySelector('[data-error-message]');
-    if (serverError) toast('Data belum tersimpan. Periksa pesan kesalahan pada form.', 'error');
+    if (serverError) toast(window.TransSurveyI18n.t("Data belum tersimpan. Periksa pesan kesalahan pada form."), 'error');
     document.addEventListener('click', async event => {
         const button = event.target.closest('[data-copy]');
         if (!button) return;
-        try { await navigator.clipboard.writeText(button.dataset.copy); toast('Tautan survei berhasil disalin.'); }
-        catch { await dialog('Pilih tautan berikut, lalu salin dengan Ctrl+C atau fitur salin di perangkat Anda.', button.dataset.copy); }
+        try { await navigator.clipboard.writeText(button.dataset.copy); toast(window.TransSurveyI18n.t("Tautan survei berhasil disalin.")); }
+        catch { await dialog(window.TransSurveyI18n.t("Pilih tautan berikut, lalu salin dengan Ctrl+C atau fitur salin di perangkat Anda."), button.dataset.copy); }
     });
 
     // Progressive enhancement: the original select remains the submitted control.
@@ -158,7 +158,7 @@
     function enhance(select) {
         if (controllers.has(select) || select.multiple || select.size > 1 || select.closest('template') || select.hasAttribute('data-native-select') || select.closest('.dt-container')) return;
         const labelText = select.labels?.[0] ? [...select.labels[0].childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent.trim()).filter(Boolean).join(' ') : '';
-        const label = select.getAttribute('aria-label') || labelText || 'Pilih opsi';
+        const label = select.getAttribute('aria-label') || labelText || window.TransSurveyI18n.t("Pilih opsi");
         const wrap = document.createElement('span'); wrap.className = 'ts-select';
         select.before(wrap); wrap.append(select);
         const trigger = document.createElement('button'); trigger.type = 'button'; trigger.className = 'ts-select-trigger';
@@ -170,7 +170,7 @@
         wrap.append(list); trigger.setAttribute('aria-controls', list.id);
         select.classList.add('ts-native-select'); select.tabIndex = -1; select.setAttribute('aria-hidden', 'true');
         let focused = -1, options = [];
-        function sync() { caption.textContent = select.selectedOptions[0]?.textContent || 'Pilih opsi'; trigger.disabled = select.disabled; }
+        function sync() { caption.textContent = select.selectedOptions[0]?.textContent || window.TransSurveyI18n.t("Pilih opsi"); trigger.disabled = select.disabled; }
         function close() { list.hidden = true; trigger.setAttribute('aria-expanded', 'false'); trigger.removeAttribute('aria-activedescendant'); if (activeSelect === controller) activeSelect = null; }
         function position() {
             const rect = trigger.getBoundingClientRect(); const roomBelow = innerHeight - rect.bottom - 12;
@@ -218,7 +218,7 @@
         });
         select.addEventListener('change', sync);
         select.addEventListener('focus', () => trigger.focus());
-        select.addEventListener('invalid', e => { e.preventDefault(); trigger.focus(); trigger.setAttribute('aria-invalid', 'true'); toast('Lengkapi pilihan: ' + label, 'error'); });
+        select.addEventListener('invalid', e => { e.preventDefault(); trigger.focus(); trigger.setAttribute('aria-invalid', 'true'); toast(window.TransSurveyI18n.t("Lengkapi pilihan: ") + label, 'error'); });
         select.addEventListener('change', () => trigger.removeAttribute('aria-invalid'));
         select.form?.addEventListener('reset', () => setTimeout(sync));
     }

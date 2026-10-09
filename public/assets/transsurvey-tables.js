@@ -3,13 +3,13 @@
     if (!window.DataTable) { window.TransSurveyTableBoot?.finish(); return; }
     DataTable.ext.errMode = 'none';
     const language = {
-        search: 'Cari', searchPlaceholder: 'Ketik kata kunci…', lengthMenu: 'Tampilkan _MENU_ baris',
-        info: 'Menampilkan _START_–_END_ dari _TOTAL_ data', infoEmpty: 'Menampilkan 0 data',
-        infoFiltered: '(dari _MAX_ data sebelum pencarian)', zeroRecords: 'Tidak ada data yang cocok. Coba kata kunci lain.',
-        emptyTable: 'Belum ada data untuk filter ini.', processing: '<span class="ts-table-loading-label">Memuat data…</span>', loadingRecords: 'Memuat data…',
-        paginate: { first: 'Awal', previous: '‹', next: '›', last: 'Akhir' },
-        aria: { orderable: 'Urutkan kolom ini', orderableReverse: 'Balik urutan kolom', orderableRemove: 'Hapus pengurutan',
-            paginate: { first: 'Halaman pertama', previous: 'Halaman sebelumnya', next: 'Halaman berikutnya', last: 'Halaman terakhir' } }
+        search: window.TransSurveyI18n.t("Cari"), searchPlaceholder: window.TransSurveyI18n.t("Ketik kata kunci…"), lengthMenu: window.TransSurveyI18n.t("Tampilkan _MENU_ baris"),
+        info: window.TransSurveyI18n.t("Menampilkan _START_–_END_ dari _TOTAL_ data"), infoEmpty: window.TransSurveyI18n.t("Menampilkan 0 data"),
+        infoFiltered: window.TransSurveyI18n.t("(dari _MAX_ data sebelum pencarian)"), zeroRecords: window.TransSurveyI18n.t("Tidak ada data yang cocok. Coba kata kunci lain."),
+        emptyTable: window.TransSurveyI18n.t("Belum ada data untuk filter ini."), processing: '<span class="ts-table-loading-label">' + window.TransSurveyI18n.t("Memuat data…") + '</span>', loadingRecords: window.TransSurveyI18n.t("Memuat data…"),
+        paginate: { first: window.TransSurveyI18n.t("Awal"), previous: '‹', next: '›', last: window.TransSurveyI18n.t("Akhir") },
+        aria: { orderable: window.TransSurveyI18n.t("Urutkan kolom ini"), orderableReverse: window.TransSurveyI18n.t("Balik urutan kolom"), orderableRemove: window.TransSurveyI18n.t("Hapus pengurutan"),
+            paginate: { first: window.TransSurveyI18n.t("Halaman pertama"), previous: window.TransSurveyI18n.t("Halaman sebelumnya"), next: window.TransSurveyI18n.t("Halaman berikutnya"), last: window.TransSurveyI18n.t("Halaman terakhir") } }
     };
     function decorate(api) {
         const container = api.table().container();
@@ -19,7 +19,7 @@
         if (!table.parentElement.classList.contains('ts-table-scroll')) {
             const scroll = document.createElement('div');
             scroll.className = 'ts-table-scroll'; scroll.tabIndex = 0;
-            scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', table.getAttribute('aria-label') || 'Tabel data, geser untuk melihat kolom lainnya');
+            scroll.setAttribute('role', 'region'); scroll.setAttribute('aria-label', table.getAttribute('aria-label') || window.TransSurveyI18n.t("Tabel data, geser untuk melihat kolom lainnya"));
             table.before(scroll); scroll.append(table);
         }
         const processing = container.querySelector('.dt-processing');
@@ -67,7 +67,7 @@
         const notice = document.createElement('div');
         notice.className = 'notice error ts-table-error'; notice.setAttribute('role', 'alert'); notice.hidden = true;
         const text = document.createElement('span');
-        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn'; retry.textContent = 'Coba lagi';
+        const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn'; retry.textContent = window.TransSurveyI18n.t("Coba lagi");
         notice.append(text, retry); table.closest('.table-wrap').before(notice);
         retry.addEventListener('click', () => new DataTable(table).ajax.reload(null, false));
         return {
@@ -87,10 +87,10 @@
                 try {
                     const response = await fetch(url, { signal: controller.signal, credentials: 'same-origin',
                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
-                    if (!response.ok) throw new Error(response.status === 401 || response.status === 419 ? 'Sesi berakhir. Muat ulang halaman lalu masuk kembali.' : 'Tabel belum berhasil dimuat. Coba lagi atau muat ulang halaman.');
+                    if (!response.ok) throw new Error(response.status === 401 || response.status === 419 ? window.TransSurveyI18n.t("Sesi berakhir. Muat ulang halaman lalu masuk kembali.") : window.TransSurveyI18n.t("Tabel belum berhasil dimuat. Coba lagi atau muat ulang halaman."));
                     const result = await response.json();
                     if (request.draw !== latestDraw) return;
-                    if (!Number.isInteger(result.draw) || typeof result.html !== 'string') throw new Error('Respons tabel tidak sesuai. Silakan muat ulang halaman.');
+                    if (!Number.isInteger(result.draw) || typeof result.html !== 'string') throw new Error(window.TransSurveyI18n.t("Respons tabel tidak sesuai. Silakan muat ulang halaman."));
                     const parsed = document.createElement('table');
                     parsed.innerHTML = '<tbody>' + result.html + '</tbody>';
                     const data = [...parsed.tBodies[0].rows]
@@ -101,7 +101,7 @@
                     callback(lastResult);
                 } catch (error) {
                     if (error.name === 'AbortError' || request.draw !== latestDraw) return;
-                    text.textContent = error.message || 'Tabel belum berhasil dimuat.';
+                    text.textContent = error.message || window.TransSurveyI18n.t("Tabel belum berhasil dimuat.");
                     notice.hidden = false;
                     // Keep the last loaded rows visible and explicitly mark failure.
                     callback({ ...lastResult, draw: request.draw });
@@ -113,7 +113,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('table[data-ts-table]').forEach(table => {
             try { create(table, table.dataset.serverTable ? serverOptions(table) : {}); }
-            catch { window.TransSurveyUI?.toast('Tabel interaktif belum aktif. Muat ulang halaman.', 'error'); }
+            catch { window.TransSurveyUI?.toast(window.TransSurveyI18n.t("Tabel interaktif belum aktif. Muat ulang halaman."), 'error'); }
         });
         window.TransSurveyTableBoot?.finish();
     });

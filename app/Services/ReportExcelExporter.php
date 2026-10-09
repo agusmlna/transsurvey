@@ -24,24 +24,24 @@ class ReportExcelExporter
     public function workbook(array $data): Spreadsheet
     {
         $book = new Spreadsheet();
-        $book->getProperties()->setCreator('TransSurvey')->setTitle('Laporan kepuasan klien');
-        $summary = $book->getActiveSheet()->setTitle('Ringkasan');
+        $book->getProperties()->setCreator('TransSurvey')->setTitle(__('Laporan kepuasan klien'));
+        $summary = $book->getActiveSheet()->setTitle(__('Ringkasan'));
         $this->base($summary, [30, 32, 22, 24, 22]);
-        $this->heading($summary, 'Laporan kepuasan klien', 5);
+        $this->heading($summary, __('Laporan kepuasan klien'), 5);
         $row = $this->metadata($summary, $data, 5);
         $summary->mergeCells("A$row:E$row");
         $this->text($summary, "A$row", $data['summaryText']);
         $summary->getStyle("A$row")->getAlignment()->setWrapText(true);
         $summary->getRowDimension($row)->setRowHeight(max(44, 16 * ceil(mb_strlen($data['summaryText']) / 100)));
         $row += 2;
-        $this->header($summary, $row++, ['Indikator', 'Nilai', 'Keterangan', '', '']);
+        $this->header($summary, $row++, [__('Indikator'), __('Nilai'), __('Keterangan'), '', '']);
         foreach ([
-            ['Total respons', $data['responses']->count(), 'Respons pada periode yang dipilih', '0'],
-            ['Undangan pada periode', $data['invCount'], 'Berdasarkan tanggal pembuatan undangan', '0'],
-            ['Undangan selesai', $data['complete'], 'Dari undangan pada periode yang dipilih', '0'],
-            ['Response rate', $data['invCount'] ? $data['rate'] / 100 : null, 'Undangan selesai / undangan pada periode', '0.0%'],
-            ['Skor rata-rata', $data['average'], 'Rata-rata skor respons, skala 1-5', '0.00'],
-            ['Persentase skor', $data['average'] === null ? null : $data['average'] / 5, 'Skor rata-rata / 5', '0.0%'],
+            [__('Total respons'), $data['responses']->count(), __('Respons pada periode yang dipilih'), '0'],
+            [__('Undangan pada periode'), $data['invCount'], __('Berdasarkan tanggal pembuatan undangan'), '0'],
+            [__('Undangan selesai'), $data['complete'], __('Dari undangan pada periode yang dipilih'), '0'],
+            ['Response rate', $data['invCount'] ? $data['rate'] / 100 : null, __('Undangan selesai / undangan pada periode'), '0.0%'],
+            [__('Skor rata-rata'), $data['average'], __('Rata-rata skor respons, skala 1-5'), '0.00'],
+            [__('Persentase skor'), $data['average'] === null ? null : $data['average'] / 5, __('Skor rata-rata / 5'), '0.0%'],
         ] as [$label, $value, $note, $format]) {
             $this->text($summary, "A$row", $label);
             $this->number($summary, "B$row", $value, $format);
@@ -50,7 +50,7 @@ class ReportExcelExporter
             $this->stripe($summary, $row++, 5);
         }
         $row += 2;
-        $this->header($summary, $row++, ['Klien', 'Proyek', 'Respons', 'Skor / 5', 'Persentase']);
+        $this->header($summary, $row++, [__('Klien'), __('Proyek'), __('Respons'), __('Skor / 5'), __('Persentase')]);
         foreach ($data['clientRows'] as $client) {
             $this->text($summary, "A$row", $client['name']);
             $this->text($summary, "B$row", $client['project']);
@@ -61,10 +61,10 @@ class ReportExcelExporter
             $this->stripe($summary, $row++, 5);
         }
         if ($data['clientRows']->isEmpty()) {
-            $this->text($summary, 'A'.$row++, 'Belum ada respons.');
+            $this->text($summary, 'A'.$row++, __('Belum ada respons.'));
         }
         $row += 2;
-        $this->header($summary, $row++, ['Kategori', 'Skor / 5', 'Persentase', '', '']);
+        $this->header($summary, $row++, [__('Kategori'), __('Skor / 5'), __('Persentase'), '', '']);
         foreach ($data['categories'] as $name => $score) {
             $this->text($summary, "A$row", $name);
             $this->number($summary, "B$row", $score, '0.00');
@@ -73,25 +73,25 @@ class ReportExcelExporter
             $this->stripe($summary, $row++, 5);
         }
         if ($data['categories']->isEmpty()) {
-            $this->text($summary, 'A'.$row++, 'Belum ada jawaban rating.');
+            $this->text($summary, 'A'.$row++, __('Belum ada jawaban rating.'));
         }
         $row += 2;
         $summary->mergeCells("A$row:E$row");
-        $this->text($summary, "A$row", 'Skor keseluruhan = rata-rata skor respons. Skor kategori = rata-rata jawaban rating dalam kategori. Teks dan pilihan ganda tidak dihitung. Tanggal respons dan tanggal pembuatan undangan dapat berbeda.');
+        $this->text($summary, "A$row", __('Skor keseluruhan = rata-rata skor respons. Skor kategori = rata-rata jawaban rating dalam kategori. Teks dan pilihan ganda tidak dihitung. Tanggal respons dan tanggal pembuatan undangan dapat berbeda.'));
         $summary->getRowDimension($row)->setRowHeight(48);
         // $summary->freezePane('A15');
         $summary->getPageSetup()->setPrintArea("A1:E$row");
 
-        $detail = $book->createSheet()->setTitle('Detail Jawaban');
+        $detail = $book->createSheet()->setTitle(__('Detail Jawaban'));
         $this->base($detail, [14, 27, 24, 30, 23, 14, 16, 25, 18, 58, 42, 58]);
-        $this->heading($detail, 'Detail jawaban survei', 12);
+        $this->heading($detail, __('Detail jawaban survei'), 12);
         $row = $this->metadata($detail, $data, 12);
         $detail->mergeCells("A$row:L$row");
-        $this->text($detail, "A$row", 'Satu baris mewakili satu jawaban. ID respons yang sama berarti jawaban berasal dari satu pengisian survei. Tanggal menggunakan WIB.');
+        $this->text($detail, "A$row", __('Satu baris mewakili satu jawaban. ID respons yang sama berarti jawaban berasal dari satu pengisian survei. Tanggal menggunakan WIB.'));
         $detail->getRowDimension($row)->setRowHeight(28);
         $row += 2;
         $headerRow = $row;
-        $this->header($detail, $row++, ['ID Respons', 'Klien', 'Proyek', 'Kuesioner', 'Tanggal respons (WIB)', 'Skor respons', 'Persentase skor', 'Kategori', 'Jenis pertanyaan', 'Pertanyaan', 'Jawaban', 'Komentar']);
+        $this->header($detail, $row++, [__('ID Respons'), __('Klien'), __('Proyek'), __('Kuesioner'), __('Tanggal respons (WIB)'), __('Skor respons'), __('Persentase skor'), __('Kategori'), __('Jenis pertanyaan'), __('Pertanyaan'), __('Jawaban'), __('Komentar')]);
         foreach ($data['responses'] as $response) {
             // Responses without answers remain represented; do not silently lose them.
             $answers = $response->answers->isEmpty() ? [null] : $response->answers;
@@ -99,7 +99,7 @@ class ReportExcelExporter
                 $cells = [
                     'A' => (string) $response->id, 'B' => $response->client?->name,
                     'C' => $response->client?->project, 'D' => $response->survey?->title,
-                    'H' => $answer?->category, 'I' => ['rating' => 'Skala 1-5', 'choice' => 'Pilihan ganda', 'text' => 'Teks'][$answer?->type] ?? ($answer?->type ?? ''), 'J' => $answer?->question_text,
+                    'H' => $answer?->category, 'I' => ['rating' => __('Skala 1-5'), 'choice' => __('Pilihan ganda'), 'text' => __('Teks')][$answer?->type] ?? ($answer?->type ?? ''), 'J' => $answer?->question_text,
                     'K' => $answer?->value, 'L' => $answer?->comment,
                 ];
                 foreach ($cells as $column => $value) {
@@ -124,7 +124,7 @@ class ReportExcelExporter
         // $detail->freezePane('C'.($headerRow + 1));
         if ($row === $headerRow + 1) {
             $detail->mergeCells("A$row:L$row");
-            $this->text($detail, "A$row", 'Belum ada respons yang sesuai dengan filter laporan ini.');
+            $this->text($detail, "A$row", __('Belum ada respons yang sesuai dengan filter laporan ini.'));
         }
         $detail->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($headerRow, $headerRow);
         $detail->getPageSetup()->setPrintArea("A1:L$row");
@@ -141,7 +141,7 @@ class ReportExcelExporter
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i + 1))->setWidth($width);
         }
         $sheet->getPageSetup()->setPaperSize(PageSetup::PAPERSIZE_A4)->setOrientation(PageSetup::ORIENTATION_LANDSCAPE)->setFitToWidth(1)->setFitToHeight(0);
-        $sheet->getHeaderFooter()->setOddFooter('&LTransSurvey&RHalaman &P / &N');
+        $sheet->getHeaderFooter()->setOddFooter('&LTransSurvey&R'.__('Halaman').' &P / &N');
     }
 
     private function heading(Worksheet $sheet, string $title, int $columns): void
@@ -162,7 +162,7 @@ class ReportExcelExporter
     {
         $end = Coordinate::stringFromColumnIndex($columns);
         $row = 5;
-        foreach ($data['reportFilters'] + ['Dibuat (WIB)' => $data['generatedAt']->format('d/m/Y H:i')] as $label => $value) {
+        foreach ($data['reportFilters'] + [__('Dibuat (WIB)') => $data['generatedAt']->format('d/m/Y H:i')] as $label => $value) {
             $this->text($sheet, "A$row", $label);
             $sheet->mergeCells("B$row:$end$row");
             $this->text($sheet, "B$row", $value);
