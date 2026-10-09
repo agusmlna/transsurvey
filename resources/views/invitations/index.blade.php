@@ -1,35 +1,34 @@
 @extends('layouts.app')
-@section('title', 'Undangan')
-@section('heading', 'Undangan & pengingat')
-@section('subtitle', 'Buat undangan survei dan kirim email ke PIC klien.')
+@section('title', __('Undangan'))
+@section('heading', __('Undangan & pengingat'))
+@section('subtitle', __('Buat undangan survei dan kirim email ke PIC klien.'))
 @section('content')
     @php
         $emailEnabled = config('survey.email_enabled') && config('mail.default') === 'smtp';
     @endphp
     @if (!$emailEnabled)
         <div class="notice">
-            Pengiriman email belum diaktifkan. Anda tetap dapat menyalin tautan survei. Hubungi administrator untuk
-            mengaktifkan email.</div>
+            {{ __('Pengiriman email belum diaktifkan. Anda tetap dapat menyalin tautan survei. Hubungi administrator untuk mengaktifkan email.') }}</div>
     @endif
     <details class="panel distribution-form">
-        <summary>＋ Buat undangan survei</summary>
+        <summary>{{ __('＋ Buat undangan survei') }}</summary>
         <form action="{{ route('invitations.store') }}" method="post"
-            data-confirm="Buat tautan undangan untuk klien yang dipilih? Email belum dikirim pada langkah ini."
-            data-confirm-title="Buat undangan?" data-confirm-button="Ya, buat undangan"
-            data-busy-text="Sedang membuat undangan…">
+            data-confirm="{{ __('Buat tautan undangan untuk klien yang dipilih? Email belum dikirim pada langkah ini.') }}"
+            data-confirm-title="{{ __('Buat undangan?') }}" data-confirm-button="{{ __('Ya, buat undangan') }}"
+            data-busy-text="{{ __('Sedang membuat undangan…') }}">
             @csrf
-            <label>Kuesioner aktif<select name="survey_id" required>
-                    <option value="">Pilih kuesioner</option>
+            <label>{{ __('Kuesioner aktif') }}<select name="survey_id" required>
+                    <option value="">{{ __('Pilih kuesioner') }}</option>
                     @foreach ($surveys as $s)
                         <option value="{{ $s->id }}">{{ $s->title }}</option>
                     @endforeach
                 </select>
             </label>
             <fieldset>
-                <legend>Klien penerima (pilih satu atau lebih)</legend>
+                <legend>{{ __('Klien penerima (pilih satu atau lebih)') }}</legend>
 
                 @if ($clients->isEmpty())
-                    <p>Belum ada klien aktif.</p>
+                    <p>{{ __('Belum ada klien aktif.') }}</p>
                 @else
                     <div class="client-table-wrap">
                         <table id="client-table" class="display" style="width:100%"
@@ -37,18 +36,18 @@
                             <thead>
                                 <tr>
                                     <th><input type="checkbox" id="client-check-all"
-                                            aria-label="Pilih semua klien hasil pencarian, lintas halaman"></th>
-                                    <th>Klien</th>
+                                            aria-label="{{ __('Pilih semua klien hasil pencarian, lintas halaman') }}"></th>
+                                    <th>{{ __('Klien') }}</th>
                                     <th>PIC</th>
                                     <th>Email</th>
-                                    <th>Proyek</th>
+                                    <th>{{ __('Proyek') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach ($clients as $c)
                                     <tr>
                                         <td><input type="checkbox" class="client-check" value="{{ $c->id }}"
-                                                aria-label="Pilih {{ $c->name }}"></td>
+                                                aria-label="{{ __('Pilih') }} {{ $c->name }}"></td>
                                         <td>{{ $c->name }}</td>
                                         <td>{{ $c->contact }}</td>
                                         <td>{{ $c->email }}</td>
@@ -58,41 +57,40 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="footnote"><span id="client-selected-count">0 klien dipilih</span> · maksimal 100 klien per
-                        pembuatan.</p>
+                    <p class="footnote"><span id="client-selected-count">{{ __('0 klien dipilih') }}</span> {{ __('· maksimal 100 klien per pembuatan.') }}</p>
                     <div id="client-hidden"></div>
                 @endif
             </fieldset>
-            <button class="btn primary">Buat tautan unik</button>
-            <p class="footnote">Setelah undangan dibuat, klik Kirim email pada baris PIC yang dituju.</p>
+            <button class="btn primary">{{ __('Buat tautan unik') }}</button>
+            <p class="footnote">{{ __('Setelah undangan dibuat, klik Kirim email pada baris PIC yang dituju.') }}</p>
         </form>
     </details>
     <div class="list-toolbar">
         <div class="tabs"><a href="{{ route('invitations.index') }}"
-                class="{{ !request('status') ? 'selected' : '' }}">Semua</a><a
+                class="{{ !request('status') ? 'selected' : '' }}">{{ __('Semua') }}</a><a
                 href="{{ route('invitations.index', ['status' => 'pending']) }}"
-                class="{{ request('status') === 'pending' ? 'selected' : '' }}">Belum selesai</a><a
+                class="{{ request('status') === 'pending' ? 'selected' : '' }}">{{ __('Belum selesai') }}</a><a
                 href="{{ route('invitations.index', ['status' => 'completed']) }}"
-                class="{{ request('status') === 'completed' ? 'selected' : '' }}">Selesai</a></div>
+                class="{{ request('status') === 'completed' ? 'selected' : '' }}">{{ __('Selesai') }}</a></div>
     </div>
     <section class="panel">
         <div class="panel-heading">
             <div>
-                <h2>Email & reminder</h2>
-                <p>Periksa alamat penerima, lalu kirim undangan atau pengingat.</p>
+                <h2>{{ __('Email & reminder') }}</h2>
+                <p>{{ __('Periksa alamat penerima, lalu kirim undangan atau pengingat.') }}</p>
             </div>
         </div>
         <div class="table-wrap">
-            <table id="invitations-table" class="ts-data-table" data-ts-table data-server-table="invitations" data-search="{{ request('q', '') }}" aria-label="Daftar undangan">
+            <table id="invitations-table" class="ts-data-table" data-ts-table data-server-table="invitations" data-search="{{ request('q', '') }}" aria-label="{{ __('Daftar undangan') }}">
                 <thead>
                     <tr>
-                        <th>Klien / survei</th>
-                        <th>PIC penerima</th>
-                        <th>Pengisian</th>
-                        <th data-dt-order="disable">Email terakhir</th>
+                        <th>{{ __('Klien / survei') }}</th>
+                        <th>{{ __('PIC penerima') }}</th>
+                        <th>{{ __('Pengisian') }}</th>
+                        <th data-dt-order="disable">{{ __('Email terakhir') }}</th>
                         <th>Reminder</th>
-                        <th data-dt-order="disable">Kirim email</th>
-                        <th data-dt-order="disable">Tautan</th>
+                        <th data-dt-order="disable">{{ __('Kirim email') }}</th>
+                        <th data-dt-order="disable">{{ __('Tautan') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -101,9 +99,7 @@
             </table>
         </div>
     </section>
-    <p class="footnote">Email dikirim ke alamat PIC yang tersimpan pada undangan. Setelah konfirmasi, email masuk antrean.
-        Muat ulang halaman untuk melihat status terbaru. Status Terkirim berarti pesan diterima server email, bukan
-        konfirmasi bahwa email sudah dibaca.</p>
+    <p class="footnote">{{ __('Email dikirim ke alamat PIC yang tersimpan pada undangan. Setelah konfirmasi, email masuk antrean. Muat ulang halaman untuk melihat status terbaru. Status Terkirim berarti pesan diterima server email, bukan konfirmasi bahwa email sudah dibaca.') }}</p>
     <div data-table-fallback="invitations-table">{{ $invitations->links() }}</div>
 @endsection
 @push('scripts')
@@ -137,7 +133,7 @@
             }
 
             function refreshState() {
-                counter.textContent = selected.size + ' klien dipilih';
+                counter.textContent = window.TransSurveyI18n.t(':count klien dipilih', {count: selected.size});
                 var boxes = filteredBoxes();
                 var checked = boxes.filter(function (b) { return selected.has(b.value); }).length;
                 checkAll.checked = boxes.length > 0 && checked === boxes.length;
@@ -182,7 +178,7 @@
                 if (!selected.size || selected.size > 100) {
                     e.preventDefault();
                     e.stopImmediatePropagation();
-                    window.TransSurveyUI.toast(!selected.size ? 'Pilih minimal satu klien.' : 'Maksimal 100 klien per pembuatan undangan.', 'error');
+                    window.TransSurveyUI.toast(!selected.size ? window.TransSurveyI18n.t("Pilih minimal satu klien.") : window.TransSurveyI18n.t("Maksimal 100 klien per pembuatan undangan."), 'error');
                 }
             }, true);
 

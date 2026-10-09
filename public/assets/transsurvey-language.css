@@ -1,0 +1,11 @@
+.ts-language-switch{display:inline-flex;align-items:center;gap:3px;padding:4px;margin:0;border:1px solid #e2e8f0;border-radius:999px;background:#fff;flex-shrink:0;line-height:1.2}
+.ts-language-switch button{appearance:none;border:0;border-radius:999px;background:transparent;color:#526075;font:inherit;font-size:12px;font-weight:700;letter-spacing:.03em;min-width:38px;min-height:30px;padding:6px 10px;cursor:pointer}
+.ts-language-switch button[aria-pressed="true"]{background:#c8102e;color:#fff;opacity:1;cursor:default}
+.ts-language-switch button:hover:not(:disabled){background:#fff0f2;color:#a30d27}
+.ts-language-switch button:focus-visible{outline:2px solid #c8102e;outline-offset:3px}
+.ts-language-row{display:flex;justify-content:flex-end;margin-bottom:22px}
+.topbar-meta .ts-language-switch{margin-right:8px}
+.survey-top>.ts-language-switch{margin-left:auto}
+.ts-access-card>.ts-language-row{margin-bottom:16px}
+@media(max-width:600px){.topbar{gap:8px}.topbar-meta{gap:4px}.topbar-meta>span:first-of-type{display:none}.ts-language-switch button{min-width:34px;padding:6px 8px}.survey-top{flex-wrap:wrap;gap:12px}}
+@media print{.ts-language-switch,.ts-language-row{display:none!important}}

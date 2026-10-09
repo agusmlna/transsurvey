@@ -1,15 +1,15 @@
 @php($showAction = $showAction ?? false)
 <div class="table-wrap">
     <table id="{{ $showAction ? 'responses-table' : 'recent-responses-table' }}" class="ts-data-table" data-ts-table
-        @if ($showAction) data-server-table="responses" @endif aria-label="Daftar respons">
+        @if ($showAction) data-server-table="responses" @endif aria-label="{{ __('Daftar respons') }}">
         <thead>
             <tr>
-                <th>Klien / proyek</th>
-                <th>Kuesioner</th>
-                <th>Skor</th>
-                <th>Tanggal</th>
+                <th>{{ __('Klien / proyek') }}</th>
+                <th>{{ __('Kuesioner') }}</th>
+                <th>{{ __('Skor') }}</th>
+                <th>{{ __('Tanggal') }}</th>
                 @if ($showAction)
-                    <th data-dt-order="disable">Tindakan</th>
+                    <th data-dt-order="disable">{{ __('Tindakan') }}</th>
                 @endif
                 <th data-dt-order="disable">Detail</th>
             </tr>

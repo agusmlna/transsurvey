@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="id">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="utf-8">
-    <title>Laporan kepuasan klien - TransSurvey</title>
+    <title>{{ __('Laporan kepuasan klien - TransSurvey') }}</title>
     <style>
         {!! file_get_contents(public_path('assets/transsurvey-reports.css')) !!} @page {
             margin: 32px 36px 52px;

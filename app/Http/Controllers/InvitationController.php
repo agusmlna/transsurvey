@@ -26,7 +26,7 @@ class InvitationController
         $v = $r->validate(['survey_id' => 'required|exists:surveys,id', 'client_ids' => 'required|array|min:1|max:100', 'client_ids.*' => 'required|integer|distinct|exists:clients,id']);
         $count = DB::transaction(function () use ($v) {
             $survey = Survey::lockForUpdate()->findOrFail($v['survey_id']);
-            if ($survey->status !== 'active' || $survey->ends_at->endOfDay()->isPast()) throw ValidationException::withMessages(['survey_id' => 'Pilih survei aktif yang belum berakhir.']);
+            if ($survey->status !== 'active' || $survey->ends_at->endOfDay()->isPast()) throw ValidationException::withMessages(['survey_id' => __('Pilih survei aktif yang belum berakhir.')]);
             $created = 0;
             foreach ($v['client_ids'] as $id) {
                 if (Invitation::where('survey_id', $survey->id)->where('client_id', $id)->exists()) continue;
@@ -37,20 +37,20 @@ class InvitationController
             }
             return $created;
         });
-        return back()->with('success', "{$count} undangan baru dibuat; undangan yang sudah ada dilewati. Salin tautan atau klik Kirim email setelah memeriksa penerima.");
+        return back()->with('success', __(':count undangan baru dibuat; undangan yang sudah ada dilewati. Salin tautan atau klik Kirim email setelah memeriksa penerima.', ['count' => $count]));
     }
     public function send(Invitation $invitation, DeliveryService $delivery)
     {
-        if (!$invitation->survey->isOpen()) throw ValidationException::withMessages(['mail' => 'Email hanya dapat dikirim dalam periode survei aktif.']);
-        if ($invitation->sent_at) throw ValidationException::withMessages(['mail' => 'Undangan pertama sudah dikirim. Gunakan tombol Kirim reminder ke PIC.']);
+        if (!$invitation->survey->isOpen()) throw ValidationException::withMessages(['mail' => __('Email hanya dapat dikirim dalam periode survei aktif.')]);
+        if ($invitation->sent_at) throw ValidationException::withMessages(['mail' => __('Undangan pertama sudah dikirim. Gunakan tombol Kirim reminder ke PIC.')]);
         $delivery->enqueue($invitation, 'invitation');
-        return back()->with('success', 'Email masuk antrean. Pantau status pengiriman di daftar undangan.');
+        return back()->with('success', __('Email masuk antrean. Pantau status pengiriman di daftar undangan.'));
     }
     public function remind(Invitation $invitation, DeliveryService $delivery)
     {
-        if (!$invitation->sent_at) throw ValidationException::withMessages(['mail' => 'Kirim email undangan pertama terlebih dahulu.']);
-        if (!$invitation->survey->isOpen()) throw ValidationException::withMessages(['mail' => 'Reminder hanya dapat dikirim dalam periode survei aktif.']);
+        if (!$invitation->sent_at) throw ValidationException::withMessages(['mail' => __('Kirim email undangan pertama terlebih dahulu.')]);
+        if (!$invitation->survey->isOpen()) throw ValidationException::withMessages(['mail' => __('Reminder hanya dapat dikirim dalam periode survei aktif.')]);
         $delivery->enqueue($invitation, 'reminder');
-        return back()->with('success', 'Reminder masuk antrean untuk PIC yang tercantum pada undangan.');
+        return back()->with('success', __('Reminder masuk antrean untuk PIC yang tercantum pada undangan.'));
     }
 }

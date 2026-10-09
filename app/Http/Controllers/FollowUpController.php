@@ -27,12 +27,12 @@ class FollowUpController
         $v = $r->validate(['assigned_to' => 'required|exists:users,id', 'due_at' => 'required|date_format:Y-m-d', 'status' => 'required|in:open,in_progress,resolved', 'notes' => 'nullable|required_if:status,resolved|string|max:10000', 'version' => 'required|integer']);
         DB::transaction(function () use ($v, $followup) {
             $f = FollowUp::lockForUpdate()->findOrFail($followup->id);
-            if ($f->version !== (int)$v['version']) throw ValidationException::withMessages(['followup' => 'Data berubah. Muat ulang halaman.']);
+            if ($f->version !== (int)$v['version']) throw ValidationException::withMessages(['followup' => __('Data berubah. Muat ulang halaman.')]);
             $f->fill($v);
             $f->version++;
             $f->resolved_at = $v['status'] === 'resolved' ? ($f->resolved_at ?? now()) : null;
             $f->save();
         });
-        return redirect()->route('followups.index')->with('success', 'Tindak lanjut diperbarui.');
+        return redirect()->route('followups.index')->with('success', __('Tindak lanjut diperbarui.'));
     }
 }

@@ -87,12 +87,12 @@ class PublicSurveyController
             || ! Hash::check($code, $invitation->access_code_hash)) {
             // Do not flash the access code back into session/HTML.
             return redirect()->route('survey.public', $token)
-                ->withErrors(['access_code' => 'Kode tidak sesuai. Periksa 6 angka pada email undangan Anda.']);
+                ->withErrors(['access_code' => __('Kode tidak sesuai. Periksa 6 angka pada email undangan Anda.')]);
         }
 
         RateLimiter::clear($invitationKey);
         $access->grant($request, $invitation);
-        return redirect()->route('survey.public', $token)->with('success', 'Kode terverifikasi. Silakan isi survei.');
+        return redirect()->route('survey.public', $token)->with('success', __('Kode terverifikasi. Silakan isi survei.'));
     }
 
     public function submit(Request $request, string $token, ResponseService $service, SurveyAccessService $access)
@@ -101,12 +101,12 @@ class PublicSurveyController
         if ($invitation->completed_at || ! $invitation->survey->isOpen()) {
             $access->forget($request, $invitation);
             return redirect()->route('survey.public', $token)
-                ->withErrors(['survey' => 'Survei sudah selesai atau sedang tidak menerima respons.']);
+                ->withErrors(['survey' => __('Survei sudah selesai atau sedang tidak menerima respons.')]);
         }
 
         if (! $access->isVerified($request, $invitation)) {
             return redirect()->route('survey.public', $token)
-                ->withErrors(['access_code' => 'Masukkan kode dari email sebelum menyimpan atau mengirim jawaban.']);
+                ->withErrors(['access_code' => __('Masukkan kode dari email sebelum menyimpan atau mengirim jawaban.')]);
         }
 
         $request->validate(['action' => 'required|in:draft,submit', 'answers' => 'nullable|array']);
@@ -114,7 +114,7 @@ class PublicSurveyController
         $service->save($invitation, $request->only('answers'), $draft);
         if ($draft) {
             return redirect()->route('survey.public', $token)
-                ->with('success', 'Draf tersimpan. Buka tautan yang sama untuk melanjutkan.');
+                ->with('success', __('Draf tersimpan. Buka tautan yang sama untuk melanjutkan.'));
         }
 
         $access->forget($request, $invitation);

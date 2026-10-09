@@ -14,6 +14,9 @@ use App\Http\Controllers\{
 };
 use Illuminate\Support\Facades\Route;
 
+Route::post('/language', [App\Http\Controllers\LanguageController::class, 'update'])
+    ->name('language.update');
+
 /*
 |--------------------------------------------------------------------------
 | Guest Routes

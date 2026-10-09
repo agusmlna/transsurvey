@@ -1,9 +1,9 @@
 <form method="get" class="ts-filters no-print">
     <div class="ts-filter-main">
         <label>
-            Klien
+            {{ __('Klien') }}
             <select name="client_id">
-                <option value="">Semua klien</option>
+                <option value="">{{ __('Semua klien') }}</option>
 
                 @foreach ($clients as $client)
                     <option
@@ -17,9 +17,9 @@
         </label>
 
         <label>
-            Kuesioner
+            {{ __('Kuesioner') }}
             <select name="survey_id">
-                <option value="">Semua kuesioner</option>
+                <option value="">{{ __('Semua kuesioner') }}</option>
 
                 @foreach ($surveys as $survey)
                     <option
@@ -33,7 +33,7 @@
         </label>
 
         <label>
-            Dari tanggal
+            {{ __('Dari tanggal') }}
             <input
                 type="date"
                 name="from"
@@ -42,7 +42,7 @@
         </label>
 
         <label>
-            Sampai tanggal
+            {{ __('Sampai tanggal') }}
             <input
                 type="date"
                 name="to"
@@ -55,14 +55,14 @@
         class="ts-filter-extra"
         @if(request()->filled('project') || request()->filled('source') || request()->filled('category')) open @endif
     >
-        <summary>Filter lainnya: kategori, proyek, dan sumber data</summary>
+        <summary>{{ __('Filter lainnya: kategori, proyek, dan sumber data') }}</summary>
 
         <div class="ts-filter-secondary">
             @isset($categoryOptions)
                 <label>
-                    Kategori
+                    {{ __('Kategori') }}
                     <select name="category">
-                        <option value="">Semua kategori</option>
+                        <option value="">{{ __('Semua kategori') }}</option>
 
                         @foreach ($categoryOptions as $category)
                             <option
@@ -77,9 +77,9 @@
             @endisset
 
             <label>
-                Proyek
+                {{ __('Proyek') }}
                 <select name="project">
-                    <option value="">Semua proyek</option>
+                    <option value="">{{ __('Semua proyek') }}</option>
 
                     @foreach ($clients->pluck('project')->unique()->sort() as $project)
                         <option
@@ -93,14 +93,14 @@
             </label>
 
             <label>
-                Sumber data
+                {{ __('Sumber data') }}
                 <select name="source">
-                    <option value="">Semua data</option>
+                    <option value="">{{ __('Semua data') }}</option>
                     <option value="real" @selected(request('source') === 'real')>
-                        Operasional
+                        {{ __('Operasional') }}
                     </option>
                     <option value="demo" @selected(request('source') === 'demo')>
-                        Contoh
+                        {{ __('Contoh') }}
                     </option>
                 </select>
             </label>
@@ -109,7 +109,7 @@
 
     <div class="ts-filter-actions">
         <button type="submit" class="btn primary">
-            Terapkan filter
+            {{ __('Terapkan filter') }}
         </button>
 
         <a class="text-button" href="{{ url()->current() }}">

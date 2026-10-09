@@ -9,9 +9,9 @@
             <td class="rs-brand"><strong>TransSurvey</strong><span>CLIENT SATISFACTION</span></td>
         </tr>
     </table>
-    <div class="rs-title"><span class="rs-eyebrow">HASIL SURVEI</span>
-        <h1>Laporan kepuasan klien</h1>
-        <p>Dibuat {{ $generatedAt->format('d/m/Y H:i') }} WIB</p>
+    <div class="rs-title"><span class="rs-eyebrow">{{ __('HASIL SURVEI') }}</span>
+        <h1>{{ __('Laporan kepuasan klien') }}</h1>
+        <p>{{ __('Dibuat') }} {{ $generatedAt->format('d/m/Y H:i') }} WIB</p>
     </div>
     <table class="rs-meta">
         <tbody>
@@ -25,32 +25,28 @@
     </table>
     <table class="rs-metrics">
         <tr>
-            <td><span>Total respons</span><strong>{{ $responses->count() }}</strong><small>Pada periode yang
-                    dipilih</small></td>
+            <td><span>{{ __('Total respons') }}</span><strong>{{ $responses->count() }}</strong><small>{{ __('Pada periode yang dipilih') }}</small></td>
             <td><span>Response
                     rate</span><strong>{{ $invCount ? number_format($rate, 0, ',', '.') . '%' : '-' }}</strong><small>{{ $complete }}
-                    dari {{ $invCount }} undangan</small></td>
-            <td><span>Skor
-                    rata-rata</span><strong>{{ $average === null ? '-' : number_format($average, 2, ',', '.') }}<em> /
-                        5</em></strong><small>Rata-rata skor respons</small></td>
-            <td class="rs-highlight"><span>Persentase
-                    skor</span><strong>{{ $average === null ? '-' : number_format(($average / 5) * 100, 1, ',', '.') . '%' }}</strong><small>Skor
-                    rata-rata dibagi 5</small></td>
+                    {{ __('dari') }} {{ $invCount }} {{ __('undangan') }}</small></td>
+            <td><span>{{ __('Skor rata-rata') }}</span><strong>{{ $average === null ? '-' : number_format($average, 2, ',', '.') }}<em> /
+                        5</em></strong><small>{{ __('Rata-rata skor respons') }}</small></td>
+            <td class="rs-highlight"><span>{{ __('Persentase skor') }}</span><strong>{{ $average === null ? '-' : number_format(($average / 5) * 100, 1, ',', '.') . '%' }}</strong><small>{{ __('Skor rata-rata dibagi 5') }}</small></td>
         </tr>
     </table>
     <section class="rs-summary">
-        <h2>Ringkasan hasil</h2>
+        <h2>{{ __('Ringkasan hasil') }}</h2>
         <p>{{ $summaryText }}</p>
     </section>
-    <h2 class="rs-section-title">Kepuasan per klien</h2>
+    <h2 class="rs-section-title">{{ __('Kepuasan per klien') }}</h2>
     <table class="rs-table" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
-                <th style="width:29%">Klien</th>
-                <th style="width:26%">Proyek</th>
-                <th class="rs-num">Respons</th>
-                <th class="rs-num">Skor / 5</th>
-                <th class="rs-num">Persentase</th>
+                <th style="width:29%">{{ __('Klien') }}</th>
+                <th style="width:26%">{{ __('Proyek') }}</th>
+                <th class="rs-num">{{ __('Respons') }}</th>
+                <th class="rs-num">{{ __('Skor / 5') }}</th>
+                <th class="rs-num">{{ __('Persentase') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -66,18 +62,18 @@
                     </td>
                 </tr>
             @empty<tr>
-                    <td colspan="5" class="rs-empty">Belum ada respons pada filter ini.</td>
+                    <td colspan="5" class="rs-empty">{{ __('Belum ada respons pada filter ini.') }}</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
-    <h2 class="rs-section-title">Skor per kategori</h2>
+    <h2 class="rs-section-title">{{ __('Skor per kategori') }}</h2>
     <table class="rs-table rs-categories" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
-                <th style="width:40%">Kategori</th>
-                <th style="width:40%" data-dt-order="disable">Perbandingan skor</th>
-                <th class="rs-num">Skor / 5</th>
+                <th style="width:40%">{{ __('Kategori') }}</th>
+                <th style="width:40%" data-dt-order="disable">{{ __('Perbandingan skor') }}</th>
+                <th class="rs-num">{{ __('Skor / 5') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -92,44 +88,40 @@
                     <td class="rs-num" data-order="{{ $value }}">{{ number_format($value, 2, ',', '.') }}</td>
                 </tr>
             @empty<tr>
-                    <td colspan="3" class="rs-empty">Belum ada jawaban rating pada filter ini.</td>
+                    <td colspan="3" class="rs-empty">{{ __('Belum ada jawaban rating pada filter ini.') }}</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
-    <h2 class="rs-section-title">Detail respons</h2>
+    <h2 class="rs-section-title">{{ __('Detail respons') }}</h2>
     <table class="rs-table" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
-                <th style="width:28%">Klien / proyek</th>
-                <th style="width:28%">Kuesioner</th>
-                <th class="rs-num" style="width:16%">Skor / 5</th>
-                <th style="width:28%">Tanggal (WIB)</th>
+                <th style="width:28%">{{ __('Klien / proyek') }}</th>
+                <th style="width:28%">{{ __('Kuesioner') }}</th>
+                <th class="rs-num" style="width:16%">{{ __('Skor / 5') }}</th>
+                <th style="width:28%">{{ __('Tanggal (WIB)') }}</th>
             </tr>
         </thead>
         <tbody>
             @forelse($responses as $response)
                 <tr>
-                    <td><strong>{{ $response->client?->name ?? 'Klien tidak tersedia' }}</strong><small>{{ $response->client?->project ?: '-' }}</small>
+                    <td><strong>{{ $response->client?->name ?? __('Klien tidak tersedia') }}</strong><small>{{ $response->client?->project ?: '-' }}</small>
                     </td>
-                    <td>{{ $response->survey?->title ?? 'Kuesioner tidak tersedia' }}</td>
+                    <td>{{ $response->survey?->title ?? __('Kuesioner tidak tersedia') }}</td>
                     <td class="rs-num" data-order="{{ $response->score ?? -1 }}">
                         {{ $response->score === null ? '-' : number_format($response->score, 2, ',', '.') }}</td>
                     <td data-order="{{ $response->submitted_at?->timestamp ?? 0 }}">{{ $response->submitted_at?->copy()->timezone('Asia/Jakarta')->format('d/m/Y H:i') ?? '-' }}
                     </td>
                 </tr>
             @empty<tr>
-                    <td colspan="4" class="rs-empty">Belum ada respons pada filter ini.</td>
+                    <td colspan="4" class="rs-empty">{{ __('Belum ada respons pada filter ini.') }}</td>
                 </tr>
             @endforelse
         </tbody>
     </table>
-    <div class="rs-method"><strong>Dasar perhitungan</strong>
-        <p>Skor respons adalah rata-rata jawaban rating yang diisi. Skor keseluruhan adalah rata-rata skor respons. Skor
-            kategori adalah rata-rata jawaban rating dalam kategori tersebut. Persentase skor = skor / 5 × 100. Teks dan
-            pilihan ganda tidak dihitung.</p>
-        <p>Filter tanggal respons memakai waktu pengiriman survei. Response rate memakai undangan yang dibuat pada
-            periode filter beserta status penyelesaiannya. Karena tanggal acuannya berbeda, total respons dapat berbeda
-            dari jumlah undangan selesai.</p>
+    <div class="rs-method"><strong>{{ __('Dasar perhitungan') }}</strong>
+        <p>{{ __('Skor respons adalah rata-rata jawaban rating yang diisi. Skor keseluruhan adalah rata-rata skor respons. Skor kategori adalah rata-rata jawaban rating dalam kategori tersebut. Persentase skor = skor / 5 × 100. Teks dan pilihan ganda tidak dihitung.') }}</p>
+        <p>{{ __('Filter tanggal respons memakai waktu pengiriman survei. Response rate memakai undangan yang dibuat pada periode filter beserta status penyelesaiannya. Karena tanggal acuannya berbeda, total respons dapat berbeda dari jumlah undangan selesai.') }}</p>
     </div>
 </div>
