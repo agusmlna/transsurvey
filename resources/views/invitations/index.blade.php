@@ -17,7 +17,7 @@
             data-confirm-title="{{ __('Buat undangan?') }}" data-confirm-button="{{ __('Ya, buat undangan') }}"
             data-busy-text="{{ __('Sedang membuat undangan…') }}">
             @csrf
-            <label>{{ __('Kuesioner aktif') }}<select name="survey_id" required>
+            <label>{{ __('Kuesioner aktif') }}<select name="survey_id" id="survey-select" required>
                     <option value="">{{ __('Pilih kuesioner') }}</option>
                     @foreach ($surveys as $s)
                         <option value="{{ $s->id }}">{{ $s->title }}</option>
@@ -102,6 +102,25 @@
     <p class="footnote">{{ __('Email dikirim ke alamat PIC yang tersimpan pada undangan. Setelah konfirmasi, email masuk antrean. Muat ulang halaman untuk melihat status terbaru. Status Terkirim berarti pesan diterima server email, bukan konfirmasi bahwa email sudah dibaca.') }}</p>
     <div data-table-fallback="invitations-table">{{ $invitations->links() }}</div>
 @endsection
+
+@push('styles')
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <style>
+        .select2-container { width: 100% !important; font-size: 13px; }
+        .select2-container--default .select2-selection--single { height: 39px; border: 1px solid #dfe3ea; border-radius: 5px; background: #fff; }
+        .select2-container--default .select2-selection--single .select2-selection__rendered { line-height: 37px; padding-left: 11px; padding-right: 30px; color: var(--ink); }
+        .select2-container--default .select2-selection--single .select2-selection__placeholder { color: #97a0ad; }
+        .select2-container--default .select2-selection--single .select2-selection__arrow { height: 37px; right: 6px; }
+        .select2-container--default.select2-container--focus .select2-selection--single,
+        .select2-container--default.select2-container--open .select2-selection--single { border-color: var(--ts-red); box-shadow: 0 0 0 3px #c8102e12; }
+        .select2-dropdown { border-color: #e1e5ec; border-radius: 7px; box-shadow: 0 8px 30px #20293626; overflow: hidden; }
+        .select2-container--default .select2-search--dropdown { padding: 8px; }
+        .select2-container--default .select2-search--dropdown .select2-search__field { border: 1px solid #dfe3ea; border-radius: 5px; min-height: 36px; padding: 6px 10px; }
+        .select2-container--default .select2-results__option { padding: 9px 10px; }
+        .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable { background: #fff6f8; color: var(--ts-red); }
+        .select2-container--default .select2-results__option--selected { background: #fff0f3; color: var(--ts-red); font-weight: 600; }
+    </style>
+@endpush
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -187,6 +206,37 @@
             if (details) details.addEventListener('toggle', function () { dt.columns.adjust(); });
 
             refreshState();
+        });
+    </script>
+@endpush
+
+@push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        // Pakai 'load' supaya jalan setelah enhancer select bawaan (transsurvey.js) selesai
+        window.addEventListener('load', function () {
+            var sel = document.getElementById('survey-select');
+            if (!sel || !window.jQuery || !jQuery.fn.select2) return;
+
+            // Bongkar wrapper select custom (.ts-select) supaya tidak dobel dengan Select2
+            var wrap = sel.closest('.ts-select');
+            if (wrap) {
+                wrap.parentNode.insertBefore(sel, wrap);
+                wrap.remove();
+                sel.classList.remove('ts-native-select');
+                sel.removeAttribute('style');
+                sel.removeAttribute('tabindex');
+                sel.removeAttribute('aria-hidden');
+            }
+
+            jQuery(sel).select2({
+                placeholder: 'Pilih kuesioner',
+                width: '100%',
+                language: {
+                    noResults: function () { return 'Kuesioner tidak ditemukan'; },
+                    searching: function () { return 'Mencari…'; }
+                }
+            });
         });
     </script>
 @endpush
