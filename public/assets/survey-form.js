@@ -28,6 +28,7 @@
         rating: 'Rating 1–5',
         choice: window.TransSurveyI18n.t("Pilihan ganda"),
         text: window.TransSurveyI18n.t("Teks terbuka"),
+        multiple: window.TransSurveyI18n.t("Banyak pilihan"),
     };
 
     let step = 1;
@@ -35,9 +36,9 @@
     let saveTimer;
 
     function toOptions(value) {
-        const raw = Array.isArray(value)
-            ? value
-            : String(value == null ? '' : value).split(/\r?\n/);
+        const raw = Array.isArray(value) ?
+            value :
+            String(value == null ? '' : value).split(/\r?\n/);
 
         return raw
             .map((s) => String(s).trim())
@@ -79,7 +80,10 @@
     function showAlert(message) {
         alertBox.textContent = message;
         alertBox.hidden = false;
-        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        alertBox.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
     }
 
     function clearAlert() {
@@ -134,17 +138,23 @@
             const options = $('[data-f=options]', card);
 
             if (!text.value.trim()) {
-                return fail(text, window.TransSurveyI18n.t("Pertanyaan :no: teks pertanyaan wajib diisi.", {no}));
+                return fail(text, window.TransSurveyI18n.t("Pertanyaan :no: teks pertanyaan wajib diisi.", {
+                    no
+                }));
             }
             if (!category.value.trim()) {
-                return fail(category, window.TransSurveyI18n.t("Pertanyaan :no: kategori wajib diisi.", {no}));
+                return fail(category, window.TransSurveyI18n.t("Pertanyaan :no: kategori wajib diisi.", {
+                    no
+                }));
             }
 
-            if ($('[data-f=type]', card).value === 'choice') {
+            if (['choice', 'multiple'].includes($('[data-f=type]', card).value)) {
                 const values = toOptions(options.value);
                 const invalid = values.length < 2 || new Set(values).size !== values.length;
                 if (invalid) {
-                    return fail(options, window.TransSurveyI18n.t("Pertanyaan :no: isi minimal dua pilihan yang berbeda.", {no}));
+                    return fail(options, window.TransSurveyI18n.t("Pertanyaan :no: isi minimal dua pilihan yang berbeda.", {
+                        no
+                    }));
                 }
             }
         }
@@ -160,7 +170,10 @@
        Navigasi langkah
        ========================================================== */
     function goTo(target, options) {
-        const opts = Object.assign({ push: true, force: false }, options);
+        const opts = Object.assign({
+            push: true,
+            force: false
+        }, options);
 
         target = Math.max(1, Math.min(3, target));
 
@@ -190,9 +203,14 @@
         if (target === 3) renderReview();
 
         if (opts.push && location.hash !== '#langkah-' + target) {
-            history.pushState({ target: target }, '', '#langkah-' + target);
+            history.pushState({
+                target: target
+            }, '', '#langkah-' + target);
         }
-        root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        root.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+        });
     }
 
     $$('[data-go]').forEach((btn) =>
@@ -207,7 +225,9 @@
 
     window.addEventListener('popstate', () => {
         const match = location.hash.match(/langkah-(\d)/);
-        goTo(match ? Number(match[1]) : 1, { push: false });
+        goTo(match ? Number(match[1]) : 1, {
+            push: false
+        });
     });
 
     form.addEventListener('keydown', (e) => {
@@ -228,12 +248,15 @@
             type: $('[data-f=type]', card).value,
             required: $('[data-f=required]', card).checked,
             options: toOptions($('[data-f=options]', card).value),
+            allow_other: $('[data-f=allow_other]', card).checked,
         };
     }
 
     function getQuestions() {
         if (locked) {
-            return initial.map((q) => Object.assign({}, q, { options: toOptions(q.options) }));
+            return initial.map((q) => Object.assign({}, q, {
+                options: toOptions(q.options)
+            }));
         }
         return $$('.sw-q', list).map(readCard);
     }
@@ -256,7 +279,9 @@
             btn.setAttribute('aria-pressed', String(btn.dataset.type === type));
         });
 
-        $('[data-wrap=options]', card).hidden = type !== 'choice';
+        const hasOptions = type === 'choice' || type === 'multiple';
+        $('[data-wrap=options]', card).hidden = !hasOptions;
+        $('[data-wrap=other]', card).hidden = !hasOptions;
         refreshCard(card);
     }
 
@@ -278,15 +303,22 @@
         });
 
         $('#sw-empty').hidden = cards.length > 0;
-        $('#sw-count-label').textContent = window.TransSurveyI18n.t(":count pertanyaan", {count: cards.length});
+        $('#sw-count-label').textContent = window.TransSurveyI18n.t(":count pertanyaan", {
+            count: cards.length
+        });
     }
 
     function addQuestion(q, options) {
         q = q || {};
-        const opts = Object.assign({ after: null, open: true }, options);
+        const opts = Object.assign({
+            after: null,
+            open: true
+        }, options);
 
         if ($$('.sw-q', list).length >= MAX_QUESTIONS) {
-            showAlert(window.TransSurveyI18n.t("Maksimal :count pertanyaan.", {count: MAX_QUESTIONS}));
+            showAlert(window.TransSurveyI18n.t("Maksimal :count pertanyaan.", {
+                count: MAX_QUESTIONS
+            }));
             return null;
         }
 
@@ -297,6 +329,7 @@
         $('[data-f=options]', card).value = toOptions(q.options).join('\n');
         $('[data-f=required]', card).checked =
             q.required === undefined ? true : [true, 1, '1', 'on'].includes(q.required);
+        $('[data-f=allow_other]', card).checked = [true, 1, '1', 'on'].includes(q.allow_other);
 
         card.classList.toggle('is-collapsed', !opts.open);
 
@@ -346,7 +379,9 @@
             }
 
             case 'dup':
-                addQuestion(readCard(card), { after: card });
+                addQuestion(readCard(card), {
+                    after: card
+                });
                 return;
 
             case 'del':
@@ -373,7 +408,10 @@
             const card = addQuestion({});
             if (card) {
                 $('[data-f=text]', card).focus();
-                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                card.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
             }
         });
 
@@ -422,9 +460,12 @@
                 const dots = make('div', 'sw-pv-dots');
                 [1, 2, 3, 4, 5].forEach((n) => dots.append(make('i', '', n)));
                 wrap.append(dots);
-            } else if (q.type === 'choice') {
+                // f) renderPreview(), ganti cabang choice
+            } else if (q.type === 'choice' || q.type === 'multiple') {
+                const icon = q.type === 'multiple' ? '☐ ' : '○ ';
                 const opts = q.options.length ? q.options : [window.TransSurveyI18n.t("Pilihan 1"), window.TransSurveyI18n.t("Pilihan 2")];
-                opts.forEach((o) => wrap.append(make('span', 'sw-pv-opt', '○ ' + o)));
+                opts.forEach((o) => wrap.append(make('span', 'sw-pv-opt', icon + o)));
+                if (q.allow_other) wrap.append(make('span', 'sw-pv-opt', icon + window.TransSurveyI18n.t("Lainnya") + ': ________'));
             } else {
                 wrap.append(make('div', 'sw-pv-txt'));
             }
@@ -437,9 +478,9 @@
         const questions = getQuestions();
 
         const checked = checkedStatus();
-        const statusLabel = checked
-            ? checked.nextElementSibling.querySelector('b').textContent
-            : '';
+        const statusLabel = checked ?
+            checked.nextElementSibling.querySelector('b').textContent :
+            '';
 
         const rows = [
             [window.TransSurveyI18n.t("Judul"), $('#sw-title').value.trim() || '—'],
@@ -515,7 +556,9 @@
         $('input[type=checkbox][name=is_template]').checked = !!data.is_template;
 
         list.replaceChildren();
-        (data.questions || []).forEach((q) => addQuestion(q, { open: false }));
+        (data.questions || []).forEach((q) => addQuestion(q, {
+            open: false
+        }));
         changed();
     }
 
@@ -550,12 +593,16 @@
     form.addEventListener('submit', (e) => {
         if (!validateInfo()) {
             e.preventDefault();
-            goTo(1, { force: true });
+            goTo(1, {
+                force: true
+            });
             return;
         }
         if (!validateQuestions()) {
             e.preventDefault();
-            goTo(2, { force: true });
+            goTo(2, {
+                force: true
+            });
             return;
         }
 
@@ -580,22 +627,25 @@
        ========================================================== */
     function init() {
         if (locked) {
-            $('#sw-count-label').textContent = window.TransSurveyI18n.t(":count pertanyaan (dikunci)", {count: initial.length});
+            $('#sw-count-label').textContent = window.TransSurveyI18n.t(":count pertanyaan (dikunci)", {
+                count: initial.length
+            });
         } else {
             bindQuestionEditor();
 
             if (initial.length) {
-                initial.forEach((q, i) => addQuestion(q, { open: i === 0 }));
+                initial.forEach((q, i) => addQuestion(q, {
+                    open: i === 0
+                }));
             } else {
-                addQuestion(
-                    {
-                        text: 'Seberapa puas Anda terhadap kualitas layanan kami?',
-                        category: 'Kualitas layanan',
-                        type: 'rating',
-                        required: true,
-                    },
-                    { open: false }
-                );
+                addQuestion({
+                    text: 'Seberapa puas Anda terhadap kualitas layanan kami?',
+                    category: 'Kualitas layanan',
+                    type: 'rating',
+                    required: true,
+                }, {
+                    open: false
+                });
             }
         }
 
@@ -605,7 +655,10 @@
         const startStep = serverStep > 1 ? serverStep : hash ? Number(hash[1]) : 1;
 
         maxStep = exists ? 3 : startStep;
-        goTo(startStep, { push: false, force: true });
+        goTo(startStep, {
+            push: false,
+            force: true
+        });
         renderPreview();
     }
 

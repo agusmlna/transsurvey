@@ -19,11 +19,21 @@ class BankController
     }
     public function store(Request $r)
     {
-        $v = $r->validate(['text' => 'required|string|max:2000', 'category' => 'required|string|max:100', 'type' => 'required|in:rating,choice,text', 'options' => 'nullable|string|max:5000']);
-        $options = array_values(array_filter(array_map('trim', preg_split('/\R/', $v['options'] ?? '')), fn($s) => $s !== ''));
-        if ($v['type'] === 'choice' && (count($options) < 2 || count($options) !== count(array_unique($options))))
+        $v = $r->validate([
+            'text' => 'required|string|max:2000', 
+            'category' => 'required|string|max:100',
+            'type' => 'required|in:rating,choice,text,multiple', 
+            'options' => 'nullable|string|max:5000',
+            'allow_other' => 'nullable|boolean',
+        ]);
+        $withOptions = in_array($v['type'], ['choice', 'multiple'], true);
+        $options = array_values(
+            array_filter(
+                array_map('trim', preg_split('/\R/', $v['options'] ?? '')), fn($s) => $s !== ''));
+        if (in_array($v['type'], ['choice', 'multiple'], true) && (count($options) < 2 || count($options) !== count(array_unique($options))))
             throw ValidationException::withMessages(['options' => __('Masukkan minimal dua pilihan unik.')]);
-        $v['options'] = $v['type'] === 'choice' ? $options : [];
+        $v['options'] = $withOptions ? $options : [];
+        $v['allow_other'] = $withOptions && $r->boolean('allow_other');
         $v['required'] = $r->boolean('required');
         BankQuestion::create($v);
         return back()->with('success', __('Pertanyaan disimpan.'));

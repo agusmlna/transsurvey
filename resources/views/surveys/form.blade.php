@@ -15,33 +15,47 @@
 
 @push('styles')
     <link rel="stylesheet"
-          href="{{ asset('assets/survey-form.css') }}?v={{ filemtime(public_path('assets/survey-form.css')) }}">
+        href="{{ asset('assets/survey-form.css') }}?v={{ filemtime(public_path('assets/survey-form.css')) }}">
 @endpush
 
 @section('content')
     @php
-        $initial = old('questions', $survey->questions->map(fn ($q) => [
-            'text'     => $q->text,
-            'category' => $q->category,
-            'type'     => $q->type,
-            'required' => (bool) $q->required,
-            'options'  => $q->options ?? [],
-        ])->values()->all());
+        $initial = old(
+            'questions',
+            $survey->questions
+                ->map(
+                    fn($q) => [
+                        'text' => $q->text,
+                        'category' => $q->category,
+                        'type' => $q->type,
+                        'required' => (bool) $q->required,
+                        'options' => $q->options ?? [],
+                        'allow_other' => (bool) $q->allow_other,
+                    ],
+                )
+                ->values()
+                ->all(),
+        );
 
-        $bankData = $bank->map(fn ($b) => [
-            'id'       => $b->id,
-            'text'     => $b->text,
-            'category' => $b->category,
-            'type'     => $b->type,
-            'required' => (bool) $b->required,
-            'options'  => $b->options ?? [],
-        ])->values();
+        $bankData = $bank
+            ->map(
+                fn($b) => [
+                    'id' => $b->id,
+                    'text' => $b->text,
+                    'category' => $b->category,
+                    'type' => $b->type,
+                    'required' => (bool) $b->required,
+                    'options' => $b->options ?? [],
+                    'allow_other' => (bool) $b->allow_other,
+                ],
+            )
+            ->values();
 
-        $hasQuestionError = collect($errors->keys())->contains(fn ($k) => str_starts_with($k, 'questions'));
+        $hasQuestionError = collect($errors->keys())->contains(fn($k) => str_starts_with($k, 'questions'));
         $startStep = $errors->any() ? ($hasQuestionError ? 2 : 1) : 1;
 
         $statuses = [
-            'draft'  => [__('Draf'), __('Bisa dipratinjau dulu')],
+            'draft' => [__('Draf'), __('Bisa dipratinjau dulu')],
             'active' => [__('Aktif'), __('Langsung menerima respons')],
             'closed' => [__('Ditutup'), __('Tidak menerima respons')],
         ];
@@ -49,11 +63,8 @@
         $quickDays = [7 => __('+7 hari'), 14 => __('+14 hari'), 30 => __('+30 hari'), 90 => __('+3 bulan')];
     @endphp
 
-    <div class="sw"
-         id="sw"
-         data-start="{{ $startStep }}"
-         data-exists="{{ $survey->exists ? 1 : 0 }}"
-         data-locked="{{ $locked ? 1 : 0 }}">
+    <div class="sw" id="sw" data-start="{{ $startStep }}" data-exists="{{ $survey->exists ? 1 : 0 }}"
+        data-locked="{{ $locked ? 1 : 0 }}">
 
         {{-- Tawaran memulihkan draf lokal --}}
         <div class="sw-draft notice" id="sw-draft-banner" hidden>
@@ -82,10 +93,8 @@
 
         <div id="sw-alert" class="sw-alert" role="alert" hidden></div>
 
-        <form id="sw-form"
-              method="post"
-              action="{{ $survey->exists ? route('surveys.update', $survey) : route('surveys.store') }}"
-              novalidate>
+        <form id="sw-form" method="post"
+            action="{{ $survey->exists ? route('surveys.update', $survey) : route('surveys.store') }}" novalidate>
             @csrf
             @if ($survey->exists)
                 @method('put')
@@ -103,46 +112,35 @@
                             <div class="sw-grid">
                                 <label class="full">
                                     {{ __('Judul') }}
-                                    <input name="title"
-                                           id="sw-title"
-                                           maxlength="255"
-                                           required
-                                           placeholder="{{ __('cth. Survei Kepuasan Klien Q4 2026') }}"
-                                           value="{{ old('title', $survey->title) }}">
+                                    <input name="title" id="sw-title" maxlength="255" required
+                                        placeholder="{{ __('cth. Survei Kepuasan Klien Q4 2026') }}"
+                                        value="{{ old('title', $survey->title) }}">
                                 </label>
 
                                 <label class="full">
                                     {{ __('Pengantar') }} <small>{{ __('(opsional)') }}</small>
-                                    <textarea name="description"
-                                              id="sw-desc"
-                                              rows="3"
-                                              maxlength="5000"
-                                              placeholder="{{ __('Ceritakan singkat tujuan survei ini…') }}">{{ old('description', $survey->description) }}</textarea>
+                                    <textarea name="description" id="sw-desc" rows="3" maxlength="5000"
+                                        placeholder="{{ __('Ceritakan singkat tujuan survei ini…') }}">{{ old('description', $survey->description) }}</textarea>
                                 </label>
 
                                 <label>
                                     {{ __('Tanggal mulai') }}
-                                    <input type="date"
-                                           name="starts_at"
-                                           id="sw-start"
-                                           required
-                                           value="{{ old('starts_at', $survey->starts_at?->format('Y-m-d')) }}">
+                                    <input type="date" name="starts_at" id="sw-start" required
+                                        value="{{ old('starts_at', $survey->starts_at?->format('Y-m-d')) }}">
                                 </label>
 
                                 <label>
                                     {{ __('Tanggal selesai') }}
-                                    <input type="date"
-                                           name="ends_at"
-                                           id="sw-end"
-                                           required
-                                           value="{{ old('ends_at', $survey->ends_at?->format('Y-m-d')) }}">
+                                    <input type="date" name="ends_at" id="sw-end" required
+                                        value="{{ old('ends_at', $survey->ends_at?->format('Y-m-d')) }}">
                                 </label>
                             </div>
 
                             <div class="sw-chips" aria-label="{{ __('Durasi cepat') }}">
                                 <span class="sw-chips-label">{{ __('Durasi cepat:') }}</span>
                                 @foreach ($quickDays as $days => $label)
-                                    <button type="button" class="sw-chip" data-days="{{ $days }}">{{ $label }}</button>
+                                    <button type="button" class="sw-chip"
+                                        data-days="{{ $days }}">{{ $label }}</button>
                                 @endforeach
                             </div>
 
@@ -150,10 +148,8 @@
                             <div class="sw-status">
                                 @foreach ($statuses as $value => [$title, $note])
                                     <label>
-                                        <input type="radio"
-                                               name="status"
-                                               value="{{ $value }}"
-                                               @checked(old('status', $survey->status ?: 'draft') === $value)>
+                                        <input type="radio" name="status" value="{{ $value }}"
+                                            @checked(old('status', $survey->status ?: 'draft') === $value)>
                                         <span><b>{{ $title }}</b><small>{{ $note }}</small></span>
                                     </label>
                                 @endforeach
@@ -161,17 +157,15 @@
 
                             <label class="sw-switch">
                                 <input type="hidden" name="is_template" value="0">
-                                <input type="checkbox"
-                                       name="is_template"
-                                       value="1"
-                                       @checked(old('is_template', $survey->is_template))>
+                                <input type="checkbox" name="is_template" value="1" @checked(old('is_template', $survey->is_template))>
                                 {{ __('Simpan sebagai template') }}
                             </label>
                         </div>
 
                         <div class="sw-actions">
                             <span></span>
-                            <button type="button" class="btn primary" data-next>{{ __('Lanjut ke pertanyaan →') }}</button>
+                            <button type="button" class="btn primary"
+                                data-next>{{ __('Lanjut ke pertanyaan →') }}</button>
                         </div>
                     </section>
 
@@ -205,7 +199,8 @@
                                 <div id="sw-list"></div>
 
                                 <div class="sw-add">
-                                    <button type="button" class="btn primary" id="sw-add">{{ __('＋ Tambah pertanyaan') }}</button>
+                                    <button type="button" class="btn primary"
+                                        id="sw-add">{{ __('＋ Tambah pertanyaan') }}</button>
 
                                     <select id="sw-bank-select" aria-label="{{ __('Tambah dari bank pertanyaan') }}">
                                         <option value="">{{ __('Ambil dari bank pertanyaan…') }}</option>
@@ -235,7 +230,8 @@
                     <section class="sw-panel" data-step="3">
                         <div class="sw-card sw-review">
                             <h2>{{ __('Tinjau & simpan') }}</h2>
-                            <p class="sw-hint">{{ __('Periksa sekali lagi. Setelah undangan dibuat, pertanyaan akan dikunci.') }}</p>
+                            <p class="sw-hint">
+                                {{ __('Periksa sekali lagi. Setelah undangan dibuat, pertanyaan akan dikunci.') }}</p>
 
                             <dl id="sw-review-info"></dl>
 
@@ -277,10 +273,14 @@
                     </div>
 
                     <div class="sw-q-tools">
-                        <button type="button" data-act="up" aria-label="{{ __('Pindah ke atas') }}" title="{{ __('Naik') }}">↑</button>
-                        <button type="button" data-act="down" aria-label="{{ __('Pindah ke bawah') }}" title="{{ __('Turun') }}">↓</button>
-                        <button type="button" data-act="dup" aria-label="{{ __('Duplikat') }}" title="{{ __('Duplikat') }}">⧉</button>
-                        <button type="button" data-act="del" aria-label="{{ __('Hapus') }}" title="{{ __('Hapus') }}">✕</button>
+                        <button type="button" data-act="up" aria-label="{{ __('Pindah ke atas') }}"
+                            title="{{ __('Naik') }}">↑</button>
+                        <button type="button" data-act="down" aria-label="{{ __('Pindah ke bawah') }}"
+                            title="{{ __('Turun') }}">↓</button>
+                        <button type="button" data-act="dup" aria-label="{{ __('Duplikat') }}"
+                            title="{{ __('Duplikat') }}">⧉</button>
+                        <button type="button" data-act="del" aria-label="{{ __('Hapus') }}"
+                            title="{{ __('Hapus') }}">✕</button>
                     </div>
                 </div>
 
@@ -291,6 +291,7 @@
                         <button type="button" data-type="rating">★ Rating 1–5</button>
                         <button type="button" data-type="choice">{{ __('◉ Pilihan ganda') }}</button>
                         <button type="button" data-type="text">{{ __('¶ Teks terbuka') }}</button>
+                        <button type="button" data-type="multiple">☑ Banyak pilihan</button>
                     </div>
 
                     <label>
@@ -301,7 +302,8 @@
                     <div class="sw-grid">
                         <label>
                             {{ __('Kategori') }}
-                            <input data-f="category" list="sw-cats" maxlength="100" placeholder="{{ __('cth. Kualitas layanan') }}">
+                            <input data-f="category" list="sw-cats" maxlength="100"
+                                placeholder="{{ __('cth. Kualitas layanan') }}">
                         </label>
 
                         <label class="sw-switch sw-switch-inline">
@@ -314,7 +316,11 @@
                     <label data-wrap="options" hidden>
                         {{ __('Pilihan jawaban') }} <small>{{ __('(satu per baris, minimal 2)') }}</small>
                         <textarea data-f="options" rows="4" placeholder="{{ __('Email
-Telepon') }}"></textarea>
+                        Telepon') }}"></textarea>
+                    </label>
+                    <label class="sw-switch" data-wrap="other" hidden>
+                        <input type="checkbox" data-f="allow_other" value="1">
+                        {{ __('Sediakan opsi "Lainnya" (responden mengisi sendiri)') }}
                     </label>
                 </div>
             </section>

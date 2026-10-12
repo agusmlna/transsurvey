@@ -78,13 +78,25 @@
                                 <textarea name="answers[{{ $q->id }}][comment]" rows="3" maxlength="5000"
                                     placeholder="{{ __('Ceritakan pengalaman dan saran Anda…') }}">{{ $answer['comment'] ?? '' }}</textarea>
                             </label>
-                        @elseif($q->type === 'choice')
-                            <fieldset class="choice-group" aria-labelledby="question-{{ $q->id }}">
+                        @elseif (in_array($q->type, ['choice', 'multiple'], true))
+                            @php($multi = $q->type === 'multiple')
+                            @php($selected = (array) ($answer['value'] ?? []))
+                            <fieldset class="choice-group" aria-labelledby="question-{{ $q->id }}" data-other-group>
+                                @if ($multi)<small>{{ __('Boleh pilih lebih dari satu.') }}</small>@endif
                                 @foreach ($q->options ?? [] as $option)
-                                    <label class="choice-option"><input type="radio"
-                                            name="answers[{{ $q->id }}][value]" value="{{ $option }}"
-                                            @checked(($answer['value'] ?? '') === $option) @required($q->required)>{{ $option }}</label>
+                                    <label class="choice-option"><input type="{{ $multi ? 'checkbox' : 'radio' }}"
+                                        name="answers[{{ $q->id }}][value]{{ $multi ? '[]' : '' }}" value="{{ $option }}"
+                                        @checked(in_array($option, $selected, true))
+                                        @required(!$multi && $q->required)>{{ $option }}</label>
                                 @endforeach
+                                @if ($q->allow_other)
+                                    <label class="choice-option"><input type="{{ $multi ? 'checkbox' : 'radio' }}"
+                                        name="answers[{{ $q->id }}][value]{{ $multi ? '[]' : '' }}" value="__other__" data-other-toggle
+                                        @checked(in_array('__other__', $selected, true))>{{ __('Lainnya') }}</label>
+                                    <input type="text" class="other-input" name="answers[{{ $q->id }}][other]" maxlength="255"
+                                        placeholder="{{ __('Tuliskan jawaban Anda…') }}" aria-label="{{ __('Jawaban lainnya') }}"
+                                        value="{{ $answer['other'] ?? '' }}" hidden>
+                                @endif
                             </fieldset>
                         @else
                             <textarea aria-labelledby="question-{{ $q->id }}" name="answers[{{ $q->id }}][value]" rows="4"
