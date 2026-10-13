@@ -93,6 +93,12 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('admin')->group(function () {
         // Surveys
+        Route::get('/surveys/import', [App\Http\Controllers\QuestionImportController::class, 'create'])->name('surveys.import.create');
+        Route::get('/surveys/import/template', [App\Http\Controllers\QuestionImportController::class, 'template'])->name('surveys.import.template');
+        Route::post('/surveys/import/preview', [App\Http\Controllers\QuestionImportController::class, 'preview'])->middleware('throttle:10,1')->name('surveys.import.preview');
+        Route::get('/surveys/import/preview/{token}', [App\Http\Controllers\QuestionImportController::class, 'show'])->where('token', '[A-Za-z0-9]{64}')->name('surveys.import.show');
+        Route::post('/surveys/import/confirm/{token}', [App\Http\Controllers\QuestionImportController::class, 'confirm'])->where('token', '[A-Za-z0-9]{64}')->name('surveys.import.confirm');
+
         Route::resource('surveys', SurveyController::class)
             ->except(['show', 'destroy']);
 
