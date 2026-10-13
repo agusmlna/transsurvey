@@ -5,6 +5,9 @@
 @section('subtitle', __('Tiga langkah singkat, tanpa pindah halaman.'))
 
 @section('actions')
+    @if ($survey->exists && !$locked && $survey->status === 'draft')
+        <a class="btn" href="{{ route('surveys.import.create', ['survey_id' => $survey->id]) }}">{{ __('question_import.title') }}</a>
+    @endif
     @if ($survey->exists)
         <a class="btn" href="{{ route('surveys.preview', $survey) }}" target="_blank" rel="noopener">
             {{ __('Pratinjau tersimpan ↗') }}

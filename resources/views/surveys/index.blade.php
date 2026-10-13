@@ -2,7 +2,7 @@
 @section('title', __('Survei'))
 @section('heading', __('Daftar survei'))
 @section('subtitle', __('Kelola kuesioner, periode pengisian, dan hasil survei.'))
-@section('actions')<a class="btn primary" href="{{ route('surveys.create') }}">{{ __('＋ Buat survei') }}</a>@endsection
+@section('actions')<a class="btn" href="{{ route('surveys.import.create') }}">{{ __('question_import.title') }}</a><a class="btn primary" href="{{ route('surveys.create') }}">{{ __('＋ Buat survei') }}</a>@endsection
 @section('content')
 <form class="list-toolbar" method="get">
     <div class="search" data-table-search-fallback><input name="q" placeholder="{{ __('Cari judul survei…') }}" aria-label="{{ __('Cari judul survei') }}" value="{{ request('q') }}"><button class="btn">{{ __('Cari') }}</button></div>
