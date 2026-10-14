@@ -5,6 +5,15 @@
         <td data-order="{{ $r->score ?? -1 }}"><span
                 class="badge {{ $r->score !== null && $r->score < 3.5 ? 'amber' : 'green' }}">{{ $r->score === null ? '—' : number_format($r->score, 2) }}
                 / 5</span></td>
+        <td>
+            @forelse ($r->category_scores as $cat => $val)
+                <span class="badge {{ $val < 3.5 ? 'amber' : 'green' }} ts-cat-badge">
+                    {{ $cat }}: {{ number_format($val, 2) }}
+                </span>
+            @empty
+                —
+            @endforelse
+        </td>
         <td data-order="{{ $r->submitted_at->timestamp }}">{{ $r->submitted_at->format('d M Y H:i') }}</td>
 
         @if ($showAction)

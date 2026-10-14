@@ -9,4 +9,12 @@ class SurveyResponse extends Model {
  public function invitation(){return $this->belongsTo(Invitation::class);}
  public function answers(){return $this->hasMany(Answer::class);}
  public function followUp(){return $this->hasOne(FollowUp::class);}
+ public function getCategoryScoresAttribute(): array
+{
+    return $this->answers
+        ->filter(fn($a) => $a->type === 'rating' && $a->value !== null && $a->value !== '')
+        ->groupBy('category')
+        ->map(fn($rows) => round($rows->avg(fn($a) => (int) $a->value), 2))
+        ->all();
+}
 }

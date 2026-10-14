@@ -2086,3 +2086,5 @@ h6,
     font-variant-numeric: tabular-nums;
 }
 .survey-steps-nav .btn[hidden] { display: none; }
+
+.ts-cat-badge { display: inline-flex; margin: 0 4px 4px 0; }

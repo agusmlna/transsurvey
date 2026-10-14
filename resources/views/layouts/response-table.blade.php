@@ -7,6 +7,7 @@
                 <th>{{ __('Klien / proyek') }}</th>
                 <th>{{ __('Kuesioner') }}</th>
                 <th>{{ __('Skor') }}</th>
+                <th data-dt-order="disable">{{ __('Skor per kategori') }}</th>
                 <th>{{ __('Tanggal') }}</th>
                 @if ($showAction)
                     <th data-dt-order="disable">{{ __('Tindakan') }}</th>
