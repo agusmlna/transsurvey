@@ -8,15 +8,20 @@
     <title>{{ $survey->title }} · {{ config('app.name') }}</title>
     <link rel="icon" href="{{ asset('favicon.svg') }}">
     <link rel="stylesheet" href="{{ asset('assets/app.css') }}">
-    <link rel="stylesheet" href="{{ asset('assets/transsurvey.css') }}?v={{ filemtime(public_path('assets/transsurvey.css')) }}">
-    <script defer src="{{ asset('assets/transsurvey.js') }}?v={{ filemtime(public_path('assets/transsurvey.js')) }}"></script>
+    <link rel="stylesheet"
+        href="{{ asset('assets/transsurvey.css') }}?v={{ filemtime(public_path('assets/transsurvey.css')) }}">
+    <script defer src="{{ asset('assets/transsurvey.js') }}?v={{ filemtime(public_path('assets/transsurvey.js')) }}">
+    </script>
     <script defer src="{{ asset('assets/app.js') }}?v={{ filemtime(public_path('assets/app.js')) }}"></script>
+    <script defer src="{{ asset('assets/survey-steps.js') }}?v={{ filemtime(public_path('assets/survey-steps.js')) }}">
+    </script>
     @include('layouts.i18n')
 </head>
 
 <body class="respondent-page">
     <main class="survey-sheet">
-        <div class="survey-top"><div class="brand-panel">
+        <div class="survey-top">
+            <div class="brand-panel">
                 @include('layouts.brand')
             </div>@include('layouts.language-switch')
         </div>
@@ -35,7 +40,8 @@
             <div class="notice success" role="status" data-success-message>{{ __(session('success')) }}</div>
         @endif
         @if ($errors->any())
-            <div class="notice error" role="alert" data-error-message><strong>{{ __('Jawaban belum dikirim.') }}</strong>
+            <div class="notice error" role="alert" data-error-message>
+                <strong>{{ __('Jawaban belum dikirim.') }}</strong>
                 <ul>
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
@@ -52,66 +58,101 @@
         @else
             @php($answers = old('answers', $invitation?->draft_answers ?? []))
             <div class="progress-caption"><span
-                    id="survey-progress-text">{{ $survey->questions->where('required', true)->count() }} {{ __('pertanyaan wajib') }}</span><span>{{ __('± 3 menit') }}</span></div><progress class="survey-progress" id="survey-progress"
-                value="0" max="100" aria-label="{{ __('Progres pengisian') }}"></progress>
+                    id="survey-progress-text">{{ $survey->questions->where('required', true)->count() }}
+                    {{ __('pertanyaan wajib') }}</span><span>{{ __('± 3 menit') }}</span></div><progress
+                class="survey-progress" id="survey-progress" value="0" max="100"
+                aria-label="{{ __('Progres pengisian') }}"></progress>
             <form method="post" action="{{ $preview ? '#' : route('survey.submit', $invitation->token) }}"
-                class="respondent-form" data-submit-feedback data-busy-text="{{ __('Sedang menyimpan jawaban…') }}" @if ($preview) data-preview @endif>@csrf
-                @foreach ($survey->questions as $q)
-                    @php($answer = $answers[$q->id] ?? [])
-                    <section class="survey-question" data-question data-type="{{ $q->type }}"
-                        data-required="{{ $q->required ? '1' : '0' }}"><span class="eyebrow">{{ $q->category }}</span>
-                        <h2 id="question-{{ $q->id }}">{{ $loop->iteration }}. {{ $q->text }}
-                            @if ($q->required)
-                                <span class="required">*</span>
-                            @endif
-                        </h2>
-                        @if ($q->type === 'rating')
-                            <fieldset class="rating-group" aria-labelledby="question-{{ $q->id }}">
-                                @foreach ([1 => __('Sangat tidak puas'), 2 => __('Tidak puas'), 3 => __('Cukup puas'), 4 => __('Puas'), 5 => __('Sangat puas')] as $n => $text)
-                                    <label class="rating-option"><input type="radio"
-                                            name="answers[{{ $q->id }}][value]" value="{{ $n }}"
-                                            @checked((string) ($answer['value'] ?? '') === (string) $n)
-                                            @required($q->required)><span class="ts-rating-star" aria-hidden="true">★</span><strong>{{ $n }}</strong><span>{{ $text }}</span></label>
-                                @endforeach
-                            </fieldset>
-                            <label class="low-comment">{{ __('Apa yang bisa kami tingkatkan?') }} <small>{{ __('Komentar wajib jika memilih skor 1, 2, atau 3.') }}</small>
-                                <textarea name="answers[{{ $q->id }}][comment]" rows="3" maxlength="5000"
-                                    placeholder="{{ __('Ceritakan pengalaman dan saran Anda…') }}">{{ $answer['comment'] ?? '' }}</textarea>
-                            </label>
-                        @elseif (in_array($q->type, ['choice', 'multiple'], true))
-                            @php($multi = $q->type === 'multiple')
-                            @php($selected = (array) ($answer['value'] ?? []))
-                            <fieldset class="choice-group" aria-labelledby="question-{{ $q->id }}" data-other-group>
-                                @if ($multi)<small>{{ __('Boleh pilih lebih dari satu.') }}</small>@endif
-                                @foreach ($q->options ?? [] as $option)
-                                    <label class="choice-option"><input type="{{ $multi ? 'checkbox' : 'radio' }}"
-                                        name="answers[{{ $q->id }}][value]{{ $multi ? '[]' : '' }}" value="{{ $option }}"
-                                        @checked(in_array($option, $selected, true))
-                                        @required(!$multi && $q->required)>{{ $option }}</label>
-                                @endforeach
-                                @if ($q->allow_other)
-                                    <label class="choice-option"><input type="{{ $multi ? 'checkbox' : 'radio' }}"
-                                        name="answers[{{ $q->id }}][value]{{ $multi ? '[]' : '' }}" value="__other__" data-other-toggle
-                                        @checked(in_array('__other__', $selected, true))>{{ __('Lainnya') }}</label>
-                                    <input type="text" class="other-input" name="answers[{{ $q->id }}][other]" maxlength="255"
-                                        placeholder="{{ __('Tuliskan jawaban Anda…') }}" aria-label="{{ __('Jawaban lainnya') }}"
-                                        value="{{ $answer['other'] ?? '' }}" hidden>
+                class="respondent-form" data-submit-feedback data-busy-text="{{ __('Sedang menyimpan jawaban…') }}"
+                @if ($preview) data-preview @endif>@csrf
+                @php($no = 0)
+                @foreach ($survey->questions->groupBy('category') as $category => $items)
+                    <section class="survey-section" data-step aria-labelledby="section-{{ $loop->iteration }}">
+                        <header class="survey-section-head">
+                            <span class="survey-section-step">{{ __('Bagian') }} {{ $loop->iteration }} /
+                                {{ $loop->count }}</span>
+                            <h2 id="section-{{ $loop->iteration }}" class="survey-section-title">{{ $category }}
+                            </h2>
+                        </header>
+                        @foreach ($items as $q)
+                            @php($no++)
+                            @php($answer = $answers[$q->id] ?? [])
+                            <section class="survey-question" data-question data-type="{{ $q->type }}"
+                                data-required="{{ $q->required ? '1' : '0' }}">
+                                {{-- hapus <span class="eyebrow">{{ $q->category }}</span>, sudah ada di judul section --}}
+                                <h3 id="question-{{ $q->id }}">{{ $no }}. {{ $q->text }}
+                                    @if ($q->required)
+                                        <span class="required">*</span>
+                                    @endif
+                                </h3>
+
+                                @if ($q->type === 'rating')
+                                    <fieldset class="rating-group" aria-labelledby="question-{{ $q->id }}">
+                                        @foreach ([1 => __('Sangat tidak puas'), 2 => __('Tidak puas'), 3 => __('Cukup puas'), 4 => __('Puas'), 5 => __('Sangat puas')] as $n => $text)
+                                            <label class="rating-option"><input type="radio"
+                                                    name="answers[{{ $q->id }}][value]"
+                                                    value="{{ $n }}" @checked((string) ($answer['value'] ?? '') === (string) $n)
+                                                    @required($q->required)><span class="ts-rating-star"
+                                                    aria-hidden="true">★</span><strong>{{ $n }}</strong><span>{{ $text }}</span></label>
+                                        @endforeach
+                                    </fieldset>
+                                    <label class="low-comment">{{ __('Apa yang bisa kami tingkatkan?') }}
+                                        <small>{{ __('Komentar wajib jika memilih skor 1, 2, atau 3.') }}</small>
+                                        <textarea name="answers[{{ $q->id }}][comment]" rows="3" maxlength="5000"
+                                            placeholder="{{ __('Ceritakan pengalaman dan saran Anda…') }}">{{ $answer['comment'] ?? '' }}</textarea>
+                                    </label>
+                                @elseif (in_array($q->type, ['choice', 'multiple'], true))
+                                    @php($multi = $q->type === 'multiple')
+                                    @php($selected = (array) ($answer['value'] ?? []))
+                                    <fieldset class="choice-group" aria-labelledby="question-{{ $q->id }}"
+                                        data-other-group>
+                                        @if ($multi)
+                                            <small>{{ __('Boleh pilih lebih dari satu.') }}</small>
+                                        @endif
+                                        @foreach ($q->options ?? [] as $option)
+                                            <label class="choice-option"><input
+                                                    type="{{ $multi ? 'checkbox' : 'radio' }}"
+                                                    name="answers[{{ $q->id }}][value]{{ $multi ? '[]' : '' }}"
+                                                    value="{{ $option }}" @checked(in_array($option, $selected, true))
+                                                    @required(!$multi && $q->required)>{{ $option }}</label>
+                                        @endforeach
+                                        @if ($q->allow_other)
+                                            <label class="choice-option"><input
+                                                    type="{{ $multi ? 'checkbox' : 'radio' }}"
+                                                    name="answers[{{ $q->id }}][value]{{ $multi ? '[]' : '' }}"
+                                                    value="__other__" data-other-toggle
+                                                    @checked(in_array('__other__', $selected, true))>{{ __('Lainnya') }}</label>
+                                            <input type="text" class="other-input"
+                                                name="answers[{{ $q->id }}][other]" maxlength="255"
+                                                placeholder="{{ __('Tuliskan jawaban Anda…') }}"
+                                                aria-label="{{ __('Jawaban lainnya') }}"
+                                                value="{{ $answer['other'] ?? '' }}" hidden>
+                                        @endif
+                                    </fieldset>
+                                @else
+                                    <textarea aria-labelledby="question-{{ $q->id }}" name="answers[{{ $q->id }}][value]" rows="4"
+                                        maxlength="5000" placeholder="{{ __('Tuliskan pendapat Anda…') }}" @required($q->required)>{{ $answer['value'] ?? '' }}</textarea>
                                 @endif
-                            </fieldset>
-                        @else
-                            <textarea aria-labelledby="question-{{ $q->id }}" name="answers[{{ $q->id }}][value]" rows="4"
-                                maxlength="5000" placeholder="{{ __('Tuliskan pendapat Anda…') }}" @required($q->required)>{{ $answer['value'] ?? '' }}</textarea>
-                        @endif
+                            </section>
+                        @endforeach
                     </section>
                 @endforeach
-                <div id="preview-success" class="notice success" role="status" hidden>{{ __('Pratinjau selesai. Jawaban valid, tetapi tidak disimpan.') }}</div>
+                <div id="preview-success" class="notice success" role="status" hidden>
+                    {{ __('Pratinjau selesai. Jawaban valid, tetapi tidak disimpan.') }}</div>
+                <div class="survey-steps-nav" data-steps-nav hidden>
+                    <button type="button" class="btn" data-step-prev>← {{ __('Sebelumnya') }}</button>
+                    <span class="survey-steps-label" data-step-label></span>
+                    <button type="button" class="btn primary" data-step-next>{{ __('Berikutnya') }} →</button>
+                </div>
                 <div class="survey-submit"><span>{{ __('Masukan Anda digunakan untuk evaluasi layanan.') }}</span>
                     <div>
                         @unless ($preview)
-                            <button class="btn" type="submit" name="action" value="draft" formnovalidate>{{ __('Simpan draf') }}</button>
+                            <button class="btn" type="submit" name="action" value="draft"
+                                formnovalidate>{{ __('Simpan draf') }}</button>
                         @endunless
-                        <button class="btn primary" type="submit" name="action" value="submit" @unless($preview) data-confirm="{{ __('Pastikan jawaban Anda sudah sesuai. Jawaban yang sudah dikirim tidak dapat diubah melalui tautan ini.') }}" data-confirm-title="{{ __('Kirim jawaban survei?') }}" data-confirm-button="{{ __('Ya, kirim') }}" @endunless>
-                            {{ $preview ? __('Coba kirim') : __('Kirim respons') }} →</button>
+                        <button class="btn primary" type="submit" name="action" value="submit" data-step-final
+                            @unless ($preview) data-confirm="{{ __('Pastikan jawaban Anda sudah sesuai. Jawaban yang sudah dikirim tidak dapat diubah melalui tautan ini.') }}" data-confirm-title="{{ __('Kirim jawaban survei?') }}" data-confirm-button="{{ __('Ya, kirim') }}" @endunless>
+                            {{ $preview ? __('Coba kirim') : __('Kirim jawaban') }}</button>
                     </div>
                 </div>
                 <p class="footnote">

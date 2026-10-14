@@ -2046,3 +2046,43 @@ h6,
 }
 
 .other-input { margin-top: 8px; }
+
+.survey-section {
+    margin-top: 28px;
+    padding: 4px 0 0;
+}
+.survey-section-head {
+    padding: 14px 18px;
+    background: var(--ts-soft);
+    border-left: 4px solid var(--ts-red);
+    border-radius: 8px;
+}
+.survey-section-step {
+    display: block;
+    color: #806770;
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+}
+.survey-section-title {
+    margin: 4px 0 0;
+    color: #92213a;
+    font-size: 18px;
+}
+.survey-section .survey-question:last-child {
+    border-bottom: 0;
+}
+
+.survey-steps-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 28px 0 0;
+}
+.survey-steps-label {
+    color: #806770;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+.survey-steps-nav .btn[hidden] { display: none; }
