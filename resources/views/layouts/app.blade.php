@@ -23,7 +23,7 @@
         <a class="ts-brand-link" href="{{ route('dashboard') }}" aria-label="TransSurvey — Dashboard">@include('layouts.brand')</a>
         <div class="nav-label">{{ __('MENU UTAMA') }}</div>
         <nav>
-            @php($items = [['dashboard', 'dashboard', 'dashboard', 'Dashboard', false], ['surveys.index', 'surveys.*', 'survey', __('Survei'), true], ['clients.index', 'clients.*', 'clients', __('Klien'), true], ['invitations.index', 'invitations.*', 'mail', __('Undangan'), true], ['responses.index', 'responses.*', 'response', __('Respons'), false], ['bank.index', 'bank.*', 'bank', __('Bank Pertanyaan'), true], ['reports.index', 'reports.*', 'report', __('Laporan'), false], ['followups.index', 'followups.*', 'follow', __('Tindak Lanjut'), false]])
+            @php($items = [['dashboard', 'dashboard', 'dashboard', 'Dashboard', false], ['surveys.index', 'surveys.*', 'survey', __('Survei'), true], ['clients.index', 'clients.*', 'clients', __('Klien'), true], ['invitations.index', 'invitations.*', 'mail', __('Undangan'), true], ['responses.index', 'responses.*', 'response', __('Respons'), false], ['bank.index', 'bank.*', 'bank', __('Bank Pertanyaan'), true], ['reports.index', 'reports.*', 'report', __('Laporan'), false], ['followups.index', 'followups.*', 'follow', __('Tindak Lanjut'), false], ['data-cleanup.index', 'data-cleanup.*', 'clients', __('data_cleanup.title'), true]])
             @foreach ($items as [$route, $pattern, $icon, $label, $admin])
                 @if (!$admin || auth()->user()->role === 'admin')
                     <a class="nav-item {{ request()->routeIs($pattern) ? 'active' : '' }}" href="{{ route($route) }}" @if(request()->routeIs($pattern)) aria-current="page" @endif>

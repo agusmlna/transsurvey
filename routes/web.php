@@ -92,6 +92,12 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('admin')->group(function () {
+        Route::get('/data-cleanup', [App\Http\Controllers\DataDeletionController::class, 'index'])->name('data-cleanup.index');
+        Route::get('/data-cleanup/history', [App\Http\Controllers\DataDeletionController::class, 'history'])->name('data-cleanup.history');
+        Route::post('/data-cleanup/preview', [App\Http\Controllers\DataDeletionController::class, 'preview'])->name('data-cleanup.preview');
+        Route::get('/data-cleanup/preview/{token}', [App\Http\Controllers\DataDeletionController::class, 'show'])->where('token', '[A-Za-z0-9]{64}')->name('data-cleanup.show');
+        Route::post('/data-cleanup/delete/{token}', [App\Http\Controllers\DataDeletionController::class, 'destroy'])->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:10,1')->name('data-cleanup.destroy');
+
         // Surveys
         Route::get('/surveys/import', [App\Http\Controllers\QuestionImportController::class, 'create'])->name('surveys.import.create');
         Route::get('/surveys/import/template', [App\Http\Controllers\QuestionImportController::class, 'template'])->name('surveys.import.template');

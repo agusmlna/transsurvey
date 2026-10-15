@@ -13,11 +13,14 @@ class SendSurveyEmail implements ShouldQueue,ShouldBeUnique {
  public function uniqueId():string{return (string)$this->deliveryId;}
  public function backoff():array{return [60,180,300];}
  public function handle():void {
+  $existing=EmailDelivery::find($this->deliveryId);
+  if(!$existing)return;
   if(!config('survey.email_enabled') || config('mail.default')!=='smtp')throw new \RuntimeException('SMTP sending is not enabled.');
-  DB::transaction(function(){
-   $delivery=EmailDelivery::lockForUpdate()->findOrFail($this->deliveryId);
-   if(in_array($delivery->status,['sent','skipped']))return;
-   $inv=Invitation::with('survey')->lockForUpdate()->findOrFail($delivery->invitation_id);
+  DB::transaction(function() use ($existing){
+   $inv=Invitation::with('survey')->lockForUpdate()->find($existing->invitation_id);
+   if(!$inv)return;
+   $delivery=EmailDelivery::lockForUpdate()->find($this->deliveryId);
+   if(!$delivery || in_array($delivery->status,['sent','skipped']))return;
    if($inv->completed_at || $inv->is_demo || !$inv->survey->isOpen() || ($delivery->kind==='reminder' && $inv->reminder_count>=config('survey.max_reminders'))){$delivery->update(['status'=>'skipped']);return;}
    app(SurveyAccessService::class)->prepareForEmail($inv);
    Mail::to($inv->recipient_email)->send(new SurveyInvitationMail($inv,$delivery->kind==='reminder'));
