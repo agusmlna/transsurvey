@@ -62,7 +62,7 @@
                 @endif
             </fieldset>
             <button class="btn primary">{{ __('Buat tautan unik') }}</button>
-            <p class="footnote">{{ __('Setelah undangan dibuat, klik Kirim email pada baris PIC yang dituju.') }}</p>
+            <p class="footnote">{{ __('Email PIC otomatis diambil dari data klien yang dipilih. Setelah undangan dibuat, periksa alamat penerima sebelum mengirim email.') }}</p>
         </form>
     </details>
     <div class="list-toolbar">
@@ -119,6 +119,9 @@
         .select2-container--default .select2-results__option { padding: 9px 10px; }
         .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable { background: #fff6f8; color: var(--ts-red); }
         .select2-container--default .select2-results__option--selected { background: #fff0f3; color: var(--ts-red); font-weight: 600; }
+        .invitation-email-actions { display: flex; flex-direction: column; gap: 6px; min-width: 116px; }
+        .invitation-email-actions form { margin: 0; }
+        .invitation-email-actions .btn { width: 100%; justify-content: center; white-space: nowrap; padding: 7px 9px; font-size: 12px; }
     </style>
 @endpush
 @push('scripts')

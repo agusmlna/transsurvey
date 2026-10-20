@@ -16,10 +16,33 @@ class DeliveryService
             throw ValidationException::withMessages(['mail' => __('Pengiriman email untuk data contoh dinonaktifkan.')]);
         if ($invitation->completed_at)
             throw ValidationException::withMessages(['mail' => __('Survei sudah selesai diisi.')]);
-        if (!in_array($kind, ['invitation', 'reminder'], true))
+        if (!in_array($kind, ['invitation', 'reminder', 'not_started', 'save_draft'], true))
             throw new \InvalidArgumentException('Invalid delivery kind');
-        if ($kind === 'reminder' && $invitation->reminder_count >= config('survey.max_reminders'))
+
+        if ($kind === 'reminder' && $invitation->reminder_count >= config('survey.max_reminders')) {
             throw ValidationException::withMessages(['mail' => __('Batas reminder sudah tercapai.')]);
+        }
+
+        if (in_array($kind, ['not_started', 'save_draft'], true) && !$invitation->sent_at) {
+            throw ValidationException::withMessages(['mail' => __('Kirim email Invitation terlebih dahulu.')]);
+        }
+
+        if ($kind === 'not_started' && $invitation->started_at) {
+            throw ValidationException::withMessages(['mail' => __('PIC sudah mulai mengisi survei; template Not Started tidak sesuai.')]);
+        }
+
+        if ($kind === 'save_draft' && !$invitation->started_at) {
+            throw ValidationException::withMessages(['mail' => __('PIC belum memulai survei; template Save Draft belum sesuai.')]);
+        }
+
+        $otherPending = EmailDelivery::where('invitation_id', $invitation->id)
+            ->where('status', 'pending')
+            ->where('kind', '!=', $kind)
+            ->exists();
+        if ($otherPending) {
+            throw ValidationException::withMessages(['mail' => __('Email lain untuk undangan ini masih menunggu proses pengiriman.')]);
+        }
+
         $key = $kind . ':' . $invitation->id . ($kind === 'reminder' ? ':' . today()->format('Y-m-d') : '');
         $delivery = EmailDelivery::firstOrCreate(['dedupe_key' => $key], ['invitation_id' => $invitation->id, 'kind' => $kind, 'status' => 'pending']);
         if ($delivery->status === 'sent')
