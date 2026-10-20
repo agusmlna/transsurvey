@@ -29,6 +29,8 @@
         choice: window.TransSurveyI18n.t("Pilihan ganda"),
         text: window.TransSurveyI18n.t("Teks terbuka"),
         multiple: window.TransSurveyI18n.t("Banyak pilihan"),
+        date: window.TransSurveyI18n.t("Tanggal (otomatis)"),
+        email: window.TransSurveyI18n.t("Email (otomatis)"),
     };
 
     let step = 1;
@@ -461,6 +463,10 @@
                 [1, 2, 3, 4, 5].forEach((n) => dots.append(make('i', '', n)));
                 wrap.append(dots);
                 // f) renderPreview(), ganti cabang choice
+            } else if (q.type === 'date') {
+                wrap.append(make('div', 'sw-pv-txt', window.TransSurveyI18n.t("Tanggal akan terisi otomatis saat survei dibuka.")));
+            } else if (q.type === 'email') {
+                wrap.append(make('div', 'sw-pv-txt', window.TransSurveyI18n.t("Email akan diambil dari alamat PIC pada undangan.")));
             } else if (q.type === 'choice' || q.type === 'multiple') {
                 const icon = q.type === 'multiple' ? '☐ ' : '○ ';
                 const opts = q.options.length ? q.options : [window.TransSurveyI18n.t("Pilihan 1"), window.TransSurveyI18n.t("Pilihan 2")];

@@ -39,6 +39,7 @@ class SurveyController
     {
         return $this->editor(new Survey([
             'starts_at' => today(),
+            'ends_at' => today()->addDays(30),
             'status' => 'draft'
         ]));
     }
@@ -109,7 +110,7 @@ class SurveyController
                 'questions' => 'required|array|min:1|max:100',
                 'questions.*.text' => 'required|string|max:2000',
                 'questions.*.category' => 'required|string|max:100',
-                'questions.*.type' => 'required|in:rating,choice,text,multiple',
+                'questions.*.type' => 'required|in:rating,choice,text,multiple,date,email',
                 'questions.*.required' => 'nullable|boolean',
                 'questions.*.options' => 'nullable|string|max:5000',
                 'questions.*.allow_other' => 'nullable|boolean',
@@ -130,7 +131,7 @@ class SurveyController
                     FILTER_VALIDATE_BOOLEAN), 
                     'options' => in_array($q['type'], ['choice', 'multiple'], true) ? $options : [], 
                     'position' => $i + 1,
-                    'allow_other' => filter_var($q['allow_other'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                    'allow_other' => in_array($q['type'], ['choice', 'multiple'], true) && filter_var($q['allow_other'] ?? false, FILTER_VALIDATE_BOOLEAN)
                     ];
             }
         }

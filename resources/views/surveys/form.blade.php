@@ -295,6 +295,8 @@
                         <button type="button" data-type="choice">{{ __('◉ Pilihan ganda') }}</button>
                         <button type="button" data-type="text">{{ __('¶ Teks terbuka') }}</button>
                         <button type="button" data-type="multiple">☑ Banyak pilihan</button>
+                        <button type="button" data-type="date">▦ {{ __('Tanggal (otomatis)') }}</button>
+                        <button type="button" data-type="email">✉ {{ __('Email (otomatis)') }}</button>
                     </div>
 
                     <label>

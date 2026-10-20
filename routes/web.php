@@ -128,6 +128,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/invitations/{invitation}/send', [InvitationController::class, 'send'])
             ->name('invitations.send');
 
+        Route::post('/invitations/{invitation}/send-template/{kind}', [InvitationController::class, 'sendTemplate'])
+            ->where('kind', 'not_started|save_draft')
+            ->name('invitations.send-template');
+
         Route::post('/invitations/{invitation}/reminder', [InvitationController::class, 'remind'])
             ->name('invitations.remind');
 

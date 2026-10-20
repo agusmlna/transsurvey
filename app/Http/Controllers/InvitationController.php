@@ -46,6 +46,22 @@ class InvitationController
         $delivery->enqueue($invitation, 'invitation');
         return back()->with('success', __('Email masuk antrean. Pantau status pengiriman di daftar undangan.'));
     }
+    public function sendTemplate(Invitation $invitation, string $kind, DeliveryService $delivery)
+    {
+        if (!in_array($kind, ['not_started', 'save_draft'], true)) {
+            abort(404);
+        }
+
+        if (!$invitation->survey->isOpen()) {
+            throw ValidationException::withMessages(['mail' => __('Email hanya dapat dikirim dalam periode survei aktif.')]);
+        }
+
+        $delivery->enqueue($invitation, $kind);
+
+        $label = $kind === 'not_started' ? __('Not Started') : __('Save Draft');
+        return back()->with('success', __('Email :template masuk antrean. Pantau status pengiriman di daftar undangan.', ['template' => $label]));
+    }
+
     public function remind(Invitation $invitation, DeliveryService $delivery)
     {
         if (!$invitation->sent_at) throw ValidationException::withMessages(['mail' => __('Kirim email undangan pertama terlebih dahulu.')]);

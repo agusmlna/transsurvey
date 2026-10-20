@@ -129,9 +129,33 @@
                                                 value="{{ $answer['other'] ?? '' }}" hidden>
                                         @endif
                                     </fieldset>
+                                @elseif ($q->type === 'date')
+                                    <input
+                                        type="date"
+                                        name="answers[{{ $q->id }}][value]"
+                                        value="{{ ($answer['value'] ?? '') !== '' ? $answer['value'] : today()->format('Y-m-d') }}"
+                                        @required($q->required)
+                                    >
+
+                                @elseif ($q->type === 'email')
+                                    <input
+                                        type="email"
+                                        name="answers[{{ $q->id }}][value]"
+                                        value="{{ ($answer['value'] ?? '') !== '' ? $answer['value'] : ($invitation?->recipient_email ?? '') }}"
+                                        maxlength="255"
+                                        autocomplete="email"
+                                        @required($q->required)
+                                    >
+
                                 @else
-                                    <textarea aria-labelledby="question-{{ $q->id }}" name="answers[{{ $q->id }}][value]" rows="4"
-                                        maxlength="5000" placeholder="{{ __('Tuliskan pendapat Anda…') }}" @required($q->required)>{{ $answer['value'] ?? '' }}</textarea>
+                                    <textarea
+                                        aria-labelledby="question-{{ $q->id }}"
+                                        name="answers[{{ $q->id }}][value]"
+                                        rows="4"
+                                        maxlength="5000"
+                                        placeholder="{{ __('Tuliskan pendapat Anda…') }}"
+                                        @required($q->required)
+                                    >{{ $answer['value'] ?? '' }}</textarea>
                                 @endif
                             </section>
                         @endforeach
