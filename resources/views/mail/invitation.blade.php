@@ -112,19 +112,8 @@
             </p>
 
             <p style="margin:0 0 14px">
-                {{ $s['labels']['link'] }}: <a href="{{ $surveyUrl }}" style="color:#c8102e;word-break:break-all">{{ $surveyUrl }}</a>
-            </p>
-
-            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;border:1px solid #fecdd3;border-radius:8px;background:#fff1f2">
-                <tr>
-                    <td style="padding:12px 18px;text-align:center">
-                        <div style="font-size:12px;color:#9f1239">{{ $s['labels']['code'] }}</div>
-                        <div style="font-family:Arial,sans-serif;font-size:20px;font-weight:bold;letter-spacing:3px;color:#c8102e">{{ $code }}</div>
-                    </td>
-                </tr>
-            </table>
-
-            <p style="margin:0 0 14px">
+                {{ $s['labels']['link'] }}: <a href="{{ $surveyUrl }}" style="color:#c8102e;word-break:break-all">{{ $surveyUrl }}</a><br>
+                {{ $s['labels']['code'] }}: <strong>{{ $code }}</strong><br>
                 {{ $s['labels']['deadline'] }}: {{ $s['deadline'] }}
             </p>
 
