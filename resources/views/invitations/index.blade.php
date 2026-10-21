@@ -71,7 +71,12 @@
                 href="{{ route('invitations.index', ['status' => 'pending']) }}"
                 class="{{ request('status') === 'pending' ? 'selected' : '' }}">{{ __('Belum selesai') }}</a><a
                 href="{{ route('invitations.index', ['status' => 'completed']) }}"
-                class="{{ request('status') === 'completed' ? 'selected' : '' }}">{{ __('Selesai') }}</a></div>
+                class="{{ request('status') === 'completed' ? 'selected' : '' }}">{{ __('Selesai') }}</a>
+                <a href="{{ route('invitations.index', ['status' => 'draft']) }}"
+                    class="{{ request('status') === 'draft' ? 'selected' : '' }}">
+                        {{ __('Draft saved') }}
+                </a>
+            </div>
     </div>
     <section class="panel">
         <div class="panel-heading">

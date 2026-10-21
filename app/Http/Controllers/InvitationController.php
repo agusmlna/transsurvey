@@ -18,6 +18,7 @@ class InvitationController
         $q = Invitation::with(['survey', 'client', 'deliveries'])->latest();
         if ($r->input('status') === 'completed') $q->whereNotNull('completed_at');
         if ($r->input('status') === 'pending') $q->whereNull('completed_at');
+        if ($r->input('status') === 'draft')     $q->whereNull('completed_at')->whereNotNull('started_at'); 
         if ($r->boolean('_table')) return $tables->respond($r, $q, 'invitations');
         return view('invitations.index', ['invitations' => $q->paginate(20)->withQueryString(), 'surveys' => Survey::where('status', 'active')->get(), 'clients' => Client::where('active', true)->orderBy('name')->get()]);
     }
