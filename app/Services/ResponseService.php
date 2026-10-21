@@ -33,7 +33,7 @@ class ResponseService
                     if ($q->type === 'rating') $rules[$prefix.'.value'][] = Rule::in(['1','2','3','4','5']);
                     if ($q->type === 'choice') $rules[$prefix.'.value'][] = Rule::in($allowed);
                     if ($q->type === 'date') $rules[$prefix.'.value'][] = 'date_format:Y-m-d';
-                    if ($q->type === 'email') $rules[$prefix.'.value'][] = 'email|max:255';
+                    if ($q->type === 'email') array_push($rules[$prefix.'.value'], 'email', 'max:255');
                 }
                 $chosen = (array) data_get($input, $prefix.'.value', []);
                 $rules[$prefix.'.other'] = [(!$draft && in_array('__other__', $chosen, true)) ? 'required' : 'nullable', 'string', 'max:255'];
