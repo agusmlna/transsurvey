@@ -15,12 +15,18 @@ class SurveyInvitationMail extends Mailable
 
     public function build()
     {
+        $now = now();
+        $bulanId = $now->copy()->locale('id')->translatedFormat('F'); // Oktober
+        $bulanEn = $now->copy()->locale('en')->translatedFormat('F'); // October
+        $tahun   = $now->format('Y');   
+
         // Subjek dwibahasa: Indonesia dulu, lalu Inggris (sesuai template email TCID).
         $subject = match ($this->resolvedKind()) {
-            'not_started' => 'Pengingat – Client Satisfaction Survey TCID 2026 / Reminder – TCID 2026 Client Satisfaction Survey',
-            'save_draft'  => 'Pengingat untuk Melanjutkan – Client Satisfaction Survey TCID 2026 / Reminder to Continue – TCID 2026 Client Satisfaction Survey',
-            default       => 'Undangan – Client Satisfaction Survey TCID 2026 / Invitation – TCID 2026 Client Satisfaction Survey',
+            'not_started' => "Pengingat – Client Satisfaction Survey TCID {$bulanId} {$tahun} / Reminder – TCID Client Satisfaction Survey {$bulanEn} {$tahun}",
+            'save_draft'  => "Pengingat untuk Melanjutkan – Client Satisfaction Survey TCID {$bulanId} {$tahun} / Reminder to Continue – TCID Client Satisfaction Survey {$bulanEn} {$tahun}",
+            default       => "Undangan – Client Satisfaction Survey TCID {$bulanId} {$tahun} / Invitation – TCID Client Satisfaction Survey {$bulanEn} {$tahun}",
         };
+
 
         return $this->subject($subject)
             ->view('mail.invitation')
