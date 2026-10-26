@@ -110,7 +110,7 @@ class SurveyController
                 'questions' => 'required|array|min:1|max:100',
                 'questions.*.text' => 'required|string|max:2000',
                 'questions.*.category' => 'required|string|max:100',
-                'questions.*.type' => 'required|in:rating,choice,text,multiple,date,email',
+                'questions.*.type' => 'required|in:rating,choice,text,multiple,date,email,name,company',
                 'questions.*.required' => 'nullable|boolean',
                 'questions.*.options' => 'nullable|string|max:5000',
                 'questions.*.allow_other' => 'nullable|boolean',

@@ -31,6 +31,8 @@
         multiple: window.TransSurveyI18n.t("Banyak pilihan"),
         date: window.TransSurveyI18n.t("Tanggal (otomatis)"),
         email: window.TransSurveyI18n.t("Email (otomatis)"),
+        name: window.TransSurveyI18n.t("Nama (otomatis)"),
+        company: window.TransSurveyI18n.t("Perusahaan (otomatis)"),
     };
 
     let step = 1;
@@ -467,6 +469,10 @@
                 wrap.append(make('div', 'sw-pv-txt', window.TransSurveyI18n.t("Tanggal akan terisi otomatis saat survei dibuka.")));
             } else if (q.type === 'email') {
                 wrap.append(make('div', 'sw-pv-txt', window.TransSurveyI18n.t("Email akan diambil dari alamat PIC pada undangan.")));
+            } else if (q.type === 'name') {
+                wrap.append(make('div', 'sw-pv-txt', window.TransSurveyI18n.t("Nama akan diambil dari nama PIC pada undangan.")));
+            } else if (q.type === 'company') {
+                wrap.append(make('div', 'sw-pv-txt', window.TransSurveyI18n.t("Nama perusahaan akan diambil dari data klien pada undangan.")));
             } else if (q.type === 'choice' || q.type === 'multiple') {
                 const icon = q.type === 'multiple' ? '☐ ' : '○ ';
                 const opts = q.options.length ? q.options : [window.TransSurveyI18n.t("Pilihan 1"), window.TransSurveyI18n.t("Pilihan 2")];
