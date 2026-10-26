@@ -146,6 +146,26 @@
                                         autocomplete="email"
                                         @required($q->required)
                                     >
+                                
+                                @elseif ($q->type === 'name')
+                                    <input
+                                        type="text"
+                                        name="answers[{{ $q->id }}][value]"
+                                        value="{{ ($answer['value'] ?? '') !== '' ? $answer['value'] : ($invitation?->recipient_name ?? '') }}"
+                                        maxlength="255"
+                                        autocomplete="name"
+                                        @required($q->required)
+                                    >
+
+                                @elseif ($q->type === 'company')
+                                    <input
+                                        type="text"
+                                        name="answers[{{ $q->id }}][value]"
+                                        value="{{ ($answer['value'] ?? '') !== '' ? $answer['value'] : ($invitation?->client?->name ?? '') }}"
+                                        maxlength="255"
+                                        autocomplete="organization"
+                                        @required($q->required)
+                                    >
 
                                 @else
                                     <textarea

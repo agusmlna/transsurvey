@@ -297,6 +297,8 @@
                         <button type="button" data-type="multiple">☑ Banyak pilihan</button>
                         <button type="button" data-type="date">▦ {{ __('Tanggal (otomatis)') }}</button>
                         <button type="button" data-type="email">✉ {{ __('Email (otomatis)') }}</button>
+                        <button type="button" data-type="name">👤 {{ __('Nama (otomatis)') }}</button>
+                        <button type="button" data-type="company">🏢 {{ __('Perusahaan (otomatis)') }}</button>
                     </div>
 
                     <label>
