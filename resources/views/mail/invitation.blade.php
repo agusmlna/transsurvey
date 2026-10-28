@@ -11,7 +11,7 @@
         $deadlineId = $invitation->survey->ends_at->locale('id')->translatedFormat('j F Y');
         $deadlineEn = $invitation->survey->ends_at->locale('en')->translatedFormat('j F Y');
 
-        // Isi email per bahasa. Urutan tampil: Indonesia penuh dulu, garis, lalu Inggris penuh.
+        // Isi email per bahasa. Urutan tampil: Inggris penuh dulu, garis, lalu Indonesia penuh.
         $sections = [
             'id' => [
                 'greeting' => 'Yth. Bapak/Ibu '.$name.',',
@@ -95,7 +95,7 @@
     @endphp
 
     <div style="max-width:620px;margin:0 auto;padding:24px;font-family:Arial,sans-serif;font-size:15px;color:#263e46;line-height:1.7">
-        @foreach (['id', 'en'] as $lang)
+        @foreach (['en', 'id'] as $lang)
             @php
                 $s = $sections[$lang];
                 $t = $s[$kind] ?? $s['invitation'];
@@ -125,7 +125,7 @@
 
             <p style="margin:0">{{ $s['sign'][0] }}<br>{{ $s['sign'][1] }}</p>
 
-            @if ($lang === 'id')
+            @if ($lang === 'en')
                 <hr style="border:0;border-top:1px solid #cbd5e1;margin:32px 0">
             @endif
         @endforeach
