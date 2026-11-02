@@ -29,8 +29,12 @@ class SendSurveyCompletionEmail implements ShouldQueue
         }
         $response = $notification->response;
         $admin = $notification->user;
-        if (! $admin || $admin->role !== 'admin'
-            || $admin->email !== $notification->recipient_email
+        // An admin recipient must still be an admin with the same email; a configured
+        // address must still be in the configured list.
+        $recipientValid = $notification->user_id === null
+            ? in_array(strtolower($notification->recipient_email), config('survey.completion_recipients', []), true)
+            : $admin && $admin->role === 'admin' && $admin->email === $notification->recipient_email;
+        if (! $recipientValid
             || ! $response || ! $response->invitation?->completed_at
             || $response->invitation->is_demo || $response->client->is_demo || $response->survey->is_demo) {
             $this->writeStatus(['pending', 'failed'], ['status' => 'skipped']);
@@ -45,7 +49,7 @@ class SendSurveyCompletionEmail implements ShouldQueue
             return;
         }
         try {
-            Mail::to($notification->recipient_email)->send(new SurveyCompletedMail($response, $admin->name));
+            Mail::to($notification->recipient_email)->send(new SurveyCompletedMail($response, $admin?->name ?? 'Bapak/Ibu'));
         } catch (\Throwable $exception) {
             // A transport error may be retried. If this write also fails, keep 'sending'
             // for manual review instead of risking an uncontrolled duplicate.

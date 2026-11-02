@@ -71,6 +71,33 @@ class SurveyAdminNotificationTest extends TestCase
         $this->get(route('responses.show', $response))->assertRedirect(route('login'));
     }
 
+    public function test_configured_recipients_replace_admins(): void
+    {
+        config(['survey.completion_recipients' => ['gunawan@trans-cosmos.co.id', 'dean.maudy@trans-cosmos.co.id']]);
+        $this->admin();
+        $this->submit($this->invitation());
+        $this->assertDatabaseCount('admin_survey_notifications', 2);
+        foreach (AdminSurveyNotification::all() as $notification) {
+            $this->assertNull($notification->user_id);
+            (new SendSurveyCompletionEmail($notification->id))->handle();
+        }
+        Mail::assertSent(SurveyCompletedMail::class, 2);
+        Mail::assertSent(SurveyCompletedMail::class, fn ($mail) => $mail->hasTo('gunawan@trans-cosmos.co.id'));
+        Mail::assertSent(SurveyCompletedMail::class, fn ($mail) => $mail->hasTo('dean.maudy@trans-cosmos.co.id'));
+        Mail::assertNotSent(SurveyCompletedMail::class, fn ($mail) => $mail->hasTo('admin@example.test'));
+    }
+
+    public function test_configured_recipient_removed_before_delivery_is_skipped(): void
+    {
+        config(['survey.completion_recipients' => ['gunawan@trans-cosmos.co.id']]);
+        $this->admin();
+        $this->submit($this->invitation());
+        config(['survey.completion_recipients' => ['dean.maudy@trans-cosmos.co.id']]);
+        (new SendSurveyCompletionEmail(AdminSurveyNotification::firstOrFail()->id))->handle();
+        Mail::assertNothingSent();
+        $this->assertSame('skipped', AdminSurveyNotification::firstOrFail()->status);
+    }
+
     public function test_draft_and_invalid_submission_do_not_notify(): void
     {
         $inv = $this->invitation();
