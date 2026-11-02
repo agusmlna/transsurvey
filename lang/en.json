@@ -566,5 +566,16 @@
   "● Skor kepuasan": "● Satisfaction score",
   "Kelola": "Manage",
   "s.d.": "to",
-  "Halaman": "Page"
+  "Halaman": "Page",
+  "PIC": "PIC",
+  "Semua PIC": "All PICs",
+  "Terkirim": "Sent",
+  "Sudah isi": "Completed",
+  "Belum isi": "Pending",
+  "Survei terkirim": "Surveys sent",
+  "Belum diisi": "Not yet completed",
+  ":sent survei terkirim, :done sudah diisi, :pending belum diisi": ":sent surveys sent, :done completed, :pending pending",
+  "Undangan yang emailnya sudah dikirim ke PIC": "Invitations whose email was sent to the PIC",
+  "Survei terkirim yang belum diisi PIC": "Sent surveys the PIC has not completed",
+  "Terkirim = undangan yang emailnya sudah dikirim ke PIC. Belum isi = terkirim dikurangi yang sudah mengisi survei. Klien dengan nama sama digabung menjadi satu baris; seluruh PIC-nya ditampilkan.": "Sent = invitations whose email was sent to the PIC. Pending = sent minus completed surveys. Clients with the same name are merged into one row and all their PICs are listed."
 }

@@ -25,7 +25,7 @@
     </table>
     <table class="rs-metrics">
         <tr>
-            <td><span>{{ __('Total respons') }}</span><strong>{{ $responses->count() }}</strong><small>{{ __('Pada periode yang dipilih') }}</small></td>
+            <td><span>{{ __('Total respons') }}</span><strong>{{ $responses->count() }}<em> / {{ $sent }}</em></strong><small>{{ __(':sent survei terkirim, :done sudah diisi, :pending belum diisi', ['sent' => $sent, 'done' => $sent - $pending, 'pending' => $pending]) }}</small></td>
             <td><span>Response
                     rate</span><strong>{{ $invCount ? number_format($rate, 0, ',', '.') . '%' : '-' }}</strong><small>{{ $complete }}
                     {{ __('dari') }} {{ $invCount }} {{ __('undangan') }}</small></td>
@@ -42,9 +42,12 @@
     <table class="rs-table" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
-                <th style="width:29%">{{ __('Klien') }}</th>
-                <th style="width:26%">{{ __('Proyek') }}</th>
-                <th class="rs-num">{{ __('Respons') }}</th>
+                <th style="width:18%">{{ __('Klien') }}</th>
+                <th style="width:20%">{{ __('PIC') }}</th>
+                <th style="width:16%">{{ __('Proyek') }}</th>
+                <th class="rs-num">{{ __('Terkirim') }}</th>
+                <th class="rs-num">{{ __('Sudah isi') }}</th>
+                <th class="rs-num">{{ __('Belum isi') }}</th>
                 <th class="rs-num">{{ __('Skor / 5') }}</th>
                 <th class="rs-num">{{ __('Persentase') }}</th>
             </tr>
@@ -53,8 +56,11 @@
             @forelse($clientRows as $client)
                 <tr>
                     <td>{{ $client['name'] }}</td>
+                    <td>{{ $client['pic'] }}</td>
                     <td>{{ $client['project'] }}</td>
-                    <td class="rs-num">{{ $client['responses'] }}</td>
+                    <td class="rs-num">{{ $client['sent'] }}</td>
+                    <td class="rs-num">{{ $client['completed'] }}</td>
+                    <td class="rs-num">{{ $client['pending'] }}</td>
                     <td class="rs-num" data-order="{{ $client['score'] ?? -1 }}">
                         {{ $client['score'] === null ? '-' : number_format($client['score'], 2, ',', '.') }}</td>
                     <td class="rs-num" data-order="{{ $client['percentage'] ?? -1 }}">
@@ -62,7 +68,7 @@
                     </td>
                 </tr>
             @empty<tr>
-                    <td colspan="5" class="rs-empty">{{ __('Belum ada respons pada filter ini.') }}</td>
+                    <td colspan="8" class="rs-empty">{{ __('Belum ada respons pada filter ini.') }}</td>
                 </tr>
             @endforelse
         </tbody>
@@ -97,10 +103,11 @@
     <table class="rs-table" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>
             <tr>
-                <th style="width:28%">{{ __('Klien / proyek') }}</th>
-                <th style="width:28%">{{ __('Kuesioner') }}</th>
-                <th class="rs-num" style="width:16%">{{ __('Skor / 5') }}</th>
-                <th style="width:28%">{{ __('Tanggal (WIB)') }}</th>
+                <th style="width:24%">{{ __('Klien / proyek') }}</th>
+                <th style="width:20%">{{ __('PIC') }}</th>
+                <th style="width:24%">{{ __('Kuesioner') }}</th>
+                <th class="rs-num" style="width:12%">{{ __('Skor / 5') }}</th>
+                <th style="width:20%">{{ __('Tanggal (WIB)') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -108,6 +115,7 @@
                 <tr>
                     <td><strong>{{ $response->client?->name ?? __('Klien tidak tersedia') }}</strong><small>{{ $response->client?->project ?: '-' }}</small>
                     </td>
+                    <td>{{ $response->invitation?->recipient_name ?: ($response->client?->contact ?: '-') }}</td>
                     <td>{{ $response->survey?->title ?? __('Kuesioner tidak tersedia') }}</td>
                     <td class="rs-num" data-order="{{ $response->score ?? -1 }}">
                         {{ $response->score === null ? '-' : number_format($response->score, 2, ',', '.') }}</td>
@@ -115,7 +123,7 @@
                     </td>
                 </tr>
             @empty<tr>
-                    <td colspan="4" class="rs-empty">{{ __('Belum ada respons pada filter ini.') }}</td>
+                    <td colspan="5" class="rs-empty">{{ __('Belum ada respons pada filter ini.') }}</td>
                 </tr>
             @endforelse
         </tbody>
@@ -123,5 +131,6 @@
     <div class="rs-method"><strong>{{ __('Dasar perhitungan') }}</strong>
         <p>{{ __('Skor respons adalah rata-rata jawaban rating yang diisi. Skor keseluruhan adalah rata-rata skor respons. Skor kategori adalah rata-rata jawaban rating dalam kategori tersebut. Persentase skor = skor / 5 × 100. Teks dan pilihan ganda tidak dihitung.') }}</p>
         <p>{{ __('Filter tanggal respons memakai waktu pengiriman survei. Response rate memakai undangan yang dibuat pada periode filter beserta status penyelesaiannya. Karena tanggal acuannya berbeda, total respons dapat berbeda dari jumlah undangan selesai.') }}</p>
+        <p>{{ __('Terkirim = undangan yang emailnya sudah dikirim ke PIC. Belum isi = terkirim dikurangi yang sudah mengisi survei. Klien dengan nama sama digabung menjadi satu baris; seluruh PIC-nya ditampilkan.') }}</p>
     </div>
 </div>
