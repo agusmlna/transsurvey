@@ -1,16 +1,39 @@
 <form method="get" class="ts-filters no-print">
     <div class="ts-filter-main">
+        @php
+            // One option per client name; each client row is one PIC of that client.
+            $clientNames = $clients->pluck('name')->map(fn ($name) => trim($name))->unique(fn ($name) => mb_strtolower($name))->sort(SORT_NATURAL | SORT_FLAG_CASE);
+            $selectedPic = request()->filled('client_id') ? $clients->firstWhere('id', (int) request('client_id')) : null;
+            $selectedClient = request('client', $selectedPic?->name);
+        @endphp
         <label>
             {{ __('Klien') }}
-            <select name="client_id">
+            <select name="client" data-client-filter>
                 <option value="">{{ __('Semua klien') }}</option>
 
-                @foreach ($clients as $client)
+                @foreach ($clientNames as $name)
+                    <option
+                        value="{{ $name }}"
+                        @selected($selectedClient !== null && mb_strtolower(trim($selectedClient)) === mb_strtolower($name))
+                    >
+                        {{ $name }}
+                    </option>
+                @endforeach
+            </select>
+        </label>
+
+        <label>
+            {{ __('PIC') }}
+            <select name="client_id" data-pic-filter>
+                <option value="">{{ __('Semua PIC') }}</option>
+
+                @foreach ($clients->sortBy(fn ($client) => mb_strtolower(trim($client->name)).' '.mb_strtolower($client->contact)) as $client)
                     <option
                         value="{{ $client->id }}"
+                        data-client="{{ mb_strtolower(trim($client->name)) }}"
                         @selected(request('client_id') == $client->id)
                     >
-                        {{ $client->name }}
+                        {{ trim($client->contact) ?: $client->email }}{{ $client->project ? ' - '.$client->project : '' }}
                     </option>
                 @endforeach
             </select>

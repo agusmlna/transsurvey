@@ -73,15 +73,16 @@ class ReportExportTest extends TestCase
             $book = IOFactory::load($path);
             $this->assertSame(['Ringkasan', 'Detail Jawaban'], $book->getSheetNames());
             $sheet = $book->getSheetByName('Detail Jawaban');
-            $this->assertSame('Testing 3', $sheet->getCell('B15')->getValue());
-            $this->assertSame($sheet->getCell('A15')->getValue(), $sheet->getCell('A16')->getValue());
-            $this->assertSame('', (string) $sheet->getCell('A17')->getValue());
-            $this->assertEquals(4, $sheet->getCell('F15')->getValue());
-            $this->assertEquals(0.8, $sheet->getCell('G15')->getValue());
-            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('E15')->getDataType());
-            $this->assertSame('dd/mm/yyyy hh:mm', $sheet->getCell('E15')->getStyle()->getNumberFormat()->getFormatCode());
-            $this->assertSame('A14:L16', $sheet->getAutoFilter()->getRange());
-            $this->assertSame('C15', $sheet->getFreezePane());
+            $this->assertSame('PIC', $sheet->getCell('C16')->getValue());
+            $this->assertSame('Testing 3', $sheet->getCell('B17')->getValue());
+            $this->assertSame('QA', $sheet->getCell('C17')->getValue());
+            $this->assertSame($sheet->getCell('A17')->getValue(), $sheet->getCell('A18')->getValue());
+            $this->assertSame('', (string) $sheet->getCell('A19')->getValue());
+            $this->assertEquals(4, $sheet->getCell('G17')->getValue());
+            $this->assertEquals(0.8, $sheet->getCell('H17')->getValue());
+            $this->assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('F17')->getDataType());
+            $this->assertSame('dd/mm/yyyy hh:mm', $sheet->getCell('F17')->getStyle()->getNumberFormat()->getFormatCode());
+            $this->assertSame('A16:M18', $sheet->getAutoFilter()->getRange());
             $book->disconnectWorksheets();
         } finally { @unlink($path); }
     }
@@ -97,10 +98,10 @@ class ReportExportTest extends TestCase
         try {
             $book = IOFactory::load($path);
             $detail = $book->getSheetByName('Detail Jawaban');
-            $this->assertSame('=1+1', $detail->getCell('B15')->getValue());
-            $this->assertSame(DataType::TYPE_STRING, $detail->getCell('B15')->getDataType());
-            $this->assertSame(DataType::TYPE_STRING, $detail->getCell('L15')->getDataType());
-            $this->assertStringStartsWith('=HYPERLINK', $detail->getCell('L15')->getValue());
+            $this->assertSame('=1+1', $detail->getCell('B17')->getValue());
+            $this->assertSame(DataType::TYPE_STRING, $detail->getCell('B17')->getDataType());
+            $this->assertSame(DataType::TYPE_STRING, $detail->getCell('M17')->getDataType());
+            $this->assertStringStartsWith('=HYPERLINK', $detail->getCell('M17')->getValue());
             $book->disconnectWorksheets();
         } finally { @unlink($path); }
     }
@@ -128,10 +129,37 @@ class ReportExportTest extends TestCase
         $path = $response->baseResponse->getFile()->getPathname();
         try {
             $book = IOFactory::load($path);
-            $this->assertSame('Belum ada respons yang sesuai dengan filter laporan ini.', $book->getSheetByName('Detail Jawaban')->getCell('A15')->getValue());
-            $this->assertSame('-', $book->getSheetByName('Ringkasan')->getCell('B19')->getValue());
+            $this->assertSame('Belum ada respons yang sesuai dengan filter laporan ini.', $book->getSheetByName('Detail Jawaban')->getCell('A17')->getValue());
+            $this->assertSame('-', $book->getSheetByName('Ringkasan')->getCell('B24')->getValue());
             $book->disconnectWorksheets();
         } finally { @unlink($path); }
+    }
+
+    public function test_clients_with_the_same_name_are_one_row_and_pic_filter_narrows(): void
+    {
+        $filters = $this->fixture();
+        $survey = Survey::findOrFail($filters['survey_id']);
+        $second = Client::create(['name' => 'Testing 3', 'contact' => 'Budi', 'email' => 'budi@example.test', 'project' => 'Outbond', 'active' => true]);
+        $this->response($second, $survey);
+        $third = Client::create(['name' => 'Testing 3', 'contact' => 'Sari', 'email' => 'sari@example.test', 'project' => 'Outbond', 'active' => true]);
+        $token = Str::random(64);
+        Invitation::create(['survey_id' => $survey->id, 'client_id' => $third->id, 'token' => $token, 'token_hash' => hash('sha256', $token), 'recipient_name' => 'Sari', 'recipient_email' => $third->email, 'sent_at' => now()]);
+
+        $byName = ['client' => 'Testing 3', 'source' => 'real'];
+        $data = app(ReportPresentation::class)->data(Request::create('/', 'GET', $byName), app(ReportService::class));
+        $this->assertCount(1, $data['clientRows']);
+        $row = $data['clientRows']->first();
+        $this->assertSame(['QA', 'Budi', 'Sari'], explode(', ', $row['pic']));
+        $this->assertSame([3, 2, 1, 2], [$row['sent'], $row['completed'], $row['pending'], $row['responses']]);
+        $this->assertSame([3, 1], [$data['sent'], $data['pending']]);
+
+        $data = app(ReportPresentation::class)->data(Request::create('/', 'GET', ['client_id' => $second->id]), app(ReportService::class));
+        $this->assertCount(1, $data['responses']);
+        $this->assertSame('Budi', $data['reportFilters']['PIC']);
+        $this->assertSame('Testing 3', $data['reportFilters']['Klien']);
+
+        $page = $this->get(route('reports.index', $byName))->assertOk();
+        $this->assertSame(1, substr_count($page->getContent(), 'value="Testing 3"'));
     }
 
     public function test_all_downloads_validate_date_order(): void

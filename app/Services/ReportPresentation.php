@@ -10,24 +10,38 @@ class ReportPresentation
     public function data(Request $request, ReportService $reports): array
     {
         $data = $reports->summary($request);
+        $pic = $request->filled('client_id') ? Client::findOrFail($request->integer('client_id')) : null;
         $data['generatedAt'] = now('Asia/Jakarta');
         $data['reportFilters'] = [
-            __('Klien') => $request->filled('client_id') ? Client::findOrFail($request->integer('client_id'))->name : __('Semua klien'),
+            __('Klien') => $pic?->name ?? ($request->input('client') ?: __('Semua klien')),
+            __('PIC') => $pic ? $this->picLabel($pic) : __('Semua PIC'),
             __('Kuesioner') => $request->filled('survey_id') ? Survey::findOrFail($request->integer('survey_id'))->title : __('Semua kuesioner'),
             __('Kategori') => $request->input('category') ?: __('Semua kategori'),
             __('Proyek') => $request->input('project') ?: __('Semua proyek'),
             __('Sumber data') => ['real' => __('Operasional'), 'demo' => __('Contoh')][$request->input('source')] ?? __('Semua data'),
             __('Periode respons') => $this->period($request),
         ];
-        $data['clientRows'] = $data['responses']->groupBy('client_id')->map(function ($rows) {
-            $score = $rows->whereNotNull('score')->avg('score');
-            return [
-                'name' => $rows->first()->client?->name ?? __('Klien tidak tersedia'),
-                'project' => $rows->first()->client?->project ?: '-',
-                'responses' => $rows->count(), 'score' => $score,
-                'percentage' => $score === null ? null : $score / 5,
-            ];
-        })->sortBy('name')->values();
+        // One row per client name: a company with several PIC rows is shown once,
+        // including PICs that were invited but have not responded yet.
+        $stats = $data['invitationStats'];
+        $responsesByClient = $data['responses']->groupBy('client_id');
+        $clientIds = $stats->keys()->merge($responsesByClient->keys())->unique();
+        $data['clientRows'] = Client::whereIn('id', $clientIds)->get()
+            ->groupBy(fn ($client) => mb_strtolower(trim($client->name)))
+            ->map(function ($clients) use ($stats, $responsesByClient) {
+                $rows = $clients->flatMap(fn ($client) => $responsesByClient->get($client->id, collect()));
+                $score = $rows->whereNotNull('score')->avg('score');
+                $sent = $clients->sum(fn ($client) => (int) ($stats[$client->id]->sent ?? 0));
+                $completed = $clients->sum(fn ($client) => (int) ($stats[$client->id]->completed ?? 0));
+                return [
+                    'name' => $clients->first()->name,
+                    'project' => $clients->pluck('project')->filter()->unique()->implode(', ') ?: '-',
+                    'pic' => $clients->map(fn ($client) => $this->picLabel($client))->unique()->implode(', ') ?: '-',
+                    'sent' => $sent, 'completed' => $completed, 'pending' => max(0, $sent - $completed),
+                    'responses' => $rows->count(), 'score' => $score,
+                    'percentage' => $score === null ? null : $score / 5,
+                ];
+            })->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
         $data['summaryText'] = $this->summaryText($data);
         // A fixed local image asset only. Never fetch a URL supplied by a request.
         $logo = public_path(config('transsurvey-reports.logo', 'images/tcid logo.png'));
@@ -50,6 +64,11 @@ class ReportPresentation
             }
         }
         return $data;
+    }
+
+    public function picLabel(Client $client): string
+    {
+        return trim((string) $client->contact) ?: (string) $client->email;
     }
 
     private function period(Request $request): string

@@ -20,12 +20,12 @@ class ReportController
         return response()->streamDownload(function () use ($r, $reports) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, [__('Klien'), __('Proyek'), __('Kuesioner'), __('Tanggal'), __('Skor'), __('Persentase'), __('Kategori'), __('Pertanyaan'), __('Jawaban'), __('Komentar')], ',', '"', '');
+            fputcsv($out, [__('Klien'), __('PIC'), __('Proyek'), __('Kuesioner'), __('Tanggal'), __('Skor'), __('Persentase'), __('Kategori'), __('Pertanyaan'), __('Jawaban'), __('Komentar')], ',', '"', '');
             $reports->responses($r)->orderBy('id')->chunkById(100, function ($rows) use ($out, $r, $reports) {
                 $reports->applyCategoryScores($rows, $r);
                 foreach ($rows as $row) {
                     foreach ($row->answers as $a) {
-                        $cells = [$row->client->name, $row->client->project, $row->survey->title, $row->submitted_at->toIso8601String(), $row->score, $row->score === null ? '' : round($row->score / 5 * 100, 2), $a->category, $a->question_text, $a->value, $a->comment];
+                        $cells = [$row->client->name, $row->invitation?->recipient_name ?: $row->client->contact, $row->client->project, $row->survey->title, $row->submitted_at->toIso8601String(), $row->score, $row->score === null ? '' : round($row->score / 5 * 100, 2), $a->category, $a->question_text, $a->value, $a->comment];
                         $cells = array_map(function ($v) {
                             $s = (string)$v;
                             return preg_match('/^[=+\-@\t\r\n]/', $s) ? "'" . $s : $s;
@@ -87,6 +87,7 @@ class ReportController
         $name = collect([
             __('Laporan TransSurvey'),
             $filters[__('Klien')] ?? null,
+            $filters[__('PIC')] ?? null,
             $filters[__('Kuesioner')] ?? null,
             $filters[__('Kategori')] ?? null,
             $filters[__('Periode respons')] ?? null,

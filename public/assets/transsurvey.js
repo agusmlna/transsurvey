@@ -23,6 +23,28 @@
     window.toast = toast;
     // Public helper is also used by the existing question editor.
     window.TransSurveyUI = { toast };
+    // PIC filter only lists the PICs of the selected client name.
+    document.querySelectorAll('[data-client-filter]').forEach(clientSelect => {
+        const picSelect = clientSelect.form?.querySelector('[data-pic-filter]');
+        if (!picSelect) return;
+        const syncPics = () => {
+            const client = clientSelect.value.trim().toLowerCase();
+            picSelect.querySelectorAll('option[data-client]').forEach(option => {
+                const visible = client === '' || option.dataset.client === client;
+                option.hidden = !visible; option.disabled = !visible;
+            });
+            if (picSelect.selectedOptions[0]?.disabled) picSelect.value = '';
+        };
+        clientSelect.addEventListener('change', syncPics);
+        picSelect.addEventListener('change', () => {
+            const option = picSelect.selectedOptions[0];
+            if (option?.dataset.client && clientSelect.value === '') {
+                const match = [...clientSelect.options].find(o => o.value.trim().toLowerCase() === option.dataset.client);
+                if (match) { clientSelect.value = match.value; syncPics(); }
+            }
+        });
+        syncPics();
+    });
     const menu = document.getElementById('sidebar');
     const toggle = document.querySelector('[data-toggle-menu]');
     const backdrop = document.querySelector('[data-close-menu]');
