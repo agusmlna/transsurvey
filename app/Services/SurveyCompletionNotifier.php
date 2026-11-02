@@ -17,14 +17,11 @@ class SurveyCompletionNotifier
         }
 
         $ids = [];
-        foreach (User::where('role', 'admin')->get() as $admin) {
-            if (! filter_var($admin->email, FILTER_VALIDATE_EMAIL)) {
-                continue;
-            }
+        foreach ($this->recipients() as $email => $userId) {
             $notification = AdminSurveyNotification::firstOrCreate([
                 'survey_response_id' => $response->id,
-                'user_id' => $admin->id,
-            ], ['recipient_email' => $admin->email]);
+                'recipient_email' => $email,
+            ], ['user_id' => $userId]);
             if ($notification->wasRecentlyCreated) {
                 $ids[] = $notification->id;
             }
@@ -35,6 +32,25 @@ class SurveyCompletionNotifier
                 $this->dispatch($id);
             }
         });
+    }
+
+    /**
+     * Configured addresses (no user account needed) or, when none are configured, every admin.
+     * Returns [email => user id or null].
+     */
+    public function recipients(): array
+    {
+        $configured = config('survey.completion_recipients', []);
+        if ($configured !== []) {
+            return array_fill_keys($configured, null);
+        }
+        $recipients = [];
+        foreach (User::where('role', 'admin')->get() as $admin) {
+            if (filter_var($admin->email, FILTER_VALIDATE_EMAIL)) {
+                $recipients[$admin->email] = $admin->id;
+            }
+        }
+        return $recipients;
     }
 
     public function dispatch(int $id): bool

@@ -92,6 +92,7 @@ Atur rotasi `scheduler.log`. Scheduler menjalankan reminder setiap jam dan memul
 ## Operasional
 
 - Sebelum mengaktifkan SMTP, uji pada mailbox internal dengan satu undangan operasional khusus UAT. Data contoh memang tidak dapat dikirim.
+- Email "Survei selesai" dikirim ke alamat di `SURVEY_COMPLETION_RECIPIENTS` (pisahkan dengan koma). Bila dikosongkan, email dikirim ke semua user ber-role admin. Setelah mengubahnya, jalankan `php artisan optimize` dan `php artisan queue:restart`.
 - Log aplikasi berada di `storage/logs`, status email ada pada Distribusi. `php artisan queue:failed` menampilkan job gagal.
 - Untuk mencoba ulang email gagal, gunakan tombol pengiriman pada undangan yang sama. Hindari retry massal sebelum mengetahui penyebab gagal.
 - Backup database dan `.env`/APP_KEY secara aman. Uji restore termasuk kemampuan membuka token undangan.
