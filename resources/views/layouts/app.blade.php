@@ -25,7 +25,7 @@
         <nav>
             @php($items = [['dashboard', 'dashboard', 'dashboard', 'Dashboard', false], ['surveys.index', 'surveys.*', 'survey', __('Survei'), true], ['clients.index', 'clients.*', 'clients', __('Klien'), true], ['invitations.index', 'invitations.*', 'mail', __('Undangan'), true], ['responses.index', 'responses.*', 'response', __('Respons'), false], ['bank.index', 'bank.*', 'bank', __('Bank Pertanyaan'), true], ['reports.index', 'reports.*', 'report', __('Laporan'), false], ['followups.index', 'followups.*', 'follow', __('Tindak Lanjut'), false], ['data-cleanup.index', 'data-cleanup.*', 'clients', __('data_cleanup.title'), true]])
             @foreach ($items as [$route, $pattern, $icon, $label, $admin])
-                @if (!$admin || auth()->user()->role === 'admin')
+                @if (!$admin || auth()->user()->isAdmin())
                     <a class="nav-item {{ request()->routeIs($pattern) ? 'active' : '' }}" href="{{ route($route) }}" @if(request()->routeIs($pattern)) aria-current="page" @endif>
                         <span class="nav-icon">@include('layouts.icon', ['name' => $icon])</span>{{ $label }}
                     </a>
@@ -35,7 +35,7 @@
         <div class="ts-sidebar-footer"><span class="ts-sidebar-dot"></span> Client Satisfaction Management</div>
         <div class="profile">
             <span class="avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 2)) }}</span>
-            <div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->role === 'admin' ? 'Administrator' : 'Viewer' }}</small></div>
+            <div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->roleLabel() }}</small></div>
             <form method="post" action="{{ route('logout') }}">@csrf<button class="logout" title="{{ __('Keluar') }}" aria-label="{{ __('Keluar') }}">@include('layouts.icon', ['name' => 'logout'])</button></form>
         </div>
     </aside>
