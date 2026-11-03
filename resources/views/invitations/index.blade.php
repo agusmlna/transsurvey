@@ -61,6 +61,8 @@
                     <div id="client-hidden"></div>
                 @endif
             </fieldset>
+            <label class="ts-check-inline"><input type="checkbox" name="repeat" value="1" @checked(old('repeat'))>
+                {{ __('Buat tautan baru walaupun klien sudah punya undangan untuk kuesioner ini (misalnya untuk mengisi ulang jawaban dari Google Form).') }}</label>
             <button class="btn primary">{{ __('Buat tautan unik') }}</button>
             <p class="footnote">{{ __('Email PIC otomatis diambil dari data klien yang dipilih. Setelah undangan dibuat, periksa alamat penerima sebelum mengirim email.') }}</p>
         </form>

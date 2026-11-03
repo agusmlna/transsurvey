@@ -25,21 +25,41 @@ class InvitationController
     public function store(Request $r)
     {
         $workspace = app(\App\Services\CurrentWorkspace::class);
-        $v = $r->validate(['survey_id' => ['required', $workspace->existsRule('surveys')], 'client_ids' => 'required|array|min:1|max:100', 'client_ids.*' => ['required', 'integer', 'distinct', $workspace->existsRule('clients')]]);
-        $count = DB::transaction(function () use ($v) {
+        $v = $r->validate(['survey_id' => ['required', $workspace->existsRule('surveys')], 'client_ids' => 'required|array|min:1|max:100', 'client_ids.*' => ['required', 'integer', 'distinct', $workspace->existsRule('clients')], 'repeat' => 'nullable|boolean']);
+        $repeat = $r->boolean('repeat');
+        [$count, $repeated] = DB::transaction(function () use ($v, $repeat) {
             $survey = Survey::where('type', 'client')->lockForUpdate()->findOrFail($v['survey_id']);
             if ($survey->status !== 'active' || $survey->ends_at->endOfDay()->isPast()) throw ValidationException::withMessages(['survey_id' => __('Pilih survei aktif yang belum berakhir.')]);
             $created = 0;
+            $repeated = 0;
             foreach ($v['client_ids'] as $id) {
-                if (Invitation::where('survey_id', $survey->id)->where('client_id', $id)->where('ticket_id', '')->exists()) continue;
+                // The survey row lock above serializes this check per survey.
+                $existing = Invitation::where('survey_id', $survey->id)->where('client_id', $id)->count();
+                if ($existing > 0 && !$repeat) continue;
                 $c = Client::where('active', true)->findOrFail($id);
                 $token = Str::random(64);
-                Invitation::create(['survey_id' => $survey->id, 'client_id' => $c->id, 'token' => $token, 'token_hash' => hash('sha256', $token), 'recipient_name' => $c->contact, 'recipient_email' => $c->email, 'is_demo' => $survey->is_demo || $c->is_demo]);
+                // A repeat link (e.g. admin re-entering a manual/Google Form answer) gets its own
+                // ticket_id, so the unique (survey, client, ticket) index allows it.
+                $ticket = $existing > 0 ? $this->repeatTicket($survey->id, $c->id, $existing) : '';
+                if ($ticket !== '') $repeated++;
+                Invitation::create(['survey_id' => $survey->id, 'client_id' => $c->id, 'ticket_id' => $ticket, 'token' => $token, 'token_hash' => hash('sha256', $token), 'recipient_name' => $c->contact, 'recipient_email' => $c->email, 'is_demo' => $survey->is_demo || $c->is_demo]);
                 $created++;
             }
-            return $created;
+            return [$created, $repeated];
         });
+        if ($repeat) {
+            return back()->with('success', __(':count undangan baru dibuat, :repeated di antaranya tautan ulang untuk klien yang sudah pernah diundang. Salin tautan atau klik Kirim email setelah memeriksa penerima.', ['count' => $count, 'repeated' => $repeated]));
+        }
         return back()->with('success', __(':count undangan baru dibuat; undangan yang sudah ada dilewati. Salin tautan atau klik Kirim email setelah memeriksa penerima.', ['count' => $count]));
+    }
+
+    public const REPEAT_PREFIX = 'ulang-';
+
+    private function repeatTicket(int $surveyId, int $clientId, int $existing): string
+    {
+        $n = $existing + 1;
+        while (Invitation::where('survey_id', $surveyId)->where('client_id', $clientId)->where('ticket_id', self::REPEAT_PREFIX . $n)->exists()) $n++;
+        return self::REPEAT_PREFIX . $n;
     }
     public function send(Invitation $invitation, DeliveryService $delivery)
     {

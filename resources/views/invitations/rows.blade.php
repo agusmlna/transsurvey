@@ -56,6 +56,9 @@
     <tr>
         <td>
             <strong>{{ $i->client->name }}</strong><small>{{ $i->survey->title }}</small>
+            @if (str_starts_with((string) $i->ticket_id, \App\Http\Controllers\InvitationController::REPEAT_PREFIX))
+                <span class="badge blue">{{ __('Tautan ke-:n', ['n' => substr($i->ticket_id, strlen(\App\Http\Controllers\InvitationController::REPEAT_PREFIX))]) }}</span>
+            @endif
             @if ($i->is_demo)
                 <span class="badge gray">{{ __('Data contoh') }}</span>
             @endif
