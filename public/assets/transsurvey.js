@@ -23,6 +23,7 @@
     window.toast = toast;
     // Public helper is also used by the existing question editor.
     window.TransSurveyUI = { toast };
+    document.querySelectorAll('[data-workspace-switch]').forEach(select => select.addEventListener('change', () => select.form.submit()));
     // PIC filter only lists the PICs of the selected client name.
     document.querySelectorAll('[data-client-filter]').forEach(clientSelect => {
         const picSelect = clientSelect.form?.querySelector('[data-pic-filter]');

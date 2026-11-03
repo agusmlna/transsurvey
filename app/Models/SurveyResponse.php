@@ -1,9 +1,13 @@
 <?php
 namespace App\Models;
+use App\Models\Concerns\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Model;
 class SurveyResponse extends Model {
+ use BelongsToWorkspace;
  protected $fillable=['invitation_id','survey_id','client_id','score','submitted_at'];
  protected function casts(): array {return ['score'=>'float','submitted_at'=>'datetime'];}
+ // Submitted from the public link (no active workspace): take the invitation's.
+ protected function inheritedWorkspaceId(): ?int {return Invitation::withoutGlobalScopes()->whereKey($this->invitation_id)->value('workspace_id');}
  public function survey(){return $this->belongsTo(Survey::class);}
  public function client(){return $this->belongsTo(Client::class);}
  public function invitation(){return $this->belongsTo(Invitation::class);}

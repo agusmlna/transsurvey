@@ -20,17 +20,18 @@ class InvitationController
         if ($r->input('status') === 'pending') $q->whereNull('completed_at');
         if ($r->input('status') === 'draft')     $q->whereNull('completed_at')->whereNotNull('started_at'); 
         if ($r->boolean('_table')) return $tables->respond($r, $q, 'invitations');
-        return view('invitations.index', ['invitations' => $q->paginate(20)->withQueryString(), 'surveys' => Survey::where('status', 'active')->get(), 'clients' => Client::where('active', true)->orderBy('name')->get()]);
+        return view('invitations.index', ['invitations' => $q->paginate(20)->withQueryString(), 'surveys' => Survey::where('type', 'client')->where('status', 'active')->get(), 'clients' => Client::where('active', true)->orderBy('name')->get()]);
     }
     public function store(Request $r)
     {
-        $v = $r->validate(['survey_id' => 'required|exists:surveys,id', 'client_ids' => 'required|array|min:1|max:100', 'client_ids.*' => 'required|integer|distinct|exists:clients,id']);
+        $workspace = app(\App\Services\CurrentWorkspace::class);
+        $v = $r->validate(['survey_id' => ['required', $workspace->existsRule('surveys')], 'client_ids' => 'required|array|min:1|max:100', 'client_ids.*' => ['required', 'integer', 'distinct', $workspace->existsRule('clients')]]);
         $count = DB::transaction(function () use ($v) {
-            $survey = Survey::lockForUpdate()->findOrFail($v['survey_id']);
+            $survey = Survey::where('type', 'client')->lockForUpdate()->findOrFail($v['survey_id']);
             if ($survey->status !== 'active' || $survey->ends_at->endOfDay()->isPast()) throw ValidationException::withMessages(['survey_id' => __('Pilih survei aktif yang belum berakhir.')]);
             $created = 0;
             foreach ($v['client_ids'] as $id) {
-                if (Invitation::where('survey_id', $survey->id)->where('client_id', $id)->exists()) continue;
+                if (Invitation::where('survey_id', $survey->id)->where('client_id', $id)->where('ticket_id', '')->exists()) continue;
                 $c = Client::where('active', true)->findOrFail($id);
                 $token = Str::random(64);
                 Invitation::create(['survey_id' => $survey->id, 'client_id' => $c->id, 'token' => $token, 'token_hash' => hash('sha256', $token), 'recipient_name' => $c->contact, 'recipient_email' => $c->email, 'is_demo' => $survey->is_demo || $c->is_demo]);

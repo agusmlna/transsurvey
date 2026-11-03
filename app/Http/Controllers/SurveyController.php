@@ -12,7 +12,7 @@ class SurveyController
 {
     public function index(Request $r, DataTableService $tables)
     {
-        $q = Survey::withCount(['invitations', 'responses'])->latest();
+        $q = Survey::where('type', 'client')->withCount(['invitations', 'responses'])->latest();
 
         if (in_array($r->input('status'), ['draft', 'active', 'closed'])) {
             $q->where('status', $r->input('status'));
@@ -46,7 +46,14 @@ class SurveyController
 
     public function edit(Survey $survey)
     {
+        $this->clientOnly($survey);
         return $this->editor($survey);
+    }
+
+    // CSAT templates get their own pages (phase 3).
+    private function clientOnly(Survey $survey): void
+    {
+        abort_unless(($survey->type ?? 'client') === 'client', 404);
     }
 
     private function editor(Survey $survey)
@@ -60,6 +67,7 @@ class SurveyController
 
     public function preview(Survey $survey)
     {
+        $this->clientOnly($survey);
         return view('public.survey', [
             'survey' => $survey->load('questions'),
             'invitation' => null,
@@ -76,6 +84,7 @@ class SurveyController
 
     public function update(Request $r, Survey $survey)
     {
+        $this->clientOnly($survey);
         DB::transaction(function () use ($r, $survey) {
             $locked = Survey::lockForUpdate()->findOrFail($survey->id);
 
@@ -151,6 +160,7 @@ class SurveyController
 
     public function duplicate(Request $r, Survey $survey)
     {
+        $this->clientOnly($survey);
         $copy = DB::transaction(function () use ($r, $survey) {
             $copy = $survey->replicate();
             $copy->title = mb_substr($survey->title, 0, 240) . ' (salinan)';

@@ -17,7 +17,9 @@ class ReportController
     public function csv(Request $r, ReportService $reports)
     {
         $reports->validateFilters($r);
-        return response()->streamDownload(function () use ($r, $reports) {
+        $workspace = app(\App\Services\CurrentWorkspace::class);
+        $workspaceId = $workspace->filterId();
+        return response()->streamDownload(fn () => $workspace->runAs($workspaceId, function () use ($r, $reports) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, [__('Klien'), __('PIC'), __('Proyek'), __('Kuesioner'), __('Tanggal'), __('Skor'), __('Persentase'), __('Kategori'), __('Pertanyaan'), __('Jawaban'), __('Komentar')], ',', '"', '');
@@ -35,7 +37,7 @@ class ReportController
                 }
             });
             fclose($out);
-        }, 'laporan-transsurvey-' . today()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }), 'laporan-transsurvey-' . today()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function pdf(Request $r, ReportService $reports, ReportPresentation $presentation, ReportPdfExporter $exporter)

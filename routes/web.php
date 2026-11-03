@@ -55,12 +55,15 @@ Route::middleware('throttle:respond')->group(function () {
 | Authenticated Routes
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'workspace'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('logout');
 
     Route::get('/', DashboardController::class)
         ->name('dashboard');
+
+    Route::post('/workspace', [App\Http\Controllers\WorkspaceController::class, 'switch'])
+        ->name('workspace.switch');
 
     // Responses
     Route::get('/responses', [ResponseController::class, 'index'])

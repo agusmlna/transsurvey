@@ -85,7 +85,10 @@ class DataDeletionController
 
     public function history()
     {
-        return view('data-cleanup.history', ['audits' => DB::table('data_deletion_audits')->orderByDesc('id')->paginate(10)]);
+        $workspace = app(\App\Services\CurrentWorkspace::class)->filterId();
+        return view('data-cleanup.history', ['audits' => DB::table('data_deletion_audits')
+            ->when($workspace !== null, fn ($q) => $q->where('workspace_id', $workspace))
+            ->orderByDesc('id')->paginate(10)]);
     }
 
     private function owned(Request $request, string $token): array

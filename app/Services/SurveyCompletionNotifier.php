@@ -12,7 +12,8 @@ class SurveyCompletionNotifier
     public function record(SurveyResponse $response): void
     {
         $invitation = $response->invitation;
-        if ($invitation->is_demo || $response->survey->is_demo || $response->client->is_demo) {
+        if ($invitation->is_demo || $response->survey->is_demo || $response->client->is_demo
+            || $response->workspace_id !== app(CurrentWorkspace::class)->legacyId()) {
             return;
         }
 

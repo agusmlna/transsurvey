@@ -43,7 +43,7 @@
     <div class="shell">
         <header class="topbar">
             <div class="breadcrumb"><button class="menu-button" type="button" data-toggle-menu aria-controls="sidebar" aria-expanded="false" aria-label="{{ __('Buka navigasi') }}">@include('layouts.icon', ['name' => 'menu'])</button><span>Workspace</span><span aria-hidden="true">/</span><strong>@yield('title', 'Dashboard')</strong></div>
-            <div class="topbar-meta">@include('layouts.language-switch')<span>Client Experience</span><span class="avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 2)) }}</span></div>
+            <div class="topbar-meta">@include('layouts.workspace-switch')@include('layouts.language-switch')<span>Client Experience</span><span class="avatar">{{ mb_strtoupper(mb_substr(auth()->user()->name, 0, 2)) }}</span></div>
         </header>
         <main class="workspace" id="main-content" tabindex="-1">
             <div class="page-heading"><div><h1>@yield('heading', 'Dashboard')</h1><p>@yield('subtitle', __('Kelola survei dan hasil kepuasan klien.'))</p></div><div class="heading-actions">@yield('actions')</div></div>
@@ -52,6 +52,9 @@
             @endif
             @if ($errors->any())
                 <div class="notice error" role="alert" data-error-message><strong>{{ __('Periksa kembali input Anda.') }}</strong><ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
+            @endif
+            @if (auth()->user()->isSuperadmin() && app(\App\Services\CurrentWorkspace::class)->filterId() === null && (request()->routeIs('*.create') || request()->routeIs('bank.index') || request()->routeIs('surveys.import.*')))
+                <div class="notice">{{ __('Mode Semua workspace: data baru disimpan ke workspace Data lama. Pilih workspace di kanan atas untuk menyimpan ke workspace lain.') }}</div>
             @endif
             @yield('content')
             <footer class="workspace-footer"><strong>TransSurvey</strong><span>Client Satisfaction Management</span><span class="footer-right">PT Transcosmos Indonesia</span></footer>

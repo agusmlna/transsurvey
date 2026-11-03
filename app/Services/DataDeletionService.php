@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\User;
+use App\Models\{Client, Invitation, Survey, SurveyResponse, User};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +18,9 @@ class DataDeletionService
         sort($ids);
         if (!$ids || count($ids) > 100) $this->invalid('selection');
         $table = $type === 'responses' ? 'survey_responses' : $type;
+        // Only rows visible in the current workspace may be selected.
+        $model = ['invitations' => Invitation::class, 'responses' => SurveyResponse::class, 'clients' => Client::class, 'surveys' => Survey::class][$type];
+        if ($model::whereKey($ids)->count() !== count($ids)) $this->invalid('stale');
         $selected = $this->rows($table, 'id', $ids, $type === 'responses' ? false : $lock);
         if (count($selected) !== count($ids)) $this->invalid('stale');
         $data = [];
@@ -100,6 +103,7 @@ class DataDeletionService
             // No tokens, access codes, response contents, or SMTP credentials in this log.
             DB::table('data_deletion_audits')->insert([
                 'request_token' => $preview['token'], 'user_id' => $actor->id,
+                'workspace_id' => app(CurrentWorkspace::class)->filterId() ?: null,
                 'actor_name' => $actor->name, 'entity' => $preview['type'],
                 'record_ids' => json_encode($ids), 'summary' => json_encode($state['counts']),
                 'reason' => $preview['reason'], 'created_at' => now(),

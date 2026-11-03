@@ -16,7 +16,7 @@ class QuestionImportController
     {
         $survey = null;
         if ($request->filled('survey_id')) {
-            $request->validate(['survey_id' => 'integer|exists:surveys,id']);
+            $request->validate(['survey_id' => ['integer', app(\App\Services\CurrentWorkspace::class)->existsRule('surveys')]]);
             $survey = Survey::findOrFail($request->integer('survey_id'));
             $service->assertEditable($survey);
         }
@@ -50,7 +50,7 @@ class QuestionImportController
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx|extensions:xlsx|max:5120',
-            'survey_id' => 'nullable|integer|exists:surveys,id',
+            'survey_id' => ['nullable', 'integer', app(\App\Services\CurrentWorkspace::class)->existsRule('surveys')],
         ]);
         $survey = $request->filled('survey_id') ? Survey::findOrFail($request->integer('survey_id')) : null;
         $metadata = null; $snapshot = null;

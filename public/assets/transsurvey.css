@@ -2087,4 +2087,6 @@ h6,
 }
 .survey-steps-nav .btn[hidden] { display: none; }
 
-.ts-cat-badge { display: inline-flex; margin: 0 4px 4px 0; }
+.ts-cat-badge { display: inline-flex; margin: 0 4px 4px 0; }.ts-workspace-switch{margin:0}
+.ts-workspace-switch select{min-height:34px;max-width:200px;padding:4px 28px 4px 10px;border:1px solid #e2e8f0;border-radius:999px;background-color:#fff;font-size:12px;font-weight:600;color:#243247}
+.ts-workspace-name{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:6px 12px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font-size:12px;font-weight:600;color:#243247}

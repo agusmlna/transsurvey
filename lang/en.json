@@ -577,5 +577,13 @@
   ":sent survei terkirim, :done sudah diisi, :pending belum diisi": ":sent surveys sent, :done completed, :pending pending",
   "Undangan yang emailnya sudah dikirim ke PIC": "Invitations whose email was sent to the PIC",
   "Survei terkirim yang belum diisi PIC": "Sent surveys the PIC has not completed",
-  "Terkirim = undangan yang emailnya sudah dikirim ke PIC. Belum isi = terkirim dikurangi yang sudah mengisi survei. Klien dengan nama sama digabung menjadi satu baris; seluruh PIC-nya ditampilkan.": "Sent = invitations whose email was sent to the PIC. Pending = sent minus completed surveys. Clients with the same name are merged into one row and all their PICs are listed."
+  "Terkirim = undangan yang emailnya sudah dikirim ke PIC. Belum isi = terkirim dikurangi yang sudah mengisi survei. Klien dengan nama sama digabung menjadi satu baris; seluruh PIC-nya ditampilkan.": "Sent = invitations whose email was sent to the PIC. Pending = sent minus completed surveys. Clients with the same name are merged into one row and all their PICs are listed.",
+  "Workspace": "Workspace",
+  "Pilih workspace": "Choose workspace",
+  "Semua workspace": "All workspaces",
+  "Tanpa workspace": "No workspace",
+  "Workspace aktif: :name": "Active workspace: :name",
+  "Pilih workspace terlebih dahulu.": "Choose a workspace first.",
+  "Tanpa batas waktu": "No time limit",
+  "Mode Semua workspace: data baru disimpan ke workspace Data lama. Pilih workspace di kanan atas untuk menyimpan ke workspace lain.": "All workspaces mode: new data is saved to the legacy workspace. Choose a workspace at the top right to save to another workspace."
 }
