@@ -9,7 +9,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         foreach (self::questions() as $question) {
-            BankQuestion::firstOrCreate(['text' => $question['text']], $question);
+            BankQuestion::firstOrCreate(['text' => $question['text'], 'workspace_id' => app(\App\Services\CurrentWorkspace::class)->legacyId()], $question);
         }
     }
 

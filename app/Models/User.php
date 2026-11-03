@@ -7,6 +7,7 @@ class User extends Authenticatable {
  protected $fillable=['name','email','password','role'];
  protected $hidden=['password','remember_token'];
  protected function casts(): array {return ['password'=>'hashed'];}
+ public function workspaces(){return $this->belongsToMany(Workspace::class,'workspace_user')->withTimestamps();}
  public const ROLES=['superadmin','admin','operation','viewer'];
  public function isSuperadmin(): bool {return $this->role==='superadmin';}
  // Superadmin has every admin permission (it also gets the workspace switcher later).

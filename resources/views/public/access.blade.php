@@ -24,7 +24,7 @@
             <p class="ts-access-eyebrow">{{ __('PERIODE PENGISIAN') }}</p>
             <h1>{{ __('Survei belum tersedia') }}</h1>
             <p class="ts-access-intro">{{ __('Survei ini sedang tidak menerima respons. Hubungi pengirim undangan jika Anda memerlukan informasi lebih lanjut.') }}</p>
-            <div class="ts-access-survey"><strong>{{ $invitation->survey->title }}</strong><small>{{ $invitation->survey->starts_at->format('d M Y') }} – {{ $invitation->survey->ends_at->format('d M Y') }}</small></div>
+            <div class="ts-access-survey"><strong>{{ $invitation->survey->title }}</strong><small>{{ $invitation->survey->starts_at->format('d M Y') }} – {{ $invitation->survey->ends_at?->format('d M Y') ?? __('Tanpa batas waktu') }}</small></div>
         @else
             <p class="ts-access-eyebrow">{{ __('VERIFIKASI UNDANGAN') }}</p>
             <h1>{{ __('Masukkan kode akses') }}</h1>

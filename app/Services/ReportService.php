@@ -55,7 +55,7 @@ class ReportService
     }
     public function categories()
     {
-        return Answer::query()->whereNotNull('category')->distinct()->orderBy('category')->pluck('category');
+        return Answer::query()->whereIn('survey_response_id', SurveyResponse::select('id'))->whereNotNull('category')->distinct()->orderBy('category')->pluck('category');
     }
     public function summary(Request $r): array
     {
@@ -96,7 +96,7 @@ class ReportService
     public function activeSurveys(Request $r): int
     {
         // Active means open today. The response-date filter does not change this clock.
-        $surveys = Survey::query()->where('status', 'active')->whereDate('starts_at', '<=', today())->whereDate('ends_at', '>=', today());
+        $surveys = Survey::query()->where('status', 'active')->whereDate('starts_at', '<=', today())->where(fn($q) => $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', today()));
         if ($r->filled('survey_id')) $surveys->whereKey($r->integer('survey_id'));
         if ($r->filled('client_id') || $r->filled('client') || $r->filled('project') || in_array($r->input('source'), ['real', 'demo'], true)) {
             // All assignment filters must match the same invitation; each survey counts once.
@@ -109,6 +109,6 @@ class ReportService
     }
     public function validateFilters(Request $r): void
     {
-        $r->validate(['client' => 'nullable|string|max:255', 'client_id' => 'nullable|integer|exists:clients,id', 'survey_id' => 'nullable|integer|exists:surveys,id', 'category' => 'nullable|string|max:100', 'project' => 'nullable|string|max:255', 'from' => 'nullable|date_format:Y-m-d', 'to' => array_filter(['nullable', 'date_format:Y-m-d', $r->filled('from') ? 'after_or_equal:from' : null]), 'source' => 'nullable|in:real,demo']);
+        $r->validate(['client' => 'nullable|string|max:255', 'client_id' => ['nullable', 'integer', app(CurrentWorkspace::class)->existsRule('clients')], 'survey_id' => ['nullable', 'integer', app(CurrentWorkspace::class)->existsRule('surveys')], 'category' => 'nullable|string|max:100', 'project' => 'nullable|string|max:255', 'from' => 'nullable|date_format:Y-m-d', 'to' => array_filter(['nullable', 'date_format:Y-m-d', $r->filled('from') ? 'after_or_equal:from' : null]), 'source' => 'nullable|in:real,demo']);
     }
 }

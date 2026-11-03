@@ -53,7 +53,7 @@
             <section class="empty">
                 <h2>{{ __('Survei sedang tidak menerima respons.') }}</h2>
                 <p>{{ __('Periode pengisian:') }} {{ $survey->starts_at->format('d M Y') }} –
-                    {{ $survey->ends_at->format('d M Y') }}.</p>
+                    {{ $survey->ends_at?->format('d M Y') ?? __('Tanpa batas waktu') }}.</p>
             </section>
         @else
             @php($answers = old('answers', $invitation?->draft_answers ?? []))

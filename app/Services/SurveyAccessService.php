@@ -30,7 +30,7 @@ class SurveyAccessService
             $code = (string) random_int(100000, 999999);
             // A keyed fingerprint checks uniqueness without storing a plain SHA of a short code.
             $fingerprint = hash_hmac('sha256', $code, $key);
-            if (Invitation::where('access_code_fingerprint', $fingerprint)->exists()) {
+            if (Invitation::withoutGlobalScopes()->where('access_code_fingerprint', $fingerprint)->exists()) {
                 continue;
             }
 
