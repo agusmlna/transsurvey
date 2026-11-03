@@ -585,5 +585,8 @@
   "Workspace aktif: :name": "Active workspace: :name",
   "Pilih workspace terlebih dahulu.": "Choose a workspace first.",
   "Tanpa batas waktu": "No time limit",
-  "Mode Semua workspace: data baru disimpan ke workspace Data lama. Pilih workspace di kanan atas untuk menyimpan ke workspace lain.": "All workspaces mode: new data is saved to the legacy workspace. Choose a workspace at the top right to save to another workspace."
+  "Mode Semua workspace: data baru disimpan ke workspace Data lama. Pilih workspace di kanan atas untuk menyimpan ke workspace lain.": "All workspaces mode: new data is saved to the legacy workspace. Choose a workspace at the top right to save to another workspace.",
+  "Buat tautan baru walaupun klien sudah punya undangan untuk kuesioner ini (misalnya untuk mengisi ulang jawaban dari Google Form).": "Create a new link even if the client already has an invitation for this questionnaire (for example, to re-enter answers from a Google Form).",
+  ":count undangan baru dibuat, :repeated di antaranya tautan ulang untuk klien yang sudah pernah diundang. Salin tautan atau klik Kirim email setelah memeriksa penerima.": ":count new invitations created, :repeated of them repeat links for clients already invited. Copy the link or click Send email after checking the recipient.",
+  "Tautan ke-:n": "Link #:n"
 }
