@@ -75,7 +75,7 @@ class DataDeletionService
 
     public function delete(array $preview, User $actor): void
     {
-        abort_unless($actor->role === 'admin' && $preview['user_id'] === $actor->id, 403);
+        abort_unless($actor->isAdmin() && $preview['user_id'] === $actor->id, 403);
         DB::transaction(function () use ($preview, $actor) {
             if (DB::table('data_deletion_audits')->where('request_token', $preview['token'])->where('user_id', $actor->id)->exists()) return;
             if ($preview['expires_at'] < now()->timestamp) $this->invalid('expired');

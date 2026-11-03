@@ -21,7 +21,7 @@
         @endforeach
     </section>
     @if ($response->followUp)
-        <div class="notice">{{ __('Respons ini memiliki tindak lanjut.') }} @if (auth()->user()->role === 'admin')
+        <div class="notice">{{ __('Respons ini memiliki tindak lanjut.') }} @if (auth()->user()->isAdmin())
                 <a href="{{ route('followups.edit', $response->followUp) }}">{{ __('Kelola tindak lanjut →') }}</a>
             @endif
         </div>
