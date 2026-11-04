@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\{
     AuthController,
+    CxpLaunchController,
     DashboardController,
     SurveyController,
     ClientController,
@@ -16,6 +17,17 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/language', [App\Http\Controllers\LanguageController::class, 'update'])
     ->name('language.update');
+
+/*
+|--------------------------------------------------------------------------
+| TransCXP SSO
+|--------------------------------------------------------------------------
+| Login otomatis dari tombol TransCXP. Tanpa middleware guest karena token
+| yang valid harus bisa mengganti sesi yang sedang aktif.
+*/
+Route::get('/cxp/launch', CxpLaunchController::class)
+    ->middleware('throttle:cxp-sso')
+    ->name('cxp.launch');
 
 /*
 |--------------------------------------------------------------------------
