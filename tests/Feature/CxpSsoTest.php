@@ -30,6 +30,9 @@ class CxpSsoTest extends TestCase
             'cxp.external_source' => 'transcxp',
             'cxp.redirect_route' => 'dashboard',
             'cxp.allow_operation_password' => false,
+            'cxp.require_iss_aud' => false,
+            'cxp.api_token_id' => null,
+            'cxp.replay_fallback' => false,
         ]);
 
         Cache::flush();
@@ -77,6 +80,75 @@ class CxpSsoTest extends TestCase
         $secret ??= (string) config('cxp.sso_secret');
 
         return $unsigned.'.'.$b64(hash_hmac('sha256', $unsigned, $secret, true));
+    }
+
+    /**
+     * @return array{0: \OpenSSLAsymmetricKey, 1: string}
+     */
+    private function es256KeyPair(): array
+    {
+        // PHP 8.3 + OpenSSL 3 menolak keygen EC di bawah 384 bit, walau
+        // curva yang dipakai tetap prime256v1 (P-256).
+        $key = openssl_pkey_new([
+            'private_key_type' => OPENSSL_KEYTYPE_EC,
+            'curve_name' => 'prime256v1',
+            'private_key_bits' => 384,
+        ]);
+
+        if ($key === false) {
+            $this->markTestSkipped('OpenSSL tidak dapat membuat kunci EC di lingkungan ini.');
+        }
+
+        $details = openssl_pkey_get_details($key);
+        $this->assertIsArray($details);
+
+        return [$key, $details['key']];
+    }
+
+    private function signEs256(array $payload, \OpenSSLAsymmetricKey $privateKey): string
+    {
+        $b64 = fn (string $bytes): string => rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+        $json = fn (array $value): string => $b64(json_encode($value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+
+        $unsigned = $json(['alg' => 'ES256', 'typ' => 'JWT']).'.'.$json($payload);
+
+        $this->assertTrue(openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256));
+
+        return $unsigned.'.'.$b64($this->derToRaw($signature));
+    }
+
+    private function derToRaw(string $der, int $size = 32): string
+    {
+        $pos = 0;
+        $this->assertSame(0x30, ord($der[$pos++]));
+        $length = ord($der[$pos++]);
+        if ($length & 0x80) {
+            $count = $length & 0x7f;
+            $length = 0;
+            while ($count-- > 0) {
+                $length = ($length << 8) | ord($der[$pos++]);
+            }
+        }
+
+        $readInteger = function () use ($der, &$pos): string {
+            $this->assertSame(0x02, ord($der[$pos++]));
+            $length = ord($der[$pos++]);
+            if ($length & 0x80) {
+                $count = $length & 0x7f;
+                $length = 0;
+                while ($count-- > 0) {
+                    $length = ($length << 8) | ord($der[$pos++]);
+                }
+            }
+
+            $value = substr($der, $pos, $length);
+            $pos += $length;
+
+            return ltrim($value, "\x00");
+        };
+
+        return str_pad($readInteger(), $size, "\x00", STR_PAD_LEFT)
+            .str_pad($readInteger(), $size, "\x00", STR_PAD_LEFT);
     }
 
     private function launch(array $payload, ?string $secret = null): TestResponse
@@ -290,6 +362,110 @@ class CxpSsoTest extends TestCase
         ])->assertRedirect('/');
 
         $this->assertAuthenticatedAs($admin);
+    }
+
+    public function test_es256_token_with_configured_public_key_is_accepted(): void
+    {
+        [$privateKey, $publicKey] = $this->es256KeyPair();
+
+        config([
+            'cxp.algorithms' => ['ES256'],
+            'cxp.sso_secret' => null,
+            'cxp.sso_public_key' => $publicKey,
+        ]);
+
+        $this->get(route('cxp.launch', ['sso' => $this->signEs256($this->payload(), $privateKey)]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame(1, User::where('external_source', 'transcxp')->count());
+    }
+
+    public function test_es256_token_with_wrong_signature_is_rejected(): void
+    {
+        [$privateKey] = $this->es256KeyPair();
+        [, $otherPublicKey] = $this->es256KeyPair();
+
+        config([
+            'cxp.algorithms' => ['ES256'],
+            'cxp.sso_secret' => null,
+            'cxp.sso_public_key' => $otherPublicKey,
+        ]);
+
+        $this->get(route('cxp.launch', ['sso' => $this->signEs256($this->payload(), $privateKey)]))
+            ->assertStatus(401)
+            ->assertSee(__('Tanda tangan token SSO tidak valid.'));
+
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_token_in_sso_query_parameter_is_accepted(): void
+    {
+        $this->get(route('cxp.launch', ['sso' => $this->sign($this->payload())]))
+            ->assertRedirect(route('dashboard'));
+    }
+
+    public function test_token_without_iss_and_aud_is_accepted_when_not_required(): void
+    {
+        $payload = $this->payload();
+        unset($payload['iss'], $payload['aud']);
+
+        config(['cxp.require_iss_aud' => false]);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertRedirect(route('dashboard'));
+    }
+
+    public function test_iss_and_aud_are_required_when_configured(): void
+    {
+        $payload = $this->payload();
+        unset($payload['iss'], $payload['aud']);
+
+        config(['cxp.require_iss_aud' => true]);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Token SSO tidak lengkap.'));
+    }
+
+    public function test_missing_jti_can_fall_back_to_token_hash_replay_guard(): void
+    {
+        $payload = $this->payload();
+        unset($payload['jti']);
+
+        config(['cxp.replay_fallback' => true]);
+
+        $token = $this->sign($payload);
+
+        $this->get(route('cxp.launch', ['token' => $token]))->assertRedirect(route('dashboard'));
+        $this->get(route('cxp.launch', ['token' => $token]))
+            ->assertStatus(401)
+            ->assertSee(__('Token SSO sudah pernah digunakan. Silakan buka ulang dari TransCXP.'));
+    }
+
+    public function test_api_token_id_is_validated_when_configured(): void
+    {
+        config(['cxp.api_token_id' => '7']);
+
+        $payload = $this->payload(['apiTokenId' => 8]);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Token SSO bukan untuk TransSurvey.'));
+    }
+
+    public function test_top_level_email_is_copied_to_user_email(): void
+    {
+        $payload = $this->payload();
+        unset($payload['user']['email']);
+        $payload['email'] = 'operator@cxp.test';
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame(
+            'operator@cxp.test',
+            User::where('external_source', 'transcxp')->sole()->email
+        );
     }
 
     public function test_missing_token_is_rejected(): void

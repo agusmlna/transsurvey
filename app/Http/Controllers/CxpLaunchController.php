@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\{Auth, Log, Route};
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * GET /cxp/launch?token=<JWT>
+ * GET /cxp/launch?token=<JWT> atau ?sso=<JWT>
  *
  * Login otomatis dari tombol TransCXP. Endpoint ini tidak memakai middleware
  * workspace: workspace baru ditentukan setelah token diverifikasi.
@@ -19,7 +19,11 @@ class CxpLaunchController
 {
     public function __invoke(Request $request, CxpTokenVerifier $verifier, CxpAccountProvisioner $provisioner): Response
     {
+        // TransCXP gaya CakrawalaHub mengirim token di parameter "sso".
         $token = $request->query('token');
+        if (! is_string($token) || trim($token) === '') {
+            $token = $request->query('sso');
+        }
 
         try {
             if (! is_string($token) || trim($token) === '' || strlen($token) > 8192) {
