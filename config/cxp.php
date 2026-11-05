@@ -6,19 +6,20 @@ return [
     | CXP SSO (Fase 2)
     |--------------------------------------------------------------------------
     |
-    | TransCXP mengirim pengguna ke /cxp/launch?token=<JWT>. Token ditandatangani
-    | dengan secret yang sama (HS256) atau public key TransCXP (RS256).
+    | TransCXP mengirim pengguna ke /cxp/launch?token=<JWT> (atau ?sso=<JWT>).
+    | Token ditandatangani dengan secret yang sama (HS256), public key RSA
+    | (RS256), atau public key ECDSA P-256 (ES256, pola CakrawalaHub).
     |
     */
 
     // HS256: shared secret. Jangan tulis nilainya di repo.
     'sso_secret' => env('CXP_SSO_SECRET'),
 
-    // RS256: isi salah satu. Path lebih aman untuk key multi-baris.
+    // RS256 / ES256: isi salah satu. Path lebih aman untuk key multi-baris.
     'sso_public_key' => env('CXP_SSO_PUBLIC_KEY'),
     'sso_public_key_path' => env('CXP_SSO_PUBLIC_KEY_PATH'),
 
-    // Algoritma yang diterima. Default hanya HS256; tambahkan RS256 bila disepakati.
+    // Algoritma yang diterima. Default hanya HS256; tambahkan RS256/ES256 bila disepakati.
     'algorithms' => array_values(array_filter(array_map(
         fn ($value) => strtoupper(trim($value)),
         explode(',', (string) env('CXP_SSO_ALGORITHMS', 'HS256'))
@@ -26,6 +27,17 @@ return [
 
     'issuer' => env('CXP_SSO_ISSUER', 'transcxp'),
     'audience' => env('CXP_SSO_AUDIENCE', 'transsurvey'),
+
+    // Token gaya CakrawalaHub tidak mengirim iss/aud. Kalau dimatikan, klaim
+    // yang tetap dikirim masih divalidasi; hanya kewajibannya yang dilonggarkan.
+    'require_iss_aud' => filter_var(env('CXP_SSO_REQUIRE_ISS_AUD', false), FILTER_VALIDATE_BOOL),
+
+    // Opsional: cocokkan apiTokenId yang dikirim TransCXP. Kosong = abaikan.
+    'api_token_id' => env('CXP_SSO_API_TOKEN_ID'),
+
+    // Kalau true, token tanpa jti tetap diterima dan anti-replay memakai hash
+    // token. Default false: jti wajib.
+    'replay_fallback' => filter_var(env('CXP_SSO_REPLAY_FALLBACK', false), FILTER_VALIDATE_BOOL),
 
     // Umur token maksimum (detik) dan toleransi selisih jam.
     'ttl' => max(1, (int) env('CXP_SSO_TTL', 300)),

@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\Cache;
 /**
  * Verifikasi JWT dari TransCXP tanpa library tambahan.
  *
+ * Mendukung HS256 (shared secret), RS256 (public key RSA), dan ES256
+ * (public key ECDSA P-256 dengan signature raw R||S seperti pola CakrawalaHub).
+ *
  * Yang diperiksa: struktur token, algoritma yang diizinkan, tanda tangan,
- * iss/aud/iat/exp/nbf, batas umur token, dan jti sekali pakai.
+ * iss/aud (bila dikirim), iat/exp/nbf, batas umur token, dan anti-replay.
  */
 class CxpTokenVerifier
 {
@@ -23,7 +26,7 @@ class CxpTokenVerifier
         [$encodedHeader, $encodedPayload, $encodedSignature] = $segments;
 
         $header = $this->decodeJson($encodedHeader, 'header');
-        $payload = $this->decodeJson($encodedPayload, 'payload');
+        $payload = $this->normalize($this->decodeJson($encodedPayload, 'payload'));
         $signature = $this->base64UrlDecode($encodedSignature, 'signature');
 
         $algorithm = strtoupper((string) ($header['alg'] ?? ''));
@@ -32,13 +35,13 @@ class CxpTokenVerifier
         if ($algorithm === '' || $algorithm === 'NONE' || ! in_array($algorithm, $allowed, true)) {
             throw CxpSsoException::invalid('algorithm_not_allowed', __('Algoritma token SSO tidak diizinkan.'));
         }
-        if (! in_array($algorithm, ['HS256', 'RS256'], true)) {
+        if (! in_array($algorithm, ['HS256', 'RS256', 'ES256'], true)) {
             throw CxpSsoException::invalid('algorithm_not_supported', __('Algoritma token SSO tidak didukung.'));
         }
 
         $this->verifySignature($algorithm, $encodedHeader.'.'.$encodedPayload, $signature);
         $this->verifyClaims($payload);
-        $this->guardReplay($payload);
+        $this->guardReplay($payload, $token);
 
         return $payload;
     }
@@ -63,9 +66,49 @@ class CxpTokenVerifier
         if ($publicKey === null) {
             throw CxpSsoException::server('sso_public_key_missing', __('Konfigurasi SSO belum lengkap.'));
         }
+
+        if ($algorithm === 'ES256') {
+            // JWT ES256 memakai signature raw R||S, sedangkan OpenSSL minta DER.
+            $signature = $this->rawSignatureToDer($signature);
+            if ($signature === null) {
+                throw CxpSsoException::invalid('bad_signature', __('Tanda tangan token SSO tidak valid.'));
+            }
+        }
+
         if (openssl_verify($signingInput, $signature, $publicKey, OPENSSL_ALGO_SHA256) !== 1) {
             throw CxpSsoException::invalid('bad_signature', __('Tanda tangan token SSO tidak valid.'));
         }
+    }
+
+    /**
+     * Ubah signature ECDSA mentah (32 byte R + 32 byte S) menjadi DER.
+     */
+    private function rawSignatureToDer(string $raw): ?string
+    {
+        if (strlen($raw) !== 64) {
+            return null;
+        }
+
+        $encodeInteger = static function (string $value): string {
+            $value = ltrim($value, "\x00");
+            if ($value === '' || (ord($value[0]) & 0x80) === 0x80) {
+                $value = "\x00".$value;
+            }
+
+            return "\x02".chr(strlen($value)).$value;
+        };
+
+        $sequence = $encodeInteger(substr($raw, 0, 32)).$encodeInteger(substr($raw, 32, 32));
+        $length = strlen($sequence);
+
+        if ($length < 0x80) {
+            return "\x30".chr($length).$sequence;
+        }
+        if ($length < 0x100) {
+            return "\x30\x81".chr($length).$sequence;
+        }
+
+        return "\x30\x82".chr(($length >> 8) & 0xff).chr($length & 0xff).$sequence;
     }
 
     private function publicKey(): ?string
@@ -85,23 +128,69 @@ class CxpTokenVerifier
         return $key === '' ? null : str_replace('\n', "\n", $key);
     }
 
+    /**
+     * Token gaya CakrawalaHub hanya mengirim email di level atas. Salin ke
+     * user.email supaya provisioner tetap memakai satu bentuk klaim.
+     */
+    private function normalize(array $payload): array
+    {
+        $email = $payload['email'] ?? null;
+        if (! is_string($email) || trim($email) === '') {
+            return $payload;
+        }
+
+        $email = trim($email);
+
+        if (! is_array($payload['user'] ?? null)) {
+            $payload['user'] = ['email' => $email];
+        } elseif (! isset($payload['user']['email'])) {
+            $payload['user']['email'] = $email;
+        }
+
+        return $payload;
+    }
+
     private function verifyClaims(array $payload): void
     {
-        foreach (['iss', 'aud', 'iat', 'exp', 'jti'] as $claim) {
+        $requireIssAud = (bool) config('cxp.require_iss_aud', false);
+        $requireJti = ! (bool) config('cxp.replay_fallback', false);
+
+        $required = ['iat', 'exp'];
+        if ($requireIssAud) {
+            $required[] = 'iss';
+            $required[] = 'aud';
+        }
+        if ($requireJti) {
+            $required[] = 'jti';
+        }
+
+        foreach ($required as $claim) {
             if (! array_key_exists($claim, $payload)) {
                 throw CxpSsoException::invalid('missing_claim', __('Token SSO tidak lengkap.'), ['claim' => $claim]);
             }
         }
 
-        $issuer = (string) config('cxp.issuer');
-        if (! is_string($payload['iss']) || ! hash_equals($issuer, $payload['iss'])) {
-            throw CxpSsoException::invalid('bad_issuer', __('Token SSO bukan dari sumber yang dikenal.'));
+        $issuer = (string) config('cxp.issuer', '');
+        if (array_key_exists('iss', $payload) && $issuer !== '') {
+            if (! is_string($payload['iss']) || ! hash_equals($issuer, $payload['iss'])) {
+                throw CxpSsoException::invalid('bad_issuer', __('Token SSO bukan dari sumber yang dikenal.'));
+            }
         }
 
-        $audiences = is_array($payload['aud']) ? $payload['aud'] : [$payload['aud']];
-        $audiences = array_values(array_filter($audiences, 'is_string'));
-        if (! in_array((string) config('cxp.audience'), $audiences, true)) {
-            throw CxpSsoException::invalid('bad_audience', __('Token SSO tidak ditujukan untuk TransSurvey.'));
+        $audience = (string) config('cxp.audience', '');
+        if (array_key_exists('aud', $payload) && $audience !== '') {
+            $audiences = is_array($payload['aud']) ? $payload['aud'] : [$payload['aud']];
+            $audiences = array_values(array_filter($audiences, 'is_string'));
+            if (! in_array($audience, $audiences, true)) {
+                throw CxpSsoException::invalid('bad_audience', __('Token SSO tidak ditujukan untuk TransSurvey.'));
+            }
+        }
+
+        $expectedApiToken = trim((string) config('cxp.api_token_id', ''));
+        if ($expectedApiToken !== '') {
+            if (! array_key_exists('apiTokenId', $payload) || (string) $payload['apiTokenId'] !== $expectedApiToken) {
+                throw CxpSsoException::invalid('bad_api_token_id', __('Token SSO bukan untuk TransSurvey.'));
+            }
         }
 
         if (! is_numeric($payload['iat']) || ! is_numeric($payload['exp'])) {
@@ -136,16 +225,28 @@ class CxpTokenVerifier
             }
         }
 
-        if (! is_string($payload['jti']) || trim($payload['jti']) === '' || strlen($payload['jti']) > 255) {
-            throw CxpSsoException::invalid('invalid_jti', __('Token SSO tidak valid.'));
+        if (array_key_exists('jti', $payload)) {
+            if (! is_string($payload['jti']) || trim($payload['jti']) === '' || strlen($payload['jti']) > 255) {
+                throw CxpSsoException::invalid('invalid_jti', __('Token SSO tidak valid.'));
+            }
         }
     }
 
-    private function guardReplay(array $payload): void
+    private function guardReplay(array $payload, string $token): void
     {
+        $jti = isset($payload['jti']) && is_string($payload['jti']) ? trim($payload['jti']) : '';
+
+        if ($jti !== '') {
+            $identifier = 'jti:'.$jti;
+        } elseif ((bool) config('cxp.replay_fallback', false)) {
+            $identifier = 'token:'.hash('sha256', $token);
+        } else {
+            throw CxpSsoException::invalid('invalid_jti', __('Token SSO tidak valid.'));
+        }
+
         $remaining = max(1, (int) $payload['exp'] - time());
         $ttl = $remaining + max(0, (int) config('cxp.leeway', 60)) + 60;
-        $key = (string) config('cxp.replay_prefix', 'cxp:jti:').hash('sha256', trim((string) $payload['jti']));
+        $key = (string) config('cxp.replay_prefix', 'cxp:jti:').hash('sha256', $identifier);
 
         if (! Cache::add($key, true, $ttl)) {
             throw CxpSsoException::invalid('token_replayed', __('Token SSO sudah pernah digunakan. Silakan buka ulang dari TransCXP.'));
