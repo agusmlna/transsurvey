@@ -70,12 +70,26 @@ Payload:
   "email": "operator@contoh.co.id",
   "user":     { "id": "CXP-USR-1", "name": "Nama Operator", "email": "operator@contoh.co.id" },
   "project":  { "id": 23, "code": "23", "name": "Brand A" },
-  "ticket":   { "id": "TCK-1001", "status": "open", "channel": "chat" },
-  "customer": { "id": "CUST-9", "name": "Nama Customer", "email": "customer@contoh.co.id" }
+  "ticket": {
+    "id": "TCK-1001",
+    "status": "open",
+    "channel": "chat",
+    "customer": { "id": "CUST-9", "name": "Nama Customer", "email": "customer@contoh.co.id" }
+  }
 }
 ```
 
 `email` di level atas adalah bentuk yang dipakai CakrawalaHub. TransSurvey menyalinnya ke `user.email` bila `user.email` tidak ada. Format baru tetap memakai `user.email`.
+
+`customer` sebaiknya berada **di dalam** `ticket` agar pasangan tiket–customer tidak ambigu. TransSurvey menerima tiga bentuk berikut:
+
+| Bentuk `ticket` | Contoh | Status |
+| --- | --- | --- |
+| Objek dengan `customer` di dalam | `"ticket": { "id": ..., "customer": {...} }` | Disarankan |
+| Array berisi tepat satu tiket | `"ticket": [ { "id": ..., "customer": {...} } ]` | Diterima |
+| Format lama: `ticket` objek + `customer` di level atas | `"ticket": {...}, "customer": {...}` | Tetap didukung |
+
+Array yang berisi **lebih dari satu tiket** ditolak (`ambiguous_ticket`, HTTP 401) karena token SSO adalah konteks login untuk satu tiket. Daftar tiket, bila dibutuhkan, harus dikirim lewat endpoint terpisah, bukan di token SSO.
 
 Aturan klaim:
 
@@ -94,9 +108,10 @@ Aturan klaim:
 | `user.name` | Tidak | Fallback ke email. |
 | `project.code` | Ya | Kode project; menjadi `workspaces.code`. |
 | `project.id`, `project.name` | Tidak | `name` menjadi nama workspace; fallback ke kode project. |
-| `ticket.id` | Ya | Disimpan di sesi untuk Fase 4. |
-| `ticket.status`, `ticket.channel` | Tidak | Disimpan di sesi. |
-| `customer.email` | Ya | Email valid. |
+| `ticket.id` | Ya | Disimpan di sesi untuk Fase 4. Satu token hanya untuk satu tiket. |
+| `ticket.status`, `ticket.channel` | Tidak | Disimpan di sesi. String enum lebih disarankan daripada kode angka. |
+| `ticket.customer` | Ya | Bentuk yang disarankan; customer menempel pada tiketnya. |
+| `customer.email` | Ya | Email valid; boleh di dalam `ticket.customer` atau di level atas. |
 | `customer.name` | Tidak | Fallback ke email. |
 | `customer.id` | Tidak | Disimpan di sesi. |
 
@@ -141,11 +156,11 @@ $payload = [
         'id' => $ticketId,
         'status' => $ticketStatus,
         'channel' => $ticketChannel,
-    ],
-    'customer' => [
-        'id' => $customerId,
-        'name' => $customerName,
-        'email' => $customerEmail,
+        'customer' => [
+            'id' => $customerId,
+            'name' => $customerName,
+            'email' => $customerEmail,
+        ],
     ],
 ];
 
@@ -247,7 +262,7 @@ Status HTTP yang mungkin:
 
 | Status | Arti |
 | --- | --- |
-| 401 | Token hilang, tidak valid, kedaluwarsa, tanda tangan salah, algoritma salah, atau `jti` sudah dipakai. |
+| 401 | Token hilang, tidak valid, kedaluwarsa, tanda tangan salah, algoritma salah, `jti` sudah dipakai, atau berisi lebih dari satu tiket. |
 | 403 | Akun SSO ada tetapi bukan role `operation`. |
 | 409 | Email bentrok dengan akun lain, atau kode project memakai workspace legacy. |
 | 429 | Rate limit `/cxp/launch` tercapai. |

@@ -26,7 +26,7 @@ class CxpTokenVerifier
         [$encodedHeader, $encodedPayload, $encodedSignature] = $segments;
 
         $header = $this->decodeJson($encodedHeader, 'header');
-        $payload = $this->normalize($this->decodeJson($encodedPayload, 'payload'));
+        $payload = $this->decodeJson($encodedPayload, 'payload');
         $signature = $this->base64UrlDecode($encodedSignature, 'signature');
 
         $algorithm = strtoupper((string) ($header['alg'] ?? ''));
@@ -40,6 +40,7 @@ class CxpTokenVerifier
         }
 
         $this->verifySignature($algorithm, $encodedHeader.'.'.$encodedPayload, $signature);
+        $payload = $this->normalize($payload);
         $this->verifyClaims($payload);
         $this->guardReplay($payload, $token);
 
@@ -131,9 +132,36 @@ class CxpTokenVerifier
     /**
      * Token gaya CakrawalaHub hanya mengirim email di level atas. Salin ke
      * user.email supaya provisioner tetap memakai satu bentuk klaim.
+     *
+     * Format TransCXP terbaru menaruh customer di dalam ticket. Ratakan ke
+     * bentuk lama (ticket + customer terpisah) agar provisioner tidak perlu
+     * mengenal dua bentuk. Array tiket hanya diterima bila berisi satu tiket;
+     * daftar banyak tiket bukan konteks login.
      */
     private function normalize(array $payload): array
     {
+        $ticket = $payload['ticket'] ?? null;
+
+        if (is_array($ticket) && array_is_list($ticket) && $ticket !== []) {
+            if (count($ticket) > 1) {
+                throw CxpSsoException::invalid(
+                    'ambiguous_ticket',
+                    __('Token SSO memuat lebih dari satu tiket. Buka CSAT dari satu tiket.')
+                );
+            }
+
+            if (! is_array($ticket[0])) {
+                throw CxpSsoException::invalid('invalid_claim', __('Data pada token SSO tidak valid.'), ['claim' => 'ticket']);
+            }
+
+            $payload['ticket'] = $ticket[0];
+            $ticket = $payload['ticket'];
+        }
+
+        if (is_array($ticket) && is_array($ticket['customer'] ?? null) && ! is_array($payload['customer'] ?? null)) {
+            $payload['customer'] = $ticket['customer'];
+        }
+
         $email = $payload['email'] ?? null;
         if (! is_string($email) || trim($email) === '') {
             return $payload;

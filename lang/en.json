@@ -678,5 +678,6 @@
   "Pilihan cepat masa berlaku": "Expiry quick presets",
   "Tautan berlaku": "Link is valid",
   "Berlaku selama :value :unit sejak email terkirim.": "Valid for :value :unit after the email is sent.",
-  "Tanpa batas waktu.": "No time limit."
+  "Tanpa batas waktu.": "No time limit.",
+  "Token SSO memuat lebih dari satu tiket. Buka CSAT dari satu tiket.": "The SSO token contains more than one ticket. Open CSAT from a single ticket."
 }
