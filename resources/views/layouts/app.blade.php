@@ -31,6 +31,12 @@
                     </a>
                 @endif
             @endforeach
+            @php($csatWorkspaceId = app(\App\Services\CurrentWorkspace::class)->filterId())
+            @if (in_array(auth()->user()->role, ['operation', 'superadmin'], true) && $csatWorkspaceId !== null && $csatWorkspaceId > 0)
+                <a class="nav-item {{ request()->routeIs('csat.*') ? 'active' : '' }}" href="{{ route('csat.templates.index') }}" @if(request()->routeIs('csat.*')) aria-current="page" @endif>
+                    <span class="nav-icon">@include('layouts.icon', ['name' => 'survey'])</span>{{ __('Template CSAT') }}
+                </a>
+            @endif
         </nav>
         <div class="ts-sidebar-footer"><span class="ts-sidebar-dot"></span> Client Satisfaction Management</div>
         <div class="profile">

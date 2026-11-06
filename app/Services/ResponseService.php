@@ -21,6 +21,7 @@ class ResponseService
                 throw ValidationException::withMessages(['survey' => __('Survei sedang tidak menerima respons.')]);
             }
             $questions = $survey->questions;
+            $isCsat = ($survey->type ?? 'client') === 'csat';
             $rules = [];
             foreach ($questions as $q) {
                 $prefix = 'answers.'.$q->id;
@@ -38,8 +39,8 @@ class ResponseService
                 $chosen = (array) data_get($input, $prefix.'.value', []);
                 $rules[$prefix.'.other'] = [(!$draft && in_array('__other__', $chosen, true)) ? 'required' : 'nullable', 'string', 'max:255'];
 
-                // BARU: komentar wajib untuk rating 1-3 (sebelumnya hilang dari versi ini)
-                $low = $q->type === 'rating' && in_array((string) data_get($input, $prefix.'.value'), ['1','2','3'], true);
+                // Komentar wajib untuk rating 1-3 pada survei client. CSAT selalu opsional.
+                $low = !$isCsat && $q->type === 'rating' && in_array((string) data_get($input, $prefix.'.value'), ['1','2','3'], true);
                 $rules[$prefix.'.comment'] = [(!$draft && $low) ? 'required' : 'nullable', 'string', 'max:5000'];
             }
             Validator::make($input, $rules, ['required' => __('Pertanyaan wajib atau komentar untuk skor 1–3 belum diisi.'), 'in' => __('Pilihan jawaban tidak valid.')])->validate();

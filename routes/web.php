@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\{
     AuthController,
+    CsatSettingsController,
+    CsatTemplateController,
     CxpLaunchController,
     DashboardController,
     SurveyController,
@@ -100,6 +102,38 @@ Route::middleware(['auth', 'workspace'])->group(function () {
     // Follow-ups
     Route::get('/followups', [FollowUpController::class, 'index'])
         ->name('followups.index');
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSAT Templates (operation / superadmin with a chosen workspace)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('csat')->group(function () {
+        Route::get('/csat/templates', [CsatTemplateController::class, 'index'])
+            ->name('csat.templates.index');
+        Route::get('/csat/templates/create', [CsatTemplateController::class, 'create'])
+            ->name('csat.templates.create');
+        Route::post('/csat/templates', [CsatTemplateController::class, 'store'])
+            ->name('csat.templates.store');
+
+        Route::get('/csat/templates/{survey}/edit', [CsatTemplateController::class, 'edit'])
+            ->name('csat.templates.edit');
+        Route::put('/csat/templates/{survey}', [CsatTemplateController::class, 'update'])
+            ->name('csat.templates.update');
+        Route::post('/csat/templates/{survey}/duplicate', [CsatTemplateController::class, 'duplicate'])
+            ->name('csat.templates.duplicate');
+        Route::post('/csat/templates/{survey}/default', [CsatTemplateController::class, 'setDefault'])
+            ->name('csat.templates.default');
+        Route::delete('/csat/templates/{survey}', [CsatTemplateController::class, 'destroy'])
+            ->name('csat.templates.destroy');
+        Route::get('/csat/templates/{survey}/preview', [CsatTemplateController::class, 'preview'])
+            ->name('csat.templates.preview');
+
+        Route::get('/csat/settings', [CsatSettingsController::class, 'edit'])
+            ->name('csat.settings.edit');
+        Route::put('/csat/settings', [CsatSettingsController::class, 'update'])
+            ->name('csat.settings.update');
+    });
 
     /*
     |--------------------------------------------------------------------------

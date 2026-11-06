@@ -11,6 +11,6 @@ class DashboardController
     public function __invoke(Request $r, ReportService $reports)
     {
         $reports->validateFilters($r);
-        return view('dashboard.index', $reports->summary($r) + ['clients' => Client::orderBy('name')->get(), 'surveys' => Survey::latest()->get()]);
+        return view('dashboard.index', $reports->summary($r) + ['clients' => Client::orderBy('name')->get(), 'surveys' => Survey::where('type', 'client')->latest()->get()]);
     }
 }
