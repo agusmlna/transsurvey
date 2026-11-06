@@ -664,5 +664,19 @@
   "Periksa sekali lagi sebelum template disimpan.": "Review once more before saving the template.",
   "Simpan template": "Save template",
   "Opsional. Ceritakan bila ada yang perlu kami perbaiki.": "Optional. Tell us if anything needs improvement.",
-  "Komentar bersifat opsional.": "Comments are optional."
+  "Komentar bersifat opsional.": "Comments are optional.",
+  "Ringkasan CSAT workspace": "CSAT workspace summary",
+  "Workspace aktif": "Active workspace",
+  "Template di bawah hanya berlaku untuk workspace ini.": "The templates below only apply to this workspace.",
+  "Masa berlaku tautan CSAT": "CSAT link expiry",
+  "Ubah pengaturan": "Change settings",
+  "Daftar template": "Template list",
+  "Pilih satu template default yang dipakai saat mengirim CSAT dari tiket.": "Choose one default template used when sending CSAT from a ticket.",
+  "template": "templates",
+  "Dihitung sejak email CSAT berhasil terkirim ke customer.": "Counted from when the CSAT email is successfully sent to the customer.",
+  "Pilihan cepat": "Quick presets",
+  "Pilihan cepat masa berlaku": "Expiry quick presets",
+  "Tautan berlaku": "Link is valid",
+  "Berlaku selama :value :unit sejak email terkirim.": "Valid for :value :unit after the email is sent.",
+  "Tanpa batas waktu.": "No time limit."
 }
