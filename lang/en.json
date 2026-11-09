@@ -679,5 +679,8 @@
   "Tautan berlaku": "Link is valid",
   "Berlaku selama :value :unit sejak email terkirim.": "Valid for :value :unit after the email is sent.",
   "Tanpa batas waktu.": "No time limit.",
-  "Token SSO memuat lebih dari satu tiket. Buka CSAT dari satu tiket.": "The SSO token contains more than one ticket. Open CSAT from a single ticket."
+  "Token SSO memuat lebih dari satu tiket. Buka CSAT dari satu tiket.": "The SSO token contains more than one ticket. Open CSAT from a single ticket.",
+  "Kode peluncuran tidak valid atau sudah kedaluwarsa.": "The launch code is invalid or has expired.",
+  "Konfigurasi API peluncuran belum lengkap.": "The launch API configuration is incomplete.",
+  "API key tidak valid.": "The API key is invalid."
 }

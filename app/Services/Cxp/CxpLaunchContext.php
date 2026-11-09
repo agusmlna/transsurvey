@@ -5,7 +5,8 @@ namespace App\Services\Cxp;
 use Illuminate\Contracts\Session\Session;
 
 /**
- * Menyimpan data tiket/customer dari token untuk dipakai halaman Kirim CSAT (Fase 4).
+ * Menyimpan data tiket/customer dari token atau launch session untuk dipakai
+ * halaman Kirim CSAT (Fase 4).
  */
 class CxpLaunchContext
 {

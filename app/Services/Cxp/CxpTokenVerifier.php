@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Cache;
  */
 class CxpTokenVerifier
 {
+    public function __construct(private readonly CxpClaimNormalizer $normalizer)
+    {
+    }
+
     public function verify(string $token): array
     {
         $segments = explode('.', $token);
@@ -40,7 +44,7 @@ class CxpTokenVerifier
         }
 
         $this->verifySignature($algorithm, $encodedHeader.'.'.$encodedPayload, $signature);
-        $payload = $this->normalize($payload);
+        $payload = $this->normalizer->normalize($payload);
         $this->verifyClaims($payload);
         $this->guardReplay($payload, $token);
 
@@ -127,63 +131,6 @@ class CxpTokenVerifier
         $key = (string) config('cxp.sso_public_key');
 
         return $key === '' ? null : str_replace('\n', "\n", $key);
-    }
-
-    /**
-     * Token gaya CakrawalaHub hanya mengirim email di level atas. Salin ke
-     * user.email supaya provisioner tetap memakai satu bentuk klaim.
-     *
-     * Format TransCXP terbaru menaruh customer di dalam ticket. Ratakan ke
-     * bentuk lama (ticket + customer terpisah) agar provisioner tidak perlu
-     * mengenal dua bentuk. Array tiket hanya diterima bila berisi satu tiket;
-     * daftar banyak tiket bukan konteks login.
-     */
-    private function normalize(array $payload): array
-    {
-        if (array_key_exists('ticket', $payload) && ! is_array($payload['ticket'])) {
-            throw CxpSsoException::invalid('invalid_claim', __('Data pada token SSO tidak valid.'), ['claim' => 'ticket']);
-        }
-
-        $ticket = $payload['ticket'] ?? null;
-
-        if (is_array($ticket) && array_is_list($ticket) && $ticket !== []) {
-            if (count($ticket) > 1) {
-                throw CxpSsoException::invalid(
-                    'ambiguous_ticket',
-                    __('Token SSO memuat lebih dari satu tiket. Buka CSAT dari satu tiket.')
-                );
-            }
-
-            if (! is_array($ticket[0])) {
-                throw CxpSsoException::invalid('invalid_claim', __('Data pada token SSO tidak valid.'), ['claim' => 'ticket']);
-            }
-
-            $payload['ticket'] = $ticket[0];
-            $ticket = $payload['ticket'];
-        }
-
-        if (is_array($ticket) && is_array($ticket['customer'] ?? null) && ! is_array($payload['customer'] ?? null)) {
-            $payload['customer'] = $ticket['customer'];
-        }
-
-        if (array_key_exists('customer', $payload) && ! is_array($payload['customer'])) {
-            throw CxpSsoException::invalid('invalid_claim', __('Data pada token SSO tidak valid.'), ['claim' => 'customer']);
-        }
-
-        $email = $payload['email'] ?? null;
-        if (! is_string($email) || trim($email) === '') {
-            return $payload;
-        }
-
-        $email = trim($email);
-
-        if (! is_array($payload['user'] ?? null)) {
-            $payload['user'] = ['email' => $email];
-        } elseif (! isset($payload['user']['email'])) {
-            $payload['user']['email'] = $email;
-        }
-
-        return $payload;
     }
 
     private function verifyClaims(array $payload): void

@@ -3,34 +3,52 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\CxpSsoException;
-use App\Services\Cxp\{CxpAccountProvisioner, CxpLaunchContext, CxpTokenVerifier};
+use App\Services\Cxp\{CxpAccountProvisioner, CxpLaunchCodeStore, CxpLaunchContext, CxpTokenVerifier};
 use App\Services\CurrentWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Log, Route};
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * GET /cxp/launch?token=<JWT> atau ?sso=<JWT>
+ * GET /cxp/launch?token=<JWT>, ?sso=<JWT>, atau ?code=<kode sekali pakai>
  *
  * Login otomatis dari tombol TransCXP. Endpoint ini tidak memakai middleware
- * workspace: workspace baru ditentukan setelah token diverifikasi.
+ * workspace: workspace baru ditentukan setelah token/kode diverifikasi.
  */
 class CxpLaunchController
 {
-    public function __invoke(Request $request, CxpTokenVerifier $verifier, CxpAccountProvisioner $provisioner): Response
-    {
+    public function __invoke(
+        Request $request,
+        CxpTokenVerifier $verifier,
+        CxpAccountProvisioner $provisioner,
+        CxpLaunchCodeStore $codes,
+    ): Response {
         // TransCXP gaya CakrawalaHub mengirim token di parameter "sso".
         $token = $request->query('token');
         if (! is_string($token) || trim($token) === '') {
             $token = $request->query('sso');
         }
 
+        $code = $request->query('code');
+
         try {
-            if (! is_string($token) || trim($token) === '' || strlen($token) > 8192) {
-                throw CxpSsoException::invalid('missing_token', __('Token SSO tidak ditemukan.'));
+            // Alur tanpa JWT: kode sekali pakai dari POST /api/cxp/launch-sessions.
+            if (is_string($code) && trim($code) !== '') {
+                $payload = $codes->pull($code);
+                if ($payload === null) {
+                    throw CxpSsoException::invalid(
+                        'invalid_launch_code',
+                        __('Kode peluncuran tidak valid atau sudah kedaluwarsa.')
+                    );
+                }
+            } else {
+                if (! is_string($token) || trim($token) === '' || strlen($token) > 8192) {
+                    throw CxpSsoException::invalid('missing_token', __('Token SSO tidak ditemukan.'));
+                }
+
+                $payload = $verifier->verify(trim($token));
             }
 
-            $payload = $verifier->verify(trim($token));
             $result = $provisioner->provision($payload);
 
             if (Auth::check()) {

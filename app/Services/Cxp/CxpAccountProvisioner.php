@@ -100,6 +100,15 @@ class CxpAccountProvisioner
         });
     }
 
+    /**
+     * Validasi klaim tanpa menyentuh database. Dipakai endpoint launch session
+     * supaya payload yang tidak valid ditolak sebelum kode dibuat.
+     */
+    public function validate(array $payload): void
+    {
+        $this->identity($payload);
+    }
+
     private function identity(array $payload): array
     {
         $externalId = $this->claim($payload, 'user.id', 191, true);

@@ -11,6 +11,7 @@ class AppServiceProvider extends ServiceProvider {
   RateLimiter::for('login',fn(Request $r)=>[Limit::perMinute(5)->by(mb_strtolower((string)$r->input('email')).'|'.$r->ip()),Limit::perMinute(25)->by($r->ip())]);
   RateLimiter::for('respond',fn(Request $r)=>Limit::perMinute(30)->by($r->ip().'|'.hash('sha256',(string)$r->route('token'))));
   RateLimiter::for('cxp-sso',fn(Request $r)=>[Limit::perMinute(30)->by('cxp-ip:'.$r->ip()),Limit::perMinute(120)->by('cxp-global')]);
+  RateLimiter::for('cxp-launch-api',fn(Request $r)=>[Limit::perMinute(60)->by('cxp-launch-api:'.$r->ip()),Limit::perMinute(300)->by('cxp-launch-api-global')]);
   \Illuminate\Pagination\Paginator::useBootstrapFive();
  }
 }
