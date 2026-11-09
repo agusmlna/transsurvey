@@ -140,6 +140,10 @@ class CxpTokenVerifier
      */
     private function normalize(array $payload): array
     {
+        if (array_key_exists('ticket', $payload) && ! is_array($payload['ticket'])) {
+            throw CxpSsoException::invalid('invalid_claim', __('Data pada token SSO tidak valid.'), ['claim' => 'ticket']);
+        }
+
         $ticket = $payload['ticket'] ?? null;
 
         if (is_array($ticket) && array_is_list($ticket) && $ticket !== []) {
@@ -160,6 +164,10 @@ class CxpTokenVerifier
 
         if (is_array($ticket) && is_array($ticket['customer'] ?? null) && ! is_array($payload['customer'] ?? null)) {
             $payload['customer'] = $ticket['customer'];
+        }
+
+        if (array_key_exists('customer', $payload) && ! is_array($payload['customer'])) {
+            throw CxpSsoException::invalid('invalid_claim', __('Data pada token SSO tidak valid.'), ['claim' => 'customer']);
         }
 
         $email = $payload['email'] ?? null;

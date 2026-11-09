@@ -69,7 +69,7 @@ class CxpAccountProvisioner
 
             $user->workspaces()->syncWithoutDetaching([$workspace->id]);
 
-            return new CxpLaunchResult($user->fresh(), $workspace->fresh(), [
+            $context = [
                 'user' => [
                     'external_id' => $identity['external_id'],
                     'name' => $identity['name'],
@@ -79,17 +79,24 @@ class CxpAccountProvisioner
                     'code' => $identity['project_code'],
                     'name' => $identity['project_name'],
                 ],
-                'ticket' => [
+            ];
+
+            // Token login saja tidak memuat tiket; halaman Kirim CSAT akan
+            // mengambil data tiket lewat API pada Fase 4.
+            if ($identity['ticket_id'] !== '' || $identity['customer_email'] !== '') {
+                $context['ticket'] = [
                     'id' => $identity['ticket_id'],
                     'status' => $identity['ticket_status'],
                     'channel' => $identity['channel'],
-                ],
-                'customer' => [
+                ];
+                $context['customer'] = [
                     'id' => $identity['customer_id'],
                     'name' => $identity['customer_name'],
                     'email' => $identity['customer_email'],
-                ],
-            ]);
+                ];
+            }
+
+            return new CxpLaunchResult($user->fresh(), $workspace->fresh(), $context);
         });
     }
 
@@ -102,18 +109,31 @@ class CxpAccountProvisioner
         $projectCode = mb_strtolower($this->claim($payload, 'project.code', 100, true));
         $projectName = $this->claim($payload, 'project.name', 255) ?: $projectCode;
 
-        $ticketId = $this->claim($payload, 'ticket.id', 100, true);
+        $ticketId = $this->claim($payload, 'ticket.id', 100);
         $ticketStatus = $this->claim($payload, 'ticket.status', 100);
         $channel = $this->claim($payload, 'ticket.channel', 100);
 
         $customerId = $this->claim($payload, 'customer.id', 191);
-        $customerEmail = mb_strtolower($this->claim($payload, 'customer.email', 255, true));
+        $customerEmail = mb_strtolower($this->claim($payload, 'customer.email', 255));
         $customerName = $this->claim($payload, 'customer.name', 255) ?: $customerEmail;
+
+        // Token boleh hanya berisi identitas login (user + project). Data tiket
+        // menyusul lewat API pada Fase 4. Tapi kalau salah satu dikirim, keduanya
+        // harus lengkap supaya tiket dan customer tidak tertukar.
+        if ($ticketId === '' && $customerEmail === '') {
+            // Login saja.
+        } elseif ($ticketId === '' || $customerEmail === '') {
+            throw CxpSsoException::invalid(
+                'invalid_claim',
+                __('Data pada token SSO tidak lengkap.'),
+                ['claim' => $ticketId === '' ? 'ticket.id' : 'customer.email']
+            );
+        }
 
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw CxpSsoException::invalid('invalid_claim', __('Data pengguna pada token SSO tidak valid.'), ['claim' => 'user.email']);
         }
-        if (! filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+        if ($customerEmail !== '' && ! filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
             throw CxpSsoException::invalid('invalid_claim', __('Data customer pada token SSO tidak valid.'), ['claim' => 'customer.email']);
         }
 

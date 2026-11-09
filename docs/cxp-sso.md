@@ -32,7 +32,7 @@ CXP_SSO_REDIRECT_ROUTE=dashboard
 CXP_ALLOW_OPERATION_PASSWORD=false
 ```
 
-- `CXP_SSO_SECRET` dipakai untuk HS256. Nilai harus sama dengan yang dipegang TransCXP.
+- `CXP_SSO_SECRET` dipakai untuk HS256. Nilai harus sama dengan yang dipegang TransCXP. HS256 adalah pilihan paling sederhana: tidak perlu key pair, cukup satu string rahasia di kedua sisi.
 - Untuk RS256/ES256, isi `CXP_SSO_PUBLIC_KEY_PATH` (disarankan) atau `CXP_SSO_PUBLIC_KEY` dengan newline ditulis `\n`.
 - `CXP_SSO_ALGORITHMS` adalah daftar yang dipisahkan koma, misalnya `ES256`, `HS256`, atau `ES256,HS256`. Algoritma `none` selalu ditolak.
 - `CXP_SSO_REQUIRE_ISS_AUD=false` membuat `iss`/`aud` opsional (pola CakrawalaHub). Kalau klaim itu tetap dikirim, nilainya tetap divalidasi.
@@ -81,6 +81,23 @@ Payload:
 
 `email` di level atas adalah bentuk yang dipakai CakrawalaHub. TransSurvey menyalinnya ke `user.email` bila `user.email` tidak ada. Format baru tetap memakai `user.email`.
 
+Untuk **login saja**, `ticket` dan `customer` boleh tidak dikirim. Token minimal cukup berisi `user` dan `project`:
+
+```json
+{
+  "apiTokenId": 1,
+  "iss": "transcxp",
+  "aud": "transsurvey",
+  "iat": 1762300000,
+  "exp": 1762300300,
+  "jti": "launch-8f2c1a7e",
+  "user":    { "id": "CXP-USR-1", "name": "Nama Operator", "email": "operator@contoh.co.id" },
+  "project": { "id": 23, "code": "23", "name": "Brand A" }
+}
+```
+
+Data tiket tidak perlu dibawa token SSO. Halaman Kirim CSAT akan mengambil tiket lewat API pada Fase 4. Kalau `ticket` tetap dikirim, `customer` wajib ikut (dan sebaliknya); satu tanpa yang lain ditolak.
+
 `customer` sebaiknya berada **di dalam** `ticket` agar pasangan tiket–customer tidak ambigu. TransSurvey menerima tiga bentuk berikut:
 
 | Bentuk `ticket` | Contoh | Status |
@@ -108,10 +125,10 @@ Aturan klaim:
 | `user.name` | Tidak | Fallback ke email. |
 | `project.code` | Ya | Kode project; menjadi `workspaces.code`. |
 | `project.id`, `project.name` | Tidak | `name` menjadi nama workspace; fallback ke kode project. |
-| `ticket.id` | Ya | Disimpan di sesi untuk Fase 4. Satu token hanya untuk satu tiket. |
+| `ticket.id` | Tidak | Opsional. Jika dikirim, `customer.email` wajib ikut. Disimpan di sesi untuk Fase 4. |
 | `ticket.status`, `ticket.channel` | Tidak | Disimpan di sesi. String enum lebih disarankan daripada kode angka. |
-| `ticket.customer` | Ya | Bentuk yang disarankan; customer menempel pada tiketnya. |
-| `customer.email` | Ya | Email valid; boleh di dalam `ticket.customer` atau di level atas. |
+| `ticket.customer` | Tidak | Bentuk yang disarankan; customer menempel pada tiketnya. |
+| `customer.email` | Tidak | Wajib bila `ticket` dikirim. Email valid; boleh di dalam `ticket.customer` atau di level atas. |
 | `customer.name` | Tidak | Fallback ke email. |
 | `customer.id` | Tidak | Disimpan di sesi. |
 
@@ -244,7 +261,7 @@ Aturan yang diterapkan:
 3. Jika belum ada, akun dibuat dengan role `operation`, password acak, dan ditambahkan ke workspace.
 4. Jika email sudah dipakai akun lain, launch **ditolak** (HTTP 409). Akun lama tidak pernah ditautkan atau dinaikkan role-nya berdasarkan email.
 5. Jika akun dengan `external_id` yang sama ternyata bukan `operation`, launch ditolak (HTTP 403).
-6. Workspace aktif dan data tiket/customer disimpan di sesi (`cxp.context`) untuk dipakai halaman Kirim CSAT di Fase 4.
+6. Workspace aktif disimpan di sesi (`cxp.context`). Jika token membawa `ticket`, data tiket/customer ikut disimpan untuk halaman Kirim CSAT. Jika tidak, halaman itu mengambil data tiket lewat API pada Fase 4.
 7. Login password untuk akun `operation`/SSO ditolak. Gunakan tombol dari TransCXP.
 
 ## 5. Keamanan dan error

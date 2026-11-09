@@ -535,6 +535,44 @@ class CxpSsoTest extends TestCase
         $this->assertSame(0, User::count());
     }
 
+    public function test_login_only_token_without_ticket_is_accepted(): void
+    {
+        $payload = $this->payload();
+        unset($payload['ticket'], $payload['customer']);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame('cx-user-1', session('cxp.context.user.external_id'));
+        $this->assertSame('brand-a', session('cxp.context.project.code'));
+        $this->assertNull(session('cxp.context.ticket'));
+        $this->assertNull(session('cxp.context.customer'));
+    }
+
+    public function test_ticket_without_customer_is_rejected(): void
+    {
+        $payload = $this->payload();
+        unset($payload['customer']);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Data pada token SSO tidak lengkap.'));
+
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_customer_without_ticket_is_rejected(): void
+    {
+        $payload = $this->payload();
+        unset($payload['ticket']);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Data pada token SSO tidak lengkap.'));
+
+        $this->assertSame(0, User::count());
+    }
+
     public function test_missing_token_is_rejected(): void
     {
         $this->get(route('cxp.launch'))->assertStatus(401)->assertSee(__('Token SSO tidak ditemukan.'));
