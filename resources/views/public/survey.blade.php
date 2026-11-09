@@ -1,4 +1,5 @@
 <!doctype html>
+@php($isCsat = ($survey->type ?? 'client') === 'csat')
 <html lang="{{ app()->getLocale() }}">
 
 <head>
@@ -87,17 +88,17 @@
                                 </h3>
 
                                 @if ($q->type === 'rating')
-                                    <fieldset class="rating-group" aria-labelledby="question-{{ $q->id }}">
+                                    <fieldset class="rating-group {{ $isCsat ? 'csat-rating' : '' }}" aria-labelledby="question-{{ $q->id }}">
                                         @foreach ([1 => __('Sangat tidak puas'), 2 => __('Tidak puas'), 3 => __('Cukup puas'), 4 => __('Puas'), 5 => __('Sangat puas')] as $n => $text)
                                             <label class="rating-option"><input type="radio"
                                                     name="answers[{{ $q->id }}][value]"
                                                     value="{{ $n }}" @checked((string) ($answer['value'] ?? '') === (string) $n)
-                                                    @required($q->required)><span class="ts-rating-star"
-                                                    aria-hidden="true">★</span><strong>{{ $n }}</strong><span>{{ $text }}</span></label>
+                                                    @required($q->required)>@unless ($isCsat)<span class="ts-rating-star"
+                                                    aria-hidden="true">★</span>@endunless<strong>{{ $n }}</strong><span>{{ $text }}</span></label>
                                         @endforeach
                                     </fieldset>
                                     <label class="low-comment">{{ __('Apa yang bisa kami tingkatkan?') }}
-                                        <small>{{ __('Komentar wajib jika memilih skor 1, 2, atau 3.') }}</small>
+                                        <small>{{ $isCsat ? __('Opsional. Ceritakan bila ada yang perlu kami perbaiki.') : __('Komentar wajib jika memilih skor 1, 2, atau 3.') }}</small>
                                         <textarea name="answers[{{ $q->id }}][comment]" rows="3" maxlength="5000"
                                             placeholder="{{ __('Ceritakan pengalaman dan saran Anda…') }}">{{ $answer['comment'] ?? '' }}</textarea>
                                     </label>
@@ -202,7 +203,7 @@
                 <p class="footnote">
                     @unless ($preview)
                         {{ __('Tautan ini khusus untuk Anda. Draf dapat dilanjutkan melalui tautan yang sama.') }}
-                    @endunless {{ __('Rating 1–3 memerlukan komentar agar kami dapat memahami masukan Anda.') }}
+                    @endunless {{ $isCsat ? __('Komentar bersifat opsional.') : __('Rating 1–3 memerlukan komentar agar kami dapat memahami masukan Anda.') }}
                 </p>
             </form>
         @endif

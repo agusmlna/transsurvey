@@ -9,7 +9,9 @@ GET https://<transsurvey-host>/cxp/launch?sso=<JWT>
 
 Kedua nama parameter diterima. `?sso=` disediakan untuk mengikuti pola CakrawalaHub.
 
-Token berisi identitas user, project, tiket, dan customer. Data customer/tiket **tidak boleh** dikirim sebagai query string terpisah. Setelah token valid, TransSurvey membuat/mencocokkan workspace dan akun `operation`, lalu login otomatis.
+Token berisi identitas user dan project; data tiket/customer opsional. Data customer/tiket **tidak boleh** dikirim sebagai query string terpisah. Setelah token valid, TransSurvey membuat/mencocokkan workspace dan akun `operation`, lalu login otomatis.
+
+Untuk integrasi yang tidak ingin memakai JWT sama sekali, lihat **bagian 8: launch session API** (kode sekali pakai).
 
 ## 1. Konfigurasi
 
@@ -30,9 +32,11 @@ CXP_SSO_TTL=300
 CXP_SSO_LEEWAY=60
 CXP_SSO_REDIRECT_ROUTE=dashboard
 CXP_ALLOW_OPERATION_PASSWORD=false
+CXP_LAUNCH_API_KEY=
+CXP_LAUNCH_CODE_TTL=120
 ```
 
-- `CXP_SSO_SECRET` dipakai untuk HS256. Nilai harus sama dengan yang dipegang TransCXP.
+- `CXP_SSO_SECRET` dipakai untuk HS256. Nilai harus sama dengan yang dipegang TransCXP. HS256 adalah pilihan paling sederhana: tidak perlu key pair, cukup satu string rahasia di kedua sisi.
 - Untuk RS256/ES256, isi `CXP_SSO_PUBLIC_KEY_PATH` (disarankan) atau `CXP_SSO_PUBLIC_KEY` dengan newline ditulis `\n`.
 - `CXP_SSO_ALGORITHMS` adalah daftar yang dipisahkan koma, misalnya `ES256`, `HS256`, atau `ES256,HS256`. Algoritma `none` selalu ditolak.
 - `CXP_SSO_REQUIRE_ISS_AUD=false` membuat `iss`/`aud` opsional (pola CakrawalaHub). Kalau klaim itu tetap dikirim, nilainya tetap divalidasi.
@@ -42,6 +46,8 @@ CXP_ALLOW_OPERATION_PASSWORD=false
 - `CXP_SSO_LEEWAY` adalah toleransi selisih jam dalam detik.
 - `CXP_SSO_REDIRECT_ROUTE` adalah nama route tujuan setelah login. Fase 4 dapat mengganti ke halaman Kirim CSAT.
 - `CXP_ALLOW_OPERATION_PASSWORD=false` menonaktifkan login password untuk akun operation/SSO.
+- `CXP_LAUNCH_API_KEY` adalah kunci untuk `POST /api/cxp/launch-sessions` (alur tanpa JWT, bagian 8). Kosongkan untuk menonaktifkan endpoint itu.
+- `CXP_LAUNCH_CODE_TTL` adalah umur kode peluncuran sekali pakai dalam detik (default 120, minimum 30).
 
 Setelah mengubah `.env`:
 
@@ -70,12 +76,43 @@ Payload:
   "email": "operator@contoh.co.id",
   "user":     { "id": "CXP-USR-1", "name": "Nama Operator", "email": "operator@contoh.co.id" },
   "project":  { "id": 23, "code": "23", "name": "Brand A" },
-  "ticket":   { "id": "TCK-1001", "status": "open", "channel": "chat" },
-  "customer": { "id": "CUST-9", "name": "Nama Customer", "email": "customer@contoh.co.id" }
+  "ticket": {
+    "id": "TCK-1001",
+    "status": "open",
+    "channel": "chat",
+    "customer": { "id": "CUST-9", "name": "Nama Customer", "email": "customer@contoh.co.id" }
+  }
 }
 ```
 
 `email` di level atas adalah bentuk yang dipakai CakrawalaHub. TransSurvey menyalinnya ke `user.email` bila `user.email` tidak ada. Format baru tetap memakai `user.email`.
+
+Untuk **login saja**, `ticket` dan `customer` boleh tidak dikirim. Token minimal cukup berisi `user` dan `project`:
+
+```json
+{
+  "apiTokenId": 1,
+  "iss": "transcxp",
+  "aud": "transsurvey",
+  "iat": 1762300000,
+  "exp": 1762300300,
+  "jti": "launch-8f2c1a7e",
+  "user":    { "id": "CXP-USR-1", "name": "Nama Operator", "email": "operator@contoh.co.id" },
+  "project": { "id": 23, "code": "23", "name": "Brand A" }
+}
+```
+
+Data tiket tidak perlu dibawa token SSO. Halaman Kirim CSAT akan mengambil tiket lewat API pada Fase 4. Kalau `ticket` tetap dikirim, `customer` wajib ikut (dan sebaliknya); satu tanpa yang lain ditolak.
+
+`customer` sebaiknya berada **di dalam** `ticket` agar pasangan tiket–customer tidak ambigu. TransSurvey menerima tiga bentuk berikut:
+
+| Bentuk `ticket` | Contoh | Status |
+| --- | --- | --- |
+| Objek dengan `customer` di dalam | `"ticket": { "id": ..., "customer": {...} }` | Disarankan |
+| Array berisi tepat satu tiket | `"ticket": [ { "id": ..., "customer": {...} } ]` | Diterima |
+| Format lama: `ticket` objek + `customer` di level atas | `"ticket": {...}, "customer": {...}` | Tetap didukung |
+
+Array yang berisi **lebih dari satu tiket** ditolak (`ambiguous_ticket`, HTTP 401) karena token SSO adalah konteks login untuk satu tiket. Daftar tiket, bila dibutuhkan, harus dikirim lewat endpoint terpisah, bukan di token SSO.
 
 Aturan klaim:
 
@@ -94,9 +131,10 @@ Aturan klaim:
 | `user.name` | Tidak | Fallback ke email. |
 | `project.code` | Ya | Kode project; menjadi `workspaces.code`. |
 | `project.id`, `project.name` | Tidak | `name` menjadi nama workspace; fallback ke kode project. |
-| `ticket.id` | Ya | Disimpan di sesi untuk Fase 4. |
-| `ticket.status`, `ticket.channel` | Tidak | Disimpan di sesi. |
-| `customer.email` | Ya | Email valid. |
+| `ticket.id` | Tidak | Opsional. Jika dikirim, `customer.email` wajib ikut. Disimpan di sesi untuk Fase 4. |
+| `ticket.status`, `ticket.channel` | Tidak | Disimpan di sesi. String enum lebih disarankan daripada kode angka. |
+| `ticket.customer` | Tidak | Bentuk yang disarankan; customer menempel pada tiketnya. |
+| `customer.email` | Tidak | Wajib bila `ticket` dikirim. Email valid; boleh di dalam `ticket.customer` atau di level atas. |
 | `customer.name` | Tidak | Fallback ke email. |
 | `customer.id` | Tidak | Disimpan di sesi. |
 
@@ -141,11 +179,11 @@ $payload = [
         'id' => $ticketId,
         'status' => $ticketStatus,
         'channel' => $ticketChannel,
-    ],
-    'customer' => [
-        'id' => $customerId,
-        'name' => $customerName,
-        'email' => $customerEmail,
+        'customer' => [
+            'id' => $customerId,
+            'name' => $customerName,
+            'email' => $customerEmail,
+        ],
     ],
 ];
 
@@ -229,7 +267,7 @@ Aturan yang diterapkan:
 3. Jika belum ada, akun dibuat dengan role `operation`, password acak, dan ditambahkan ke workspace.
 4. Jika email sudah dipakai akun lain, launch **ditolak** (HTTP 409). Akun lama tidak pernah ditautkan atau dinaikkan role-nya berdasarkan email.
 5. Jika akun dengan `external_id` yang sama ternyata bukan `operation`, launch ditolak (HTTP 403).
-6. Workspace aktif dan data tiket/customer disimpan di sesi (`cxp.context`) untuk dipakai halaman Kirim CSAT di Fase 4.
+6. Workspace aktif disimpan di sesi (`cxp.context`). Jika token membawa `ticket`, data tiket/customer ikut disimpan untuk halaman Kirim CSAT. Jika tidak, halaman itu mengambil data tiket lewat API pada Fase 4.
 7. Login password untuk akun `operation`/SSO ditolak. Gunakan tombol dari TransCXP.
 
 ## 5. Keamanan dan error
@@ -247,7 +285,7 @@ Status HTTP yang mungkin:
 
 | Status | Arti |
 | --- | --- |
-| 401 | Token hilang, tidak valid, kedaluwarsa, tanda tangan salah, algoritma salah, atau `jti` sudah dipakai. |
+| 401 | Token hilang, tidak valid, kedaluwarsa, tanda tangan salah, algoritma salah, `jti` sudah dipakai, atau berisi lebih dari satu tiket. |
 | 403 | Akun SSO ada tetapi bukan role `operation`. |
 | 409 | Email bentrok dengan akun lain, atau kode project memakai workspace legacy. |
 | 429 | Rate limit `/cxp/launch` tercapai. |
@@ -303,3 +341,61 @@ Alasan detail dicatat di `storage/logs/laravel.log` dengan pesan `CXP SSO reject
 - Signature JWT ES256 harus berupa raw `R||S` (64 byte), bukan DER. Contoh konversi ada di bagian 3.
 - Setelah payload selesai diubah, kirim **1 token contoh** agar bisa diuji di staging sebelum production. Jangan kirim private key.
 - Jika perlu rotasi key, koordinasikan dengan tim TransSurvey agar public key lama dan baru dapat diterima selama masa transisi.
+
+## 8. Opsi tanpa JWT: launch session API
+
+Kalau TransCXP tidak ingin membuat atau menandatangani JWT, gunakan alur ini. TransCXP mengirim payload lewat server-to-server, lalu browser hanya membawa kode sekali pakai.
+
+Alur:
+
+1. Server TransCXP memanggil `POST https://<transsurvey-host>/api/cxp/launch-sessions`.
+2. Autentikasi: header `Authorization: Bearer <CXP_LAUNCH_API_KEY>` atau `X-CXP-Key: <CXP_LAUNCH_API_KEY>`.
+3. Body JSON berisi `user` dan `project`; `ticket`/`customer` opsional (tetap satu tiket).
+4. TransSurvey membalas `201`:
+
+   ```json
+   {
+     "code": "64karakterhex...",
+     "url": "https://<transsurvey-host>/cxp/launch?code=64karakterhex...",
+     "expires_in": 120
+   }
+   ```
+
+5. TransCXP mengarahkan browser user ke `url`.
+6. Kode diambil sekali. Pemakaian kedua atau kode kedaluwarsa menghasilkan HTTP 401.
+
+Contoh login saja:
+
+```sh
+curl -X POST https://transsurvey.contoh.co.id/api/cxp/launch-sessions \
+  -H "Authorization: Bearer $CXP_LAUNCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user":    { "id": "CXP-USR-1", "name": "Nama Operator", "email": "operator@contoh.co.id" },
+    "project": { "id": 23, "code": "23", "name": "Brand A" }
+  }'
+```
+
+Contoh dengan tiket (opsional):
+
+```json
+{
+  "user":    { "id": "CXP-USR-1", "name": "Nama Operator", "email": "operator@contoh.co.id" },
+  "project": { "id": 23, "code": "23", "name": "Brand A" },
+  "ticket": {
+    "id": "TCK-1001",
+    "status": "open",
+    "channel": "chat",
+    "customer": { "id": "CUST-9", "name": "Nama Customer", "email": "customer@contoh.co.id" }
+  }
+}
+```
+
+Aturan:
+
+- Hanya server TransCXP yang boleh memanggil endpoint ini. API key tidak boleh dikirim ke browser.
+- Kode berupa 64 karakter hex, sekali pakai, dengan TTL `CXP_LAUNCH_CODE_TTL` (default 120 detik).
+- Tidak ada email customer di URL; yang beredar hanya kode acak.
+- Validasi payload sama dengan token JWT: `user.id`, `user.email`, dan `project.code` wajib; `ticket` dan `customer` harus dikirim bersama.
+- Rate limit: 60 permintaan/menit per IP dan 300/menit global.
+- Error: `401` API key salah, `422` payload tidak valid, `500` konfigurasi `CXP_LAUNCH_API_KEY` belum diisi.

@@ -1,19 +1,27 @@
 @extends('layouts.app')
 
-@section('title', __('Editor Kuesioner'))
-@section('heading', $survey->exists ? __('Edit kuesioner') : __('Buat kuesioner baru'))
-@section('subtitle', __('Tiga langkah singkat, tanpa pindah halaman.'))
+@php
+    $isCsat = $csat ?? false;
+@endphp
+
+@section('title', $isCsat ? __('Template CSAT') : __('Editor Kuesioner'))
+@section('heading', $isCsat
+    ? ($survey->exists ? __('Edit template CSAT') : __('Buat template CSAT'))
+    : ($survey->exists ? __('Edit kuesioner') : __('Buat kuesioner baru')))
+@section('subtitle', $isCsat
+    ? __('Susun pertanyaan yang akan diisi customer. Tanpa tanggal mulai/akhir.')
+    : __('Tiga langkah singkat, tanpa pindah halaman.'))
 
 @section('actions')
-    @if ($survey->exists && !$locked && $survey->status === 'draft')
+    @if (!$isCsat && $survey->exists && !$locked && $survey->status === 'draft')
         <a class="btn" href="{{ route('surveys.import.create', ['survey_id' => $survey->id]) }}">{{ __('question_import.title') }}</a>
     @endif
     @if ($survey->exists)
-        <a class="btn" href="{{ route('surveys.preview', $survey) }}" target="_blank" rel="noopener">
+        <a class="btn" href="{{ $isCsat ? route('csat.templates.preview', $survey) : route('surveys.preview', $survey) }}" target="_blank" rel="noopener">
             {{ __('Pratinjau tersimpan ↗') }}
         </a>
     @endif
-    <a class="btn" href="{{ route('surveys.index') }}">{{ __('← Kembali') }}</a>
+    <a class="btn" href="{{ $isCsat ? route('csat.templates.index') : route('surveys.index') }}">{{ __('← Kembali') }}</a>
 @endsection
 
 @push('styles')
@@ -67,7 +75,7 @@
     @endphp
 
     <div class="sw" id="sw" data-start="{{ $startStep }}" data-exists="{{ $survey->exists ? 1 : 0 }}"
-        data-locked="{{ $locked ? 1 : 0 }}">
+        data-locked="{{ $locked ? 1 : 0 }}" data-csat="{{ $isCsat ? 1 : 0 }}">
 
         {{-- Tawaran memulihkan draf lokal --}}
         <div class="sw-draft notice" id="sw-draft-banner" hidden>
@@ -82,7 +90,7 @@
         <nav class="sw-stepper" aria-label="{{ __('Langkah kuesioner') }}">
             <button type="button" class="sw-step" data-go="1">
                 <i>1</i>
-                <span>{{ __('Informasi') }}<small>{{ __('Judul & periode') }}</small></span>
+                <span>{{ __('Informasi') }}<small>{{ $isCsat ? __('Judul & pengantar') : __('Judul & periode') }}</small></span>
             </button>
             <button type="button" class="sw-step" data-go="2">
                 <i>2</i>
@@ -97,7 +105,9 @@
         <div id="sw-alert" class="sw-alert" role="alert" hidden></div>
 
         <form id="sw-form" method="post"
-            action="{{ $survey->exists ? route('surveys.update', $survey) : route('surveys.store') }}" novalidate>
+            action="{{ $survey->exists
+                ? ($isCsat ? route('csat.templates.update', $survey) : route('surveys.update', $survey))
+                : ($isCsat ? route('csat.templates.store') : route('surveys.store')) }}" novalidate>
             @csrf
             @if ($survey->exists)
                 @method('put')
@@ -109,8 +119,8 @@
                     {{-- LANGKAH 1: Informasi --}}
                     <section class="sw-panel" data-step="1">
                         <div class="sw-card">
-                            <h2>{{ __('Informasi kuesioner') }}</h2>
-                            <p class="sw-hint">{{ __('Judul dan pengantar akan dilihat langsung oleh klien.') }}</p>
+                            <h2>{{ $isCsat ? __('Informasi template') : __('Informasi kuesioner') }}</h2>
+                            <p class="sw-hint">{{ $isCsat ? __('Judul dan pengantar akan dilihat langsung oleh customer.') : __('Judul dan pengantar akan dilihat langsung oleh klien.') }}</p>
 
                             <div class="sw-grid">
                                 <label class="full">
@@ -126,26 +136,30 @@
                                         placeholder="{{ __('Ceritakan singkat tujuan survei ini…') }}">{{ old('description', $survey->description) }}</textarea>
                                 </label>
 
-                                <label>
-                                    {{ __('Tanggal mulai') }}
-                                    <input type="date" name="starts_at" id="sw-start" required
-                                        value="{{ old('starts_at', $survey->starts_at?->format('Y-m-d')) }}">
-                                </label>
+                                @unless ($isCsat)
+                                    <label>
+                                        {{ __('Tanggal mulai') }}
+                                        <input type="date" name="starts_at" id="sw-start" required
+                                            value="{{ old('starts_at', $survey->starts_at?->format('Y-m-d')) }}">
+                                    </label>
 
-                                <label>
-                                    {{ __('Tanggal selesai') }}
-                                    <input type="date" name="ends_at" id="sw-end" required
-                                        value="{{ old('ends_at', $survey->ends_at?->format('Y-m-d')) }}">
-                                </label>
+                                    <label>
+                                        {{ __('Tanggal selesai') }}
+                                        <input type="date" name="ends_at" id="sw-end" required
+                                            value="{{ old('ends_at', $survey->ends_at?->format('Y-m-d')) }}">
+                                    </label>
+                                @endunless
                             </div>
 
-                            <div class="sw-chips" aria-label="{{ __('Durasi cepat') }}">
-                                <span class="sw-chips-label">{{ __('Durasi cepat:') }}</span>
-                                @foreach ($quickDays as $days => $label)
-                                    <button type="button" class="sw-chip"
-                                        data-days="{{ $days }}">{{ $label }}</button>
-                                @endforeach
-                            </div>
+                            @unless ($isCsat)
+                                <div class="sw-chips" aria-label="{{ __('Durasi cepat') }}">
+                                    <span class="sw-chips-label">{{ __('Durasi cepat:') }}</span>
+                                    @foreach ($quickDays as $days => $label)
+                                        <button type="button" class="sw-chip"
+                                            data-days="{{ $days }}">{{ $label }}</button>
+                                    @endforeach
+                                </div>
+                            @endunless
 
                             <p class="sw-label">{{ __('Status publikasi') }}</p>
                             <div class="sw-status">
@@ -158,11 +172,13 @@
                                 @endforeach
                             </div>
 
-                            <label class="sw-switch">
-                                <input type="hidden" name="is_template" value="0">
-                                <input type="checkbox" name="is_template" value="1" @checked(old('is_template', $survey->is_template))>
-                                {{ __('Simpan sebagai template') }}
-                            </label>
+                            @unless ($isCsat)
+                                <label class="sw-switch">
+                                    <input type="hidden" name="is_template" value="0">
+                                    <input type="checkbox" name="is_template" value="1" @checked(old('is_template', $survey->is_template))>
+                                    {{ __('Simpan sebagai template') }}
+                                </label>
+                            @endunless
                         </div>
 
                         <div class="sw-actions">
@@ -193,7 +209,9 @@
                             @else
                                 <h2>{{ __('Susun pertanyaan') }}</h2>
                                 <p class="sw-hint">
-                                    {{ __('Klik kartu untuk membuka/menutup. Rating 1–3 otomatis wajib diberi komentar oleh responden.') }}
+                                    {{ $isCsat
+                                        ? __('Klik kartu untuk membuka/menutup. Komentar untuk skor rendah bersifat opsional pada CSAT.')
+                                        : __('Klik kartu untuk membuka/menutup. Rating 1–3 otomatis wajib diberi komentar oleh responden.') }}
                                 </p>
 
                                 <div class="sw-empty" id="sw-empty">
@@ -234,7 +252,9 @@
                         <div class="sw-card sw-review">
                             <h2>{{ __('Tinjau & simpan') }}</h2>
                             <p class="sw-hint">
-                                {{ __('Periksa sekali lagi. Setelah undangan dibuat, pertanyaan akan dikunci.') }}</p>
+                                {{ $isCsat
+                                    ? __('Periksa sekali lagi sebelum template disimpan.')
+                                    : __('Periksa sekali lagi. Setelah undangan dibuat, pertanyaan akan dikunci.') }}</p>
 
                             <dl id="sw-review-info"></dl>
 
@@ -245,7 +265,9 @@
                         <div class="sw-actions">
                             <button type="button" class="btn" data-prev>{{ __('← Kembali') }}</button>
                             <button type="submit" class="btn primary" id="sw-submit">
-                                {{ $survey->exists ? __('Simpan perubahan') : __('Simpan kuesioner') }}
+                                {{ $isCsat
+                                    ? ($survey->exists ? __('Simpan perubahan') : __('Simpan template'))
+                                    : ($survey->exists ? __('Simpan perubahan') : __('Simpan kuesioner')) }}
                             </button>
                         </div>
                     </section>
@@ -291,14 +313,16 @@
                     <input type="hidden" data-f="type" value="rating">
 
                     <div class="sw-types" role="group" aria-label="{{ __('Jenis pertanyaan') }}">
-                        <button type="button" data-type="rating">★ Rating 1–5</button>
+                        <button type="button" data-type="rating">{{ $isCsat ? __('Skala 1–5') : '★ Rating 1–5' }}</button>
                         <button type="button" data-type="choice">{{ __('◉ Pilihan ganda') }}</button>
                         <button type="button" data-type="text">{{ __('¶ Teks terbuka') }}</button>
                         <button type="button" data-type="multiple">☑ Banyak pilihan</button>
-                        <button type="button" data-type="date">▦ {{ __('Tanggal (otomatis)') }}</button>
-                        <button type="button" data-type="email">✉ {{ __('Email (otomatis)') }}</button>
-                        <button type="button" data-type="name">👤 {{ __('Nama (otomatis)') }}</button>
-                        <button type="button" data-type="company">🏢 {{ __('Perusahaan (otomatis)') }}</button>
+                        @unless ($isCsat)
+                            <button type="button" data-type="date">▦ {{ __('Tanggal (otomatis)') }}</button>
+                            <button type="button" data-type="email">✉ {{ __('Email (otomatis)') }}</button>
+                            <button type="button" data-type="name">👤 {{ __('Nama (otomatis)') }}</button>
+                            <button type="button" data-type="company">🏢 {{ __('Perusahaan (otomatis)') }}</button>
+                        @endunless
                     </div>
 
                     <label>

@@ -13,6 +13,7 @@
 
     const exists = root.dataset.exists === '1';
     const locked = root.dataset.locked === '1';
+    const isCsat = root.dataset.csat === '1';
     const serverStep = Number(root.dataset.start) || 1;
 
     const list = $('#sw-list');
@@ -23,7 +24,7 @@
     const initial = Object.values(JSON.parse($('#sw-initial').textContent) || {});
 
     const MAX_QUESTIONS = 100;
-    const DRAFT_KEY = 'ts-survey-draft-v1';
+    const DRAFT_KEY = isCsat ? 'ts-csat-template-draft-v1' : 'ts-survey-draft-v1';
     const TYPES = {
         rating: 'Rating 1–5',
         choice: window.TransSurveyI18n.t("Pilihan ganda"),
@@ -113,10 +114,15 @@
         clearAlert();
 
         const title = $('#sw-title');
+
+        if (!title.value.trim()) return fail(title, window.TransSurveyI18n.t("Judul kuesioner wajib diisi."));
+
+        // CSAT templates have no start/end date.
+        if (isCsat) return true;
+
         const start = $('#sw-start');
         const end = $('#sw-end');
 
-        if (!title.value.trim()) return fail(title, window.TransSurveyI18n.t("Judul kuesioner wajib diisi."));
         if (!start.value) return fail(start, window.TransSurveyI18n.t("Tanggal mulai wajib diisi."));
         if (!end.value) return fail(end, window.TransSurveyI18n.t("Tanggal selesai wajib diisi."));
         if (end.value < start.value) {
@@ -435,12 +441,14 @@
     $$('[data-days]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const start = $('#sw-start');
+            const endInput = $('#sw-end');
+            if (!start || !endInput) return;
             if (!start.value) start.value = toIsoDate(new Date());
 
             const end = new Date(start.value + 'T00:00');
             end.setDate(end.getDate() + Number(btn.dataset.days));
 
-            $('#sw-end').value = toIsoDate(end);
+            endInput.value = toIsoDate(end);
             changed();
         });
     });
@@ -496,11 +504,18 @@
 
         const rows = [
             [window.TransSurveyI18n.t("Judul"), $('#sw-title').value.trim() || '—'],
-            [window.TransSurveyI18n.t("Periode"), `${formatDate($('#sw-start').value)} – ${formatDate($('#sw-end').value)}`],
-            ['Status', statusLabel || '—'],
-            ['Template', $('input[type=checkbox][name=is_template]').checked ? window.TransSurveyI18n.t("Ya") : window.TransSurveyI18n.t("Tidak")],
-            [window.TransSurveyI18n.t("Jumlah pertanyaan"), String(questions.length)],
         ];
+
+        if (!isCsat) {
+            const templateBox = $('input[type=checkbox][name=is_template]');
+            rows.push([window.TransSurveyI18n.t("Periode"), `${formatDate($('#sw-start').value)} – ${formatDate($('#sw-end').value)}`]);
+            rows.push(['Status', statusLabel || '—']);
+            rows.push(['Template', templateBox && templateBox.checked ? window.TransSurveyI18n.t("Ya") : window.TransSurveyI18n.t("Tidak")]);
+        } else {
+            rows.push(['Status', statusLabel || '—']);
+        }
+
+        rows.push([window.TransSurveyI18n.t("Jumlah pertanyaan"), String(questions.length)]);
 
         const info = $('#sw-review-info');
         info.replaceChildren();
@@ -524,14 +539,17 @@
        ========================================================== */
     function snapshot() {
         const checked = checkedStatus();
+        const start = $('#sw-start');
+        const end = $('#sw-end');
+        const templateBox = $('input[type=checkbox][name=is_template]');
 
         return {
             title: $('#sw-title').value,
             description: $('#sw-desc').value,
-            starts_at: $('#sw-start').value,
-            ends_at: $('#sw-end').value,
+            starts_at: start ? start.value : '',
+            ends_at: end ? end.value : '',
             status: checked ? checked.value : 'draft',
-            is_template: $('input[type=checkbox][name=is_template]').checked,
+            is_template: templateBox ? templateBox.checked : true,
             questions: getQuestions(),
         };
     }
@@ -560,12 +578,16 @@
     function restoreDraft(data) {
         $('#sw-title').value = data.title || '';
         $('#sw-desc').value = data.description || '';
-        $('#sw-start').value = data.starts_at || $('#sw-start').value;
-        $('#sw-end').value = data.ends_at || '';
+
+        const start = $('#sw-start');
+        const end = $('#sw-end');
+        const templateBox = $('input[type=checkbox][name=is_template]');
+        if (start) start.value = data.starts_at || start.value;
+        if (end) end.value = data.ends_at || '';
+        if (templateBox) templateBox.checked = !!data.is_template;
 
         const radio = $(`input[name=status][value="${data.status}"]`);
         if (radio) radio.checked = true;
-        $('input[type=checkbox][name=is_template]').checked = !!data.is_template;
 
         list.replaceChildren();
         (data.questions || []).forEach((q) => addQuestion(q, {
@@ -647,6 +669,30 @@
 
             if (initial.length) {
                 initial.forEach((q, i) => addQuestion(q, {
+                    open: i === 0
+                }));
+            } else if (isCsat) {
+                // A new workspace starts with a ready-to-use CSAT template.
+                [{
+                        text: 'Seberapa puas Anda dengan layanan kami?',
+                        category: 'Kepuasan',
+                        type: 'rating',
+                        required: true,
+                    },
+                    {
+                        text: 'Apakah masalah Anda sudah diselesaikan?',
+                        category: 'Penyelesaian',
+                        type: 'choice',
+                        required: true,
+                        options: ['Ya', 'Tidak'],
+                    },
+                    {
+                        text: 'Saran untuk kami',
+                        category: 'Masukan',
+                        type: 'text',
+                        required: false,
+                    },
+                ].forEach((q, i) => addQuestion(q, {
                     open: i === 0
                 }));
             } else {

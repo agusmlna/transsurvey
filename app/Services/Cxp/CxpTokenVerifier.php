@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Cache;
  */
 class CxpTokenVerifier
 {
+    public function __construct(private readonly CxpClaimNormalizer $normalizer)
+    {
+    }
+
     public function verify(string $token): array
     {
         $segments = explode('.', $token);
@@ -26,7 +30,7 @@ class CxpTokenVerifier
         [$encodedHeader, $encodedPayload, $encodedSignature] = $segments;
 
         $header = $this->decodeJson($encodedHeader, 'header');
-        $payload = $this->normalize($this->decodeJson($encodedPayload, 'payload'));
+        $payload = $this->decodeJson($encodedPayload, 'payload');
         $signature = $this->base64UrlDecode($encodedSignature, 'signature');
 
         $algorithm = strtoupper((string) ($header['alg'] ?? ''));
@@ -40,6 +44,7 @@ class CxpTokenVerifier
         }
 
         $this->verifySignature($algorithm, $encodedHeader.'.'.$encodedPayload, $signature);
+        $payload = $this->normalizer->normalize($payload);
         $this->verifyClaims($payload);
         $this->guardReplay($payload, $token);
 
@@ -126,28 +131,6 @@ class CxpTokenVerifier
         $key = (string) config('cxp.sso_public_key');
 
         return $key === '' ? null : str_replace('\n', "\n", $key);
-    }
-
-    /**
-     * Token gaya CakrawalaHub hanya mengirim email di level atas. Salin ke
-     * user.email supaya provisioner tetap memakai satu bentuk klaim.
-     */
-    private function normalize(array $payload): array
-    {
-        $email = $payload['email'] ?? null;
-        if (! is_string($email) || trim($email) === '') {
-            return $payload;
-        }
-
-        $email = trim($email);
-
-        if (! is_array($payload['user'] ?? null)) {
-            $payload['user'] = ['email' => $email];
-        } elseif (! isset($payload['user']['email'])) {
-            $payload['user']['email'] = $email;
-        }
-
-        return $payload;
     }
 
     private function verifyClaims(array $payload): void

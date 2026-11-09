@@ -468,6 +468,111 @@ class CxpSsoTest extends TestCase
         );
     }
 
+    public function test_customer_nested_inside_ticket_is_accepted(): void
+    {
+        $payload = $this->payload();
+        unset($payload['customer']);
+        $payload['ticket']['customer'] = [
+            'id' => 'CUST-1',
+            'name' => 'Budi',
+            'email' => 'budi@example.test',
+        ];
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame('TCK-1', session('cxp.context.ticket.id'));
+        $this->assertSame('Budi', session('cxp.context.customer.name'));
+        $this->assertSame('budi@example.test', session('cxp.context.customer.email'));
+    }
+
+    public function test_single_item_ticket_array_is_accepted(): void
+    {
+        $payload = $this->payload();
+        unset($payload['customer']);
+        $payload['ticket'] = [[
+            'id' => 'TCK-9',
+            'status' => 'open',
+            'channel' => 'chat',
+            'customer' => [
+                'id' => 'CUST-9',
+                'name' => 'Sari',
+                'email' => 'sari@example.test',
+            ],
+        ]];
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame('TCK-9', session('cxp.context.ticket.id'));
+        $this->assertSame('Sari', session('cxp.context.customer.name'));
+        $this->assertSame('sari@example.test', session('cxp.context.customer.email'));
+    }
+
+    public function test_multiple_ticket_array_is_rejected_as_ambiguous(): void
+    {
+        $payload = $this->payload();
+        unset($payload['customer']);
+        $payload['ticket'] = [
+            [
+                'id' => 'TCK-1',
+                'status' => 'open',
+                'channel' => 'chat',
+                'customer' => ['id' => 'CUST-1', 'name' => 'Budi', 'email' => 'budi@example.test'],
+            ],
+            [
+                'id' => 'TCK-2',
+                'status' => 'resolved',
+                'channel' => 'email',
+                'customer' => ['id' => 'CUST-2', 'name' => 'Sari', 'email' => 'sari@example.test'],
+            ],
+        ];
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Token SSO memuat lebih dari satu tiket. Buka CSAT dari satu tiket.'));
+
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_login_only_token_without_ticket_is_accepted(): void
+    {
+        $payload = $this->payload();
+        unset($payload['ticket'], $payload['customer']);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame('cx-user-1', session('cxp.context.user.external_id'));
+        $this->assertSame('brand-a', session('cxp.context.project.code'));
+        $this->assertNull(session('cxp.context.ticket'));
+        $this->assertNull(session('cxp.context.customer'));
+    }
+
+    public function test_ticket_without_customer_is_rejected(): void
+    {
+        $payload = $this->payload();
+        unset($payload['customer']);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Data pada token SSO tidak lengkap.'));
+
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_customer_without_ticket_is_rejected(): void
+    {
+        $payload = $this->payload();
+        unset($payload['ticket']);
+
+        $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
+            ->assertStatus(401)
+            ->assertSee(__('Data pada token SSO tidak lengkap.'));
+
+        $this->assertSame(0, User::count());
+    }
+
     public function test_missing_token_is_rejected(): void
     {
         $this->get(route('cxp.launch'))->assertStatus(401)->assertSee(__('Token SSO tidak ditemukan.'));

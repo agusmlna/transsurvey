@@ -49,6 +49,12 @@ return [
     // Halaman tujuan setelah login. Fase 4 dapat mengganti ke halaman Kirim CSAT.
     'redirect_route' => env('CXP_SSO_REDIRECT_ROUTE', 'dashboard'),
 
+    // Alur tanpa JWT: API key untuk POST /api/cxp/launch-sessions.
+    'launch_api_key' => env('CXP_LAUNCH_API_KEY'),
+
+    // Umur kode peluncuran sekali pakai (detik).
+    'launch_code_ttl' => max(30, (int) env('CXP_LAUNCH_CODE_TTL', 120)),
+
     // Untuk pengembangan lokal saja. Di production biarkan false.
     'allow_operation_password' => (bool) env('CXP_ALLOW_OPERATION_PASSWORD', false),
 

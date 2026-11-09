@@ -12,7 +12,7 @@ class ReportController
     public function index(Request $r, ReportService $reports, ReportPresentation $presentation)
     {
         $reports->validateFilters($r);
-        return view('reports.index', $presentation->data($r, $reports) + ['clients' => Client::orderBy('name')->get(), 'surveys' => Survey::latest()->get(), 'categoryOptions' => $reports->categories()]);
+        return view('reports.index', $presentation->data($r, $reports) + ['clients' => Client::orderBy('name')->get(), 'surveys' => Survey::where('type', 'client')->latest()->get(), 'categoryOptions' => $reports->categories()]);
     }
     public function csv(Request $r, ReportService $reports)
     {

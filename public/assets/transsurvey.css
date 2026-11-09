@@ -1182,6 +1182,18 @@ tbody tr:hover {
 .rating-option:has(input:focus-visible) {
   outline-color: var(--ts-red);
 }
+/* CSAT tanpa bintang: angka menjadi fokus utama kartu penilaian. */
+.rating-group.csat-rating .rating-option strong {
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--ts-red);
+}
+.rating-group.csat-rating .rating-option span {
+  font-size: 11px;
+}
+.rating-group.csat-rating .rating-option:has(input:checked) strong {
+  color: var(--ts-red-dark);
+}
 .low-comment {
   color: #586577;
 }
