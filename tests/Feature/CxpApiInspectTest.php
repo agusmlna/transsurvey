@@ -31,6 +31,8 @@ class CxpApiInspectTest extends TestCase
             'cxp.api.timeout' => 5,
             'cxp.api.auth_header' => 'Authorization',
             'cxp.api.auth_prefix' => 'Bearer',
+            'cxp.api.ticket_path' => '/api/v2/tickets',
+            'cxp.api.detail_path' => '/api/v2/ticket-detail',
         ]);
     }
 
@@ -58,7 +60,7 @@ class CxpApiInspectTest extends TestCase
                     'expired_date' => '2026-12-31 23:59:59',
                 ],
             ], 201),
-            self::BASE_URL.'/api/v1/dataTicketcxp*' => Http::response([
+            self::BASE_URL.'/api/v2/tickets*' => Http::response([
                 'status' => 'success',
                 'code' => 200,
                 'message' => 'Ticket data has been successfully retrieved.',
@@ -101,7 +103,7 @@ class CxpApiInspectTest extends TestCase
                     'prev_page_url' => null,
                 ],
             ], 200),
-            self::BASE_URL.'/api/v1/detailChoose*' => Http::response([
+            self::BASE_URL.'/api/v2/ticket-detail*' => Http::response([
                 'status' => 'success',
                 'code' => 200,
                 'message' => 'Ticket details fetched successfully',
@@ -138,7 +140,8 @@ class CxpApiInspectTest extends TestCase
 
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('Login berhasil.', $output);
-        $this->assertStringContainsString('dataTicketcxp', $output);
+        $this->assertStringContainsString('Tiket    : /api/v2/tickets', $output);
+        $this->assertStringContainsString('Daftar tiket (/api/v2/tickets)', $output);
         $this->assertStringContainsString('d***@example.test', $output);
         $this->assertStringContainsString('6287700000000', $output);
         $this->assertStringContainsString('Read-only', $output);
@@ -147,7 +150,7 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringNotContainsString('dewi@example.test', $output);
 
         Http::assertSent(function (Request $request) {
-            if (! str_contains($request->url(), '/api/v1/dataTicketcxp')) {
+            if (! str_contains($request->url(), '/api/v2/tickets')) {
                 return false;
             }
 
@@ -167,9 +170,9 @@ class CxpApiInspectTest extends TestCase
         ]);
 
         $this->assertSame(0, $exitCode);
-        $this->assertStringContainsString('detailChoose', $output);
+        $this->assertStringContainsString('Detail tiket (/api/v2/ticket-detail)', $output);
 
-        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v1/detailChoose')
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v2/ticket-detail')
             && str_contains($request->url(), 'id_ticket=000152'));
     }
 
@@ -193,8 +196,38 @@ class CxpApiInspectTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('X-API-KEY', $output);
 
-        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v1/dataTicketcxp')
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v2/tickets')
             && $request->hasHeader('X-API-KEY', self::TOKEN));
+    }
+
+    public function test_inspect_respects_custom_ticket_path(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/api/v1/login-user' => Http::response([
+                'statusCode' => 200,
+                'userInfo' => [
+                    'name' => 'User Access 1',
+                    'email' => 'api-user@example.test',
+                    'token' => self::TOKEN,
+                    'expired_date' => '2026-12-31 23:59:59',
+                ],
+            ], 200),
+            self::BASE_URL.'/api/v9/tiket*' => Http::response([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'ok',
+                'data' => [],
+            ], 200),
+        ]);
+
+        config(['cxp.api.ticket_path' => 'api/v9/tiket/']);
+
+        [$exitCode, $output] = $this->runInspect();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Tiket    : /api/v9/tiket', $output);
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v9/tiket'));
     }
 
     public function test_inspect_rejects_unknown_auth_preset(): void
@@ -376,7 +409,7 @@ class CxpApiInspectTest extends TestCase
                     'expired_date' => '2026-12-31 23:59:59',
                 ],
             ], 200),
-            self::BASE_URL.'/api/v1/dataTicketcxp*' => Http::response([
+            self::BASE_URL.'/api/v2/tickets*' => Http::response([
                 'status' => 'error',
                 'code' => 500,
                 'message' => 'Server Error',
@@ -404,7 +437,7 @@ class CxpApiInspectTest extends TestCase
                     'expired_date' => '2026-12-31 23:59:59',
                 ],
             ], 200),
-            self::BASE_URL.'/api/v1/dataTicketcxp*' => Http::response(
+            self::BASE_URL.'/api/v2/tickets*' => Http::response(
                 '<html><body>Not Found</body></html>',
                 404,
                 ['Content-Type' => 'text/html'],
@@ -416,7 +449,8 @@ class CxpApiInspectTest extends TestCase
         $this->assertNotSame(0, $exitCode);
         $this->assertStringContainsString('Status HTTP : 404', $output);
         $this->assertStringContainsString('Content-Type: text/html', $output);
-        $this->assertStringContainsString('Endpoint tidak ditemukan', $output);
+        $this->assertStringContainsString('Endpoint tidak ditemukan (/api/v2/tickets)', $output);
+        $this->assertStringContainsString('CXP_API_TICKET_PATH', $output);
         $this->assertStringNotContainsString(self::TOKEN, $output);
     }
 
@@ -432,7 +466,7 @@ class CxpApiInspectTest extends TestCase
                     'expired_date' => '2026-12-31 23:59:59',
                 ],
             ], 200),
-            self::BASE_URL.'/api/v1/dataTicketcxp*' => Http::response('', 401),
+            self::BASE_URL.'/api/v2/tickets*' => Http::response('', 401),
         ]);
 
         [$exitCode, $output] = $this->runInspect();

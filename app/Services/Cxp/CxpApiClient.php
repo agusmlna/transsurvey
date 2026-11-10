@@ -24,6 +24,8 @@ class CxpApiClient
         private readonly string $authHeader = 'Authorization',
         private readonly string $authPrefix = 'Bearer',
         private readonly string $loginField = 'email',
+        private readonly string $ticketPath = '/api/v2/tickets',
+        private readonly string $detailPath = '/api/v2/tickets',
     ) {}
 
     public static function fromConfig(?string $authPreset = null, ?string $loginFieldOverride = null): self
@@ -47,7 +49,23 @@ class CxpApiClient
                 $loginFieldOverride,
                 (string) ($config['login_field'] ?? 'email'),
             ),
+            self::normalizePath((string) ($config['ticket_path'] ?? ''), '/api/v2/tickets'),
+            self::normalizePath((string) ($config['detail_path'] ?? ''), '/api/v2/tickets'),
         );
+    }
+
+    /**
+     * Path dari .env boleh ditulis dengan atau tanpa garis miring depan.
+     */
+    public static function normalizePath(string $path, string $default): string
+    {
+        $path = trim($path);
+
+        if ($path === '') {
+            $path = $default;
+        }
+
+        return '/'.trim($path, '/');
     }
 
     /**
@@ -104,6 +122,16 @@ class CxpApiClient
     public function loginField(): string
     {
         return $this->loginField;
+    }
+
+    public function ticketPath(): string
+    {
+        return $this->ticketPath;
+    }
+
+    public function detailPath(): string
+    {
+        return $this->detailPath;
     }
 
     public function authLabel(): string
@@ -171,12 +199,12 @@ class CxpApiClient
             $query['id_ticket'] = trim($ticketId);
         }
 
-        return $this->get('/api/v1/dataTicketcxp', $token, $query);
+        return $this->get($this->ticketPath, $token, $query);
     }
 
     public function detail(string $token, string $ticketId, int $page = 1, int $perPage = 10): array
     {
-        return $this->get('/api/v1/detailChoose', $token, [
+        return $this->get($this->detailPath, $token, [
             'id_ticket' => trim($ticketId),
             'page' => $page,
             'per_page' => $perPage,
@@ -245,6 +273,7 @@ class CxpApiClient
 
         $context = [
             'action' => $action,
+            'path' => $action !== 'login' ? $action : null,
             'content_type' => trim((string) $response->header('Content-Type')),
         ];
 
