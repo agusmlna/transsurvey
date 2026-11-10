@@ -143,6 +143,28 @@ class InspectCxpApi extends Command
         } catch (CxpApiException $e) {
             $this->error($e->getMessage());
 
+            if ($e->reason === 'http_error') {
+                $this->line('Status HTTP : '.$e->status);
+
+                $contentType = trim((string) ($e->context['content_type'] ?? ''));
+                if ($contentType !== '') {
+                    $this->line('Content-Type: '.$contentType);
+                }
+
+                $keys = array_values(array_filter((array) ($e->context['keys'] ?? []), 'is_string'));
+                if ($keys !== []) {
+                    $this->line('Field respons: '.implode(', ', $keys));
+                }
+
+                if ($e->status === 404) {
+                    $this->line('Endpoint tidak ditemukan. Cek CXP_API_BASE_URL dan path API production.');
+                }
+
+                if ($e->status === 405) {
+                    $this->line('Method tidak diizinkan. Cek apakah endpoint production memakai GET.');
+                }
+            }
+
             if ($e->reason === 'not_configured') {
                 $missing = array_values(array_filter((array) ($e->context['missing'] ?? []), 'is_string'));
 
