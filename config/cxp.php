@@ -60,4 +60,26 @@ return [
 
     // Prefix cache untuk anti-replay jti.
     'replay_prefix' => 'cxp:jti:',
+
+    /*
+    |--------------------------------------------------------------------------
+    | TransCXP Ticket API (read-only)
+    |--------------------------------------------------------------------------
+    |
+    | Kredensial akun API TransCXP untuk membaca data tiket. Dipakai oleh
+    | command cxp:inspect dan, nanti, mode otomatis. Jangan tulis nilainya
+    | di repo; isi hanya di .env server.
+    |
+    */
+
+    'api' => [
+        'base_url' => env('CXP_API_BASE_URL', 'https://crm.trans-cosmos.id'),
+        'email' => env('CXP_API_EMAIL'),
+        'password' => env('CXP_API_PASSWORD'),
+        'timeout' => max(5, (int) env('CXP_API_TIMEOUT', 30)),
+
+        // Skema header belum didokumentasikan TransCXP. Default Bearer.
+        'auth_header' => env('CXP_API_AUTH_HEADER', 'Authorization'),
+        'auth_prefix' => env('CXP_API_AUTH_PREFIX', 'Bearer'),
+    ],
 ];
