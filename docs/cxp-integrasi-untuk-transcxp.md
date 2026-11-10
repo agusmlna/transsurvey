@@ -108,6 +108,17 @@ header('Location: '.$response['url'], true, 302);
 exit;
 ```
 
+Setelah `url` dibuka, TransSurvey login otomatis lalu mengarahkan browser:
+
+| Payload | Tujuan |
+| --- | --- |
+| `user` + `project` saja | Dashboard |
+| `user` + `project` + `ticket` + `customer.email` | Halaman Kirim CSAT (`/csat/send`) |
+
+Di halaman Kirim CSAT, operation melihat data tiket/customer, memilih template,
+lalu mengirim CSAT lewat email. `customer.wa` yang dikirim akan tampil di
+ringkasan dan disimpan sebagai data client untuk kebutuhan broadcast.
+
 Aturan kode:
 
 - 64 karakter hex, **sekali pakai**.
@@ -322,6 +333,7 @@ function makeCxpSsoToken(array $config): string
                 'id' => (string) ($ticket['customer']['id'] ?? ''),
                 'name' => (string) ($ticket['customer']['name'] ?? $ticket['customer']['email']),
                 'email' => (string) $ticket['customer']['email'],
+                'wa' => (string) ($ticket['customer']['wa'] ?? ''),
             ],
         ];
     }
@@ -418,7 +430,8 @@ Aturan tambahan:
 3. Buka `url` di browser:
    - login otomatis sebagai user `operation`;
    - workspace sesuai `project.code` aktif di header;
-   - kalau tiket dikirim, data tiket/customer tersimpan di sesi.
+   - kalau tiket dikirim, browser diarahkan ke halaman **Kirim CSAT**;
+   - data tiket/customer tersimpan di sesi, termasuk `customer.wa` bila dikirim.
 4. Buka `url` yang sama sekali lagi → `401` (kode sekali pakai).
 5. Tunggu lebih dari `expires_in`, lalu buka kode itu → `401` (kedaluwarsa).
 

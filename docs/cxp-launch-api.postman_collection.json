@@ -54,7 +54,7 @@
             "launch-sessions"
           ]
         },
-        "description": "Tes paling sederhana. Balasan 201 berisi code, url, expires_in."
+        "description": "Tes paling sederhana. Balasan 201 berisi code, url, expires_in. Setelah url dibuka, browser diarahkan ke dashboard."
       }
     },
     {
@@ -95,7 +95,7 @@
             "launch-sessions"
           ]
         },
-        "description": "Dengan satu tiket. customer berada di dalam ticket dan harus dikirim bersama."
+        "description": "Dengan satu tiket. customer berada di dalam ticket dan harus dikirim bersama. Setelah url dibuka, browser diarahkan ke halaman Kirim CSAT. customer.wa opsional dan dinormalkan ke format 62... untuk broadcast."
       }
     }
   ]
