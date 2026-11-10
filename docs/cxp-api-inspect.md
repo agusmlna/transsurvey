@@ -56,7 +56,8 @@ php artisan cxp:inspect --per-page=5
 Yang diharapkan:
 
 1. `Login berhasil.` dan token **tidak** ditampilkan.
-2. Tabel `dataTicketcxp` berisi tiket.
+2. Baris `Tiket    : /api/v2/tickets` dan tabel `Daftar tiket (/api/v2/tickets)`
+   berisi tiket.
 3. Ringkasan jumlah tiket tanpa email, tanpa nomor WA, dan `Solved` tanpa
    `end_date`.
 4. Baris terakhir: `Read-only: tidak ada data yang disimpan...`.
@@ -76,8 +77,8 @@ php artisan cxp:inspect --per-page=5 --show-pii
 php artisan cxp:inspect --ticket=000033 --detail
 ```
 
-- `--ticket` memfilter hasil `dataTicketcxp` berdasarkan `id_ticket`.
-- `--detail` memanggil `detailChoose` untuk tiket tersebut.
+- `--ticket` memfilter hasil daftar tiket berdasarkan `id_ticket`.
+- `--detail` memanggil `CXP_API_DETAIL_PATH` untuk tiket tersebut.
 - Ingat: `id_ticket` **tidak unik lintas project**. Detail bisa memuat beberapa
   project dengan nomor tiket yang sama.
 
@@ -91,9 +92,9 @@ php artisan cxp:inspect --project=6 --per-page=10
 
 ## 4. Kalau autentikasi ditolak
 
-Login memakai body `{email,password}` dan tidak memerlukan token. Header
-autentikasi untuk endpoint tiket **belum didokumentasikan** TransCXP, jadi
-command menyediakan beberapa skema:
+Login memakai body `{email,password}` dan tidak memerlukan token. Endpoint tiket
+memakai header yang sama dengan yang diuji di bawah (default
+`Authorization: Bearer <token>`), jadi beberapa skema disediakan:
 
 ```bash
 php artisan cxp:inspect --auth=bearer      # Authorization: Bearer <token>
@@ -112,6 +113,36 @@ Kalau login sendiri gagal:
 | `401 Incorrect password!` | Password salah. |
 | `404 User not found!` | Email tidak terdaftar. |
 | `422 Validation failed` | Email/password kosong atau format email salah. |
+
+### Path endpoint tiket
+
+PDF kontrak menyebut `GET /api/v1/dataTicketcxp`, tetapi path itu **sudah tidak
+ada** di server TransCXP (production maupun development). Hasil probe
+read-only tanpa kredensial:
+
+| Path | Hasil |
+| --- | --- |
+| `/api/v1/dataTicketcxp` | `404` `text/html` |
+| `/api/v1/detailChoose` | `404` `text/html` |
+| `/api/v1/login-user` | `405` JSON (route ada, hanya POST) |
+| `/api/v2/tickets` | `401 {"statusCode":401,"message":"The token is required!"}` |
+| `/api/tickets` | `401 {"message":"Unauthenticated."}` (guard Sanctum, beda) |
+
+Artinya endpoint tiket yang benar adalah **`/api/v2/tickets`** dengan header
+`Authorization: Bearer <token>` dari `login-user`. Token yang sama juga dipakai
+di sini: tanpa header balasannya `The token is required!`, dengan token salah
+balasannya `Token does not valid!`.
+
+Path bisa diubah tanpa mengubah kode:
+
+```dotenv
+CXP_API_TICKET_PATH=/api/v2/tickets
+CXP_API_DETAIL_PATH=/api/v2/tickets
+```
+
+Endpoint detail belum ditemukan; defaultnya memakai path yang sama dengan
+filter `id_ticket`. Kalau nanti tim TransCXP memberi path detail yang benar,
+cukup isi `CXP_API_DETAIL_PATH`.
 
 ### Kalau kredensial berbentuk username
 

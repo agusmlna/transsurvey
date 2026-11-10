@@ -58,6 +58,8 @@ class InspectCxpApi extends Command
         $this->line('Base URL : '.$client->baseUrl());
         $this->line('Auth     : '.$client->authLabel());
         $this->line('Login    : '.$client->loginField());
+        $this->line('Tiket    : '.$client->ticketPath());
+        $this->line('Detail   : '.$client->detailPath());
         $this->newLine();
 
         if ($client->loginField() === 'email'
@@ -109,7 +111,7 @@ class InspectCxpApi extends Command
             }
 
             $this->render(
-                'dataTicketcxp',
+                'Daftar tiket ('.$client->ticketPath().')',
                 $response,
                 $rows,
                 $showPii,
@@ -125,7 +127,7 @@ class InspectCxpApi extends Command
                     $this->newLine();
                     $detail = $client->detail($login['token'], $ticketId, 1, $perPage);
                     $this->render(
-                        'detailChoose',
+                        'Detail tiket ('.$client->detailPath().')',
                         $detail,
                         $this->ticketRows($detail),
                         $showPii,
@@ -157,7 +159,9 @@ class InspectCxpApi extends Command
                 }
 
                 if ($e->status === 404) {
-                    $this->line('Endpoint tidak ditemukan. Cek CXP_API_BASE_URL dan path API production.');
+                    $this->line('Endpoint tidak ditemukan ('.($e->context['path'] ?? 'path tidak diketahui').').');
+                    $this->line('Path bisa diubah lewat CXP_API_TICKET_PATH dan CXP_API_DETAIL_PATH.');
+                    $this->line('Catatan: /api/v1/dataTicketcxp di PDF sudah 404 di server TransCXP.');
                 }
 
                 if ($e->status === 405) {

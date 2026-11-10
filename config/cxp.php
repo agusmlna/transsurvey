@@ -85,5 +85,12 @@ return [
         // Skema header belum didokumentasikan TransCXP. Default Bearer.
         'auth_header' => env('CXP_API_AUTH_HEADER', 'Authorization'),
         'auth_prefix' => env('CXP_API_AUTH_PREFIX', 'Bearer'),
+
+        // Path endpoint tiket. PDF menyebut /api/v1/dataTicketcxp, tetapi
+        // server production membalas 404 HTML untuk path itu. Path yang
+        // benar-benar ada di production adalah /api/v2/tickets (401 JSON
+        // "The token is required!" tanpa token).
+        'ticket_path' => env('CXP_API_TICKET_PATH', '/api/v2/tickets'),
+        'detail_path' => env('CXP_API_DETAIL_PATH', '/api/v2/tickets'),
     ],
 ];
