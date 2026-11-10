@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\{
     AuthController,
+    CsatSendController,
     CsatSettingsController,
     CsatTemplateController,
     CxpLaunchController,
@@ -128,6 +129,11 @@ Route::middleware(['auth', 'workspace'])->group(function () {
             ->name('csat.templates.destroy');
         Route::get('/csat/templates/{survey}/preview', [CsatTemplateController::class, 'preview'])
             ->name('csat.templates.preview');
+
+        Route::get('/csat/send', [CsatSendController::class, 'show'])
+            ->name('csat.send.index');
+        Route::post('/csat/send', [CsatSendController::class, 'store'])
+            ->name('csat.send.store');
 
         Route::get('/csat/settings', [CsatSettingsController::class, 'edit'])
             ->name('csat.settings.edit');

@@ -91,7 +91,7 @@ class CxpLaunchSessionTest extends TestCase
 
         $code = (string) $this->requestSession($payload)->assertCreated()->json('code');
 
-        $this->get(route('cxp.launch', ['code' => $code]))->assertRedirect(route('dashboard'));
+        $this->get(route('cxp.launch', ['code' => $code]))->assertRedirect(route('csat.send.index'));
 
         $this->assertSame('TCK-9', session('cxp.context.ticket.id'));
         $this->assertSame('Sari', session('cxp.context.customer.name'));

@@ -29,11 +29,24 @@ class SendSurveyCompletionEmail implements ShouldQueue
         }
         $response = $notification->response;
         $admin = $notification->user;
-        // An admin recipient must still be an admin with the same email; a configured
-        // address must still be in the configured list.
-        $recipientValid = $notification->user_id === null
-            ? in_array(strtolower($notification->recipient_email), config('survey.completion_recipients', []), true)
-            : $admin && $admin->role === 'admin' && $admin->email === $notification->recipient_email;
+        $isCsat = ($response?->survey?->type ?? 'client') === 'csat';
+
+        // Recipients are re-checked at delivery time: roles, email, workspace membership,
+        // or the configured address list may have changed since the response arrived.
+        if ($isCsat) {
+            $roles = config('survey.csat_notification_roles', ['operation', 'superadmin']);
+            $recipientValid = $notification->user_id !== null
+                && $admin !== null
+                && in_array($admin->role, $roles, true)
+                && $admin->email === $notification->recipient_email
+                && ($admin->role !== 'operation'
+                    || $admin->workspaces()->whereKey($response?->workspace_id)->exists());
+        } else {
+            $recipientValid = $notification->user_id === null
+                ? in_array(strtolower($notification->recipient_email), config('survey.completion_recipients', []), true)
+                : $admin && $admin->role === 'admin' && $admin->email === $notification->recipient_email;
+        }
+
         if (! $recipientValid
             || ! $response || ! $response->invitation?->completed_at
             || $response->invitation->is_demo || $response->client->is_demo || $response->survey->is_demo) {
@@ -60,6 +73,11 @@ class SendSurveyCompletionEmail implements ShouldQueue
         try {
             // Retry only this database write, never the already accepted SMTP operation.
             $this->writeStatus(['sending'], ['status' => 'sent', 'sent_at' => now()]);
+            Log::info('Notifikasi respons terkirim.', [
+                'notification_id' => $this->notificationId,
+                'recipient' => $notification->recipient_email,
+                'survey_type' => $response->survey->type,
+            ]);
         } catch (\Throwable $exception) {
             Log::error('Email admin telah diterima SMTP tetapi status belum tersimpan. Periksa inbox sebelum retry.', [
                 'notification_id' => $this->notificationId,
@@ -88,5 +106,9 @@ class SendSurveyCompletionEmail implements ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         $this->writeStatus(['pending', 'failed'], ['status' => 'failed', 'queued_at' => null]);
+        Log::warning('Notifikasi respons gagal dikirim.', [
+            'notification_id' => $this->notificationId,
+            'exception_type' => $exception ? get_class($exception) : null,
+        ]);
     }
 }

@@ -15,8 +15,8 @@ class CsatSettingsController
 
         return view('csat.settings', [
             'workspace' => $workspace,
-            'expiryUnit' => $csat['expiry_unit'] ?? 'days',
-            'expiryValue' => $csat['expiry_value'] ?? 7,
+            'expiryUnit' => $csat['expiry_unit'] ?? 'unlimited',
+            'expiryValue' => $csat['expiry_value'] ?? null,
         ]);
     }
 

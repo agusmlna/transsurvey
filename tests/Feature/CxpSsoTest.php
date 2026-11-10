@@ -160,7 +160,7 @@ class CxpSsoTest extends TestCase
     {
         $response = $this->launch($this->payload());
 
-        $response->assertRedirect(route('dashboard'))->assertSessionHas('success');
+        $response->assertRedirect(route('csat.send.index'))->assertSessionHas('success');
 
         $user = User::where('external_source', 'transcxp')->where('external_id', 'cx-user-1')->sole();
         $workspace = Workspace::where('code', 'brand-a')->sole();
@@ -176,7 +176,10 @@ class CxpSsoTest extends TestCase
 
     public function test_launch_session_can_open_dashboard_for_the_project_workspace(): void
     {
-        $this->launch($this->payload())->assertRedirect(route('dashboard'));
+        $payload = $this->payload();
+        unset($payload['ticket'], $payload['customer']);
+
+        $this->launch($payload)->assertRedirect(route('dashboard'));
 
         $this->get(route('dashboard'))
             ->assertOk()
@@ -205,15 +208,15 @@ class CxpSsoTest extends TestCase
         $this->assertTrue(openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256));
 
         $this->get(route('cxp.launch', ['token' => $unsigned.'.'.$b64($signature)]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
 
         $this->assertSame(1, User::where('external_source', 'transcxp')->count());
     }
 
     public function test_same_user_and_project_reuses_existing_workspace_and_account(): void
     {
-        $this->launch($this->payload())->assertRedirect(route('dashboard'));
-        $this->launch($this->payload())->assertRedirect(route('dashboard'));
+        $this->launch($this->payload())->assertRedirect(route('csat.send.index'));
+        $this->launch($this->payload())->assertRedirect(route('csat.send.index'));
 
         $this->assertSame(1, User::where('external_source', 'transcxp')->count());
         $this->assertSame(1, Workspace::where('code', 'brand-a')->count());
@@ -221,10 +224,10 @@ class CxpSsoTest extends TestCase
 
     public function test_user_can_be_attached_to_another_project_workspace(): void
     {
-        $this->launch($this->payload())->assertRedirect(route('dashboard'));
+        $this->launch($this->payload())->assertRedirect(route('csat.send.index'));
         $this->launch($this->payload([
             'project' => ['code' => 'brand-b', 'name' => 'Brand B'],
-        ]))->assertRedirect(route('dashboard'));
+        ]))->assertRedirect(route('csat.send.index'));
 
         $user = User::where('external_source', 'transcxp')->where('external_id', 'cx-user-1')->sole();
         $workspace = Workspace::where('code', 'brand-b')->sole();
@@ -287,7 +290,7 @@ class CxpSsoTest extends TestCase
     {
         $token = $this->sign($this->payload());
 
-        $this->get(route('cxp.launch', ['token' => $token]))->assertRedirect(route('dashboard'));
+        $this->get(route('cxp.launch', ['token' => $token]))->assertRedirect(route('csat.send.index'));
         $this->get(route('cxp.launch', ['token' => $token]))
             ->assertStatus(401)
             ->assertSee(__('Token SSO sudah pernah digunakan. Silakan buka ulang dari TransCXP.'));
@@ -375,7 +378,7 @@ class CxpSsoTest extends TestCase
         ]);
 
         $this->get(route('cxp.launch', ['sso' => $this->signEs256($this->payload(), $privateKey)]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
 
         $this->assertSame(1, User::where('external_source', 'transcxp')->count());
     }
@@ -401,7 +404,7 @@ class CxpSsoTest extends TestCase
     public function test_token_in_sso_query_parameter_is_accepted(): void
     {
         $this->get(route('cxp.launch', ['sso' => $this->sign($this->payload())]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
     }
 
     public function test_token_without_iss_and_aud_is_accepted_when_not_required(): void
@@ -412,7 +415,7 @@ class CxpSsoTest extends TestCase
         config(['cxp.require_iss_aud' => false]);
 
         $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
     }
 
     public function test_iss_and_aud_are_required_when_configured(): void
@@ -436,7 +439,7 @@ class CxpSsoTest extends TestCase
 
         $token = $this->sign($payload);
 
-        $this->get(route('cxp.launch', ['token' => $token]))->assertRedirect(route('dashboard'));
+        $this->get(route('cxp.launch', ['token' => $token]))->assertRedirect(route('csat.send.index'));
         $this->get(route('cxp.launch', ['token' => $token]))
             ->assertStatus(401)
             ->assertSee(__('Token SSO sudah pernah digunakan. Silakan buka ulang dari TransCXP.'));
@@ -460,7 +463,7 @@ class CxpSsoTest extends TestCase
         $payload['email'] = 'operator@cxp.test';
 
         $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
 
         $this->assertSame(
             'operator@cxp.test',
@@ -479,7 +482,7 @@ class CxpSsoTest extends TestCase
         ];
 
         $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
 
         $this->assertSame('TCK-1', session('cxp.context.ticket.id'));
         $this->assertSame('Budi', session('cxp.context.customer.name'));
@@ -502,7 +505,7 @@ class CxpSsoTest extends TestCase
         ]];
 
         $this->get(route('cxp.launch', ['token' => $this->sign($payload)]))
-            ->assertRedirect(route('dashboard'));
+            ->assertRedirect(route('csat.send.index'));
 
         $this->assertSame('TCK-9', session('cxp.context.ticket.id'));
         $this->assertSame('Sari', session('cxp.context.customer.name'));

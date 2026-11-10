@@ -64,6 +64,11 @@ class CxpLaunchController
 
             $redirect = (string) config('cxp.redirect_route', 'dashboard');
 
+            // Tiket yang dibuka dari TransCXP langsung mengarah ke halaman Kirim CSAT.
+            if (data_get($result->context, 'ticket.id') && data_get($result->context, 'customer.email')) {
+                $redirect = 'csat.send.index';
+            }
+
             return redirect()
                 ->route(Route::has($redirect) ? $redirect : 'dashboard')
                 ->with('success', __('Login berhasil melalui TransCXP.'));
