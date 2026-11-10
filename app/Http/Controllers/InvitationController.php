@@ -15,7 +15,10 @@ class InvitationController
 {
     public function index(Request $r, DataTableService $tables)
     {
-        $q = Invitation::with(['survey', 'client', 'deliveries'])->latest();
+        // CSAT invitations appear on the dedicated Kirim CSAT page, not the client invitation list.
+        $q = Invitation::with(['survey', 'client', 'deliveries'])
+            ->whereHas('survey', fn ($query) => $query->where('type', 'client'))
+            ->latest();
         if ($r->input('status') === 'completed') $q->whereNotNull('completed_at');
         if ($r->input('status') === 'pending') $q->whereNull('completed_at');
         if ($r->input('status') === 'draft')     $q->whereNull('completed_at')->whereNotNull('started_at'); 

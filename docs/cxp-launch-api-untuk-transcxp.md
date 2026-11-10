@@ -81,7 +81,8 @@ Accept: application/json
     "customer": {
       "id": "10",
       "name": "Customer A",
-      "email": "customerA@email.com"
+      "email": "customerA@email.com",
+      "wa": "081234567890"
     }
   }
 }
@@ -91,6 +92,8 @@ Aturan:
 
 - `user.id`, `user.email`, dan `project.code` wajib.
 - `ticket` dan `customer` harus dikirim bersama; `customer` berada di dalam `ticket`.
+- `customer.wa` opsional. Isi nomor WhatsApp customer (contoh `081234567890`);
+  TransSurvey menormalkannya menjadi format `62...` untuk kebutuhan broadcast.
 - Jangan mengirim lebih dari satu tiket dalam satu request.
 - Untuk tes pertama, cukup kirim `user` + `project` (tanpa tiket).
 

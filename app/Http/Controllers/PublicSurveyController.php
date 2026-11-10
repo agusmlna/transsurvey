@@ -29,6 +29,25 @@ class PublicSurveyController
         ], $retryAfter > 0 ? 429 : 200, $retryAfter > 0 ? ['Retry-After' => (string) $retryAfter] : []);
     }
 
+    private function isCsat(Invitation $invitation): bool
+    {
+        return ($invitation->survey->type ?? 'client') === 'csat';
+    }
+
+    private function isExpired(Invitation $invitation): bool
+    {
+        return $invitation->expires_at !== null && $invitation->expires_at->isPast();
+    }
+
+    private function unavailable(Invitation $invitation, string $title, string $message)
+    {
+        return response()->view('public.unavailable', [
+            'title' => $title,
+            'message' => $message,
+            'survey' => $invitation->survey,
+        ]);
+    }
+
     public function show(Request $request, string $token, SurveyAccessService $access)
     {
         $invitation = $this->find($token);
@@ -37,12 +56,22 @@ class PublicSurveyController
             return view('public.thanks');
         }
 
-        if (! $invitation->survey->isOpen()) {
+        $isCsat = $this->isCsat($invitation);
+
+        // Tautan CSAT tidak memakai kode akses, tetapi tetap punya masa berlaku.
+        if ($this->isExpired($invitation)) {
             $access->forget($request, $invitation);
-            return $this->accessPage($invitation);
+            return $this->unavailable($invitation, __('Tautan CSAT sudah kedaluwarsa'), __('Masa berlaku tautan survei kepuasan ini sudah berakhir. Silakan hubungi tim layanan kami bila masih ingin memberikan penilaian.'));
         }
 
-        if (! $access->isVerified($request, $invitation)) {
+        if (! $invitation->survey->isOpen()) {
+            $access->forget($request, $invitation);
+            return $isCsat
+                ? $this->unavailable($invitation, __('Survei belum tersedia'), __('Survei ini sedang tidak menerima respons. Hubungi pengirim undangan jika Anda memerlukan informasi lebih lanjut.'))
+                : $this->accessPage($invitation);
+        }
+
+        if (! $isCsat && ! $access->isVerified($request, $invitation)) {
             return $this->accessPage($invitation);
         }
 
@@ -58,7 +87,12 @@ class PublicSurveyController
     public function verify(Request $request, string $token, SurveyAccessService $access)
     {
         $invitation = $this->find($token);
-        if ($invitation->completed_at || ! $invitation->survey->isOpen()) {
+
+        if ($this->isCsat($invitation)) {
+            return redirect()->route('survey.public', $token);
+        }
+
+        if ($invitation->completed_at || $this->isExpired($invitation) || ! $invitation->survey->isOpen()) {
             $access->forget($request, $invitation);
             return redirect()->route('survey.public', $token);
         }
@@ -98,13 +132,20 @@ class PublicSurveyController
     public function submit(Request $request, string $token, ResponseService $service, SurveyAccessService $access)
     {
         $invitation = $this->find($token);
+        $isCsat = $this->isCsat($invitation);
+
+        if ($this->isExpired($invitation)) {
+            $access->forget($request, $invitation);
+            return $this->unavailable($invitation, __('Tautan CSAT sudah kedaluwarsa'), __('Masa berlaku tautan survei kepuasan ini sudah berakhir. Silakan hubungi tim layanan kami bila masih ingin memberikan penilaian.'));
+        }
+
         if ($invitation->completed_at || ! $invitation->survey->isOpen()) {
             $access->forget($request, $invitation);
             return redirect()->route('survey.public', $token)
                 ->withErrors(['survey' => __('Survei sudah selesai atau sedang tidak menerima respons.')]);
         }
 
-        if (! $access->isVerified($request, $invitation)) {
+        if (! $isCsat && ! $access->isVerified($request, $invitation)) {
             return redirect()->route('survey.public', $token)
                 ->withErrors(['access_code' => __('Masukkan kode dari email sebelum menyimpan atau mengirim jawaban.')]);
         }

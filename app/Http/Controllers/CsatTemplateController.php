@@ -256,20 +256,6 @@ class CsatTemplateController
 
     private function expiryLabel(Workspace $workspace): string
     {
-        $csat = $workspace->settings['csat'] ?? [];
-        $unit = $csat['expiry_unit'] ?? null;
-        $value = (int) ($csat['expiry_value'] ?? 0);
-
-        if ($unit === 'unlimited' || $unit === null) {
-            return $unit === 'unlimited' ? __('Tanpa batas waktu') : __('Belum diatur');
-        }
-
-        $labels = [
-            'minutes' => __('menit'),
-            'hours' => __('jam'),
-            'days' => __('hari'),
-        ];
-
-        return $value . ' ' . ($labels[$unit] ?? $unit);
+        return \App\Services\Csat\CsatSettings::label($workspace);
     }
 }

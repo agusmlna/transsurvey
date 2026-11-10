@@ -75,6 +75,8 @@ class LanguageSwitchTest extends TestCase
 
     public function test_admin_pages_and_ajax_rows_translate_without_changing_stored_content(): void
     {
+        config(['survey.email_enabled' => true, 'mail.default' => 'smtp']);
+
         $f = $this->fixture(); $this->actingAs($f['user'])->withSession(['locale' => 'en']);
         foreach ([
             '/' => 'Track survey results', '/clients' => 'Client list', '/clients/create' => 'Add client',
@@ -89,7 +91,7 @@ class LanguageSwitchTest extends TestCase
             $result->assertSee('lang="en"', false);
             $this->assertStringContainsString($expected, $this->visible($result->getContent()), $path);
         }
-        foreach (['clients' => 'Active', 'surveys' => 'Active', 'invitations' => 'Send email', 'bank' => 'Multiple choice', 'followups' => 'Open', 'responses' => 'View low ratings'] as $table => $expected) {
+        foreach (['clients' => 'Active', 'surveys' => 'Active', 'invitations' => 'Send reminder to contact', 'bank' => 'Multiple choice', 'followups' => 'Open', 'responses' => 'View low ratings'] as $table => $expected) {
             $result = $this->getJson('/'.$table.'?'.http_build_query(['_table' => 1, 'draw' => 1, 'start' => 0, 'length' => 5]))->assertOk();
             $this->assertStringContainsString($expected, $this->visible($result->json('html')), $table);
         }

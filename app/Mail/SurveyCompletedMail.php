@@ -19,11 +19,14 @@ class SurveyCompletedMail extends Mailable
             ->orderBy('id')
             ->get();
 
-        $subject = 'Survei selesai: '.$this->response->survey->title;
+        $subject = (($this->response->survey->type ?? 'client') === 'csat' ? 'Respons CSAT: ' : 'Survei selesai: ') . $this->response->survey->title;
 
         // Reuse the existing per-response/admin notification and its duplicate protection.
         return $this->subject($subject)
             ->view('mail.survey-completed')
-            ->with(['lowRatings' => $lowRatings]);
+            ->with([
+                'lowRatings' => $lowRatings,
+                'isCsat' => ($this->response->survey->type ?? 'client') === 'csat',
+            ]);
     }
 }

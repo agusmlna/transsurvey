@@ -77,7 +77,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"user\": {\n    \"id\": \"5\",\n    \"name\": \"Agent A\",\n    \"email\": \"agent@email.com\"\n  },\n  \"project\": {\n    \"id\": 23,\n    \"code\": \"23\",\n    \"name\": \"Panasonic\"\n  },\n  \"ticket\": {\n    \"id\": \"101\",\n    \"status\": \"open\",\n    \"channel\": \"whatsapp\",\n    \"customer\": {\n      \"id\": \"10\",\n      \"name\": \"Customer A\",\n      \"email\": \"customerA@email.com\"\n    }\n  }\n}",
+          "raw": "{\n  \"user\": {\n    \"id\": \"5\",\n    \"name\": \"Agent A\",\n    \"email\": \"agent@email.com\"\n  },\n  \"project\": {\n    \"id\": 23,\n    \"code\": \"23\",\n    \"name\": \"Panasonic\"\n  },\n  \"ticket\": {\n    \"id\": \"101\",\n    \"status\": \"open\",\n    \"channel\": \"whatsapp\",\n    \"customer\": {\n      \"id\": \"10\",\n      \"name\": \"Customer A\",\n      \"email\": \"customerA@email.com\",\n      \"wa\": \"081234567890\"\n    }\n  }\n}",
           "options": {
             "raw": {
               "language": "json"

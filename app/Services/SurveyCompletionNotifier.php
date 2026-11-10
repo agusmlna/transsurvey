@@ -12,13 +12,20 @@ class SurveyCompletionNotifier
     public function record(SurveyResponse $response): void
     {
         $invitation = $response->invitation;
-        if ($invitation->is_demo || $response->survey->is_demo || $response->client->is_demo
-            || $response->workspace_id !== app(CurrentWorkspace::class)->legacyId()) {
+        if ($invitation->is_demo || $response->survey->is_demo || $response->client->is_demo) {
             return;
         }
 
+        $isCsat = ($response->survey->type ?? 'client') === 'csat';
+
+        // Survei client lama tetap hanya memberi tahu admin data lama.
+        if (! $isCsat && $response->workspace_id !== app(CurrentWorkspace::class)->legacyId()) {
+            return;
+        }
+
+        $recipients = $isCsat ? $this->csatRecipients($response) : $this->recipients();
         $ids = [];
-        foreach ($this->recipients() as $email => $userId) {
+        foreach ($recipients as $email => $userId) {
             $notification = AdminSurveyNotification::firstOrCreate([
                 'survey_response_id' => $response->id,
                 'recipient_email' => $email,
@@ -33,6 +40,42 @@ class SurveyCompletionNotifier
                 $this->dispatch($id);
             }
         });
+    }
+
+    /**
+     * Penerima notifikasi CSAT: operation pada workspace respons, plus role lain
+     * yang diizinkan (secara default juga superadmin selama masa uji).
+     * Admin legacy tidak pernah menerima notifikasi CSAT.
+     *
+     * @return array<string, int> [email => user id]
+     */
+    public function csatRecipients(SurveyResponse $response): array
+    {
+        $roles = config('survey.csat_notification_roles', ['operation', 'superadmin']);
+        $recipients = [];
+
+        if (in_array('operation', $roles, true)) {
+            $operations = User::query()
+                ->where('role', 'operation')
+                ->whereHas('workspaces', fn ($query) => $query->where('workspaces.id', $response->workspace_id))
+                ->get();
+
+            foreach ($operations as $user) {
+                if (filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+                    $recipients[$user->email] = $user->id;
+                }
+            }
+        }
+
+        if (in_array('superadmin', $roles, true)) {
+            foreach (User::where('role', 'superadmin')->get() as $user) {
+                if (filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+                    $recipients[$user->email] = $user->id;
+                }
+            }
+        }
+
+        return $recipients;
     }
 
     /**

@@ -5,6 +5,7 @@
 @section('subtitle', __('Kelola pertanyaan CSAT yang akan diisi customer workspace ini.'))
 
 @section('actions')
+    <a class="btn" href="{{ route('csat.send.index') }}">{{ __('Kirim CSAT') }}</a>
     <a class="btn" href="{{ route('csat.settings.edit') }}">{{ __('Pengaturan masa berlaku') }}</a>
     <a class="btn primary" href="{{ route('csat.templates.create') }}">{{ __('＋ Buat template CSAT') }}</a>
 @endsection

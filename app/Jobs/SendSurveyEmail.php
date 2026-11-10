@@ -3,7 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\{EmailDelivery, Invitation};
-use App\Mail\SurveyInvitationMail;
+use App\Mail\{CsatInvitationMail, SurveyInvitationMail};
+use App\Services\Csat\CsatSettings;
 use App\Services\SurveyAccessService;
 use Illuminate\Contracts\Queue\{ShouldQueue, ShouldBeUnique};
 use Illuminate\Foundation\Queue\Queueable;
@@ -40,6 +41,27 @@ class SendSurveyEmail implements ShouldQueue, ShouldBeUnique
                 $delivery->update(['status' => 'skipped']);
                 return;
             }
+
+            // CSAT hanya punya satu email (undangan) dan tidak memakai kode akses.
+            // Masa berlaku dihitung dari waktu email berhasil dikirim.
+            if (($inv->survey->type ?? 'client') === 'csat') {
+                if ($delivery->kind !== 'invitation') {
+                    $delivery->update(['status' => 'skipped']);
+                    return;
+                }
+
+                $sentAt = now();
+                $workspace = $inv->workspace;
+                $inv->forceFill([
+                    'expires_at' => $workspace ? CsatSettings::expiresAt($workspace, $sentAt) : null,
+                    'sent_at' => $sentAt,
+                ])->save();
+
+                Mail::to($inv->recipient_email)->send(new CsatInvitationMail($inv));
+                $delivery->update(['status' => 'sent', 'sent_at' => $sentAt, 'last_error' => null]);
+                return;
+            }
+
             app(SurveyAccessService::class)->prepareForEmail($inv);
             Mail::to($inv->recipient_email)->send(new SurveyInvitationMail($inv, $delivery->kind === 'reminder', $delivery->kind));
             $delivery->update(['status' => 'sent', 'sent_at' => now(), 'last_error' => null]);
