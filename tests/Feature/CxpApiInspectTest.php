@@ -265,6 +265,80 @@ class CxpApiInspectTest extends TestCase
             ]);
     }
 
+    public function test_inspect_sends_username_field_when_configured(): void
+    {
+        $this->fakeApi();
+
+        config([
+            'cxp.api.email' => 'operator-cxp',
+            'cxp.api.login_field' => 'username',
+        ]);
+
+        [$exitCode, $output] = $this->runInspect();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Login    : username', $output);
+        $this->assertStringNotContainsString('tidak berbentuk email', $output);
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v1/login-user')
+            && $request->data() === [
+                'username' => 'operator-cxp',
+                'password' => self::PASSWORD,
+            ]);
+    }
+
+    public function test_inspect_can_override_login_field_from_option(): void
+    {
+        $this->fakeApi();
+
+        config(['cxp.api.email' => 'operator-cxp']);
+
+        [$exitCode, $output] = $this->runInspect(['--login-field' => 'username']);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Login    : username', $output);
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v1/login-user')
+            && $request->data() === [
+                'username' => 'operator-cxp',
+                'password' => self::PASSWORD,
+            ]);
+    }
+
+    public function test_inspect_warns_when_email_field_receives_non_email(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/api/v1/login-user' => Http::response([
+                'statusCode' => 422,
+                'message' => 'Validation failed',
+                'errors' => [
+                    'email' => ['The email must be a valid email address.'],
+                ],
+            ], 422),
+        ]);
+
+        config(['cxp.api.email' => 'operator-cxp']);
+
+        [$exitCode, $output] = $this->runInspect();
+
+        $this->assertNotSame(0, $exitCode);
+        $this->assertStringContainsString('tidak berbentuk email', $output);
+        $this->assertStringContainsString('--login-field=username', $output);
+        $this->assertStringNotContainsString(self::PASSWORD, $output);
+    }
+
+    public function test_inspect_rejects_unknown_login_field(): void
+    {
+        Http::fake();
+
+        [$exitCode, $output] = $this->runInspect(['--login-field' => 'user']);
+
+        $this->assertNotSame(0, $exitCode);
+        $this->assertStringContainsString('Field login tidak dikenal', $output);
+
+        Http::assertNothingSent();
+    }
+
     public function test_inspect_reports_ticket_api_rejection(): void
     {
         Http::fake([

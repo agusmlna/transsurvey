@@ -23,6 +23,7 @@ class InspectCxpApi extends Command
         {--per-page=5 : Jumlah tiket per halaman (1-50)}
         {--detail : Panggil detailChoose untuk --ticket}
         {--auth=config : Skema auth: config, bearer, token, x-api-key, x-token}
+        {--login-field=config : Field login: config, email, username}
         {--json : Tampilkan JSON ringkas yang sudah disanitasi}
         {--show-pii : Tampilkan email/nomor apa adanya}';
 
@@ -44,7 +45,10 @@ class InspectCxpApi extends Command
         }
 
         try {
-            $client = CxpApiClient::fromConfig((string) $this->option('auth'));
+            $client = CxpApiClient::fromConfig(
+                (string) $this->option('auth'),
+                (string) $this->option('login-field'),
+            );
         } catch (\InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
@@ -53,7 +57,16 @@ class InspectCxpApi extends Command
 
         $this->line('Base URL : '.$client->baseUrl());
         $this->line('Auth     : '.$client->authLabel());
+        $this->line('Login    : '.$client->loginField());
         $this->newLine();
+
+        if ($client->loginField() === 'email'
+            && $client->identifier() !== ''
+            && filter_var($client->identifier(), FILTER_VALIDATE_EMAIL) === false) {
+            $this->warn('CXP_API_EMAIL tidak berbentuk email, padahal API memvalidasi field email.');
+            $this->line('Kalau akun API memakai username, coba: php artisan cxp:inspect --login-field=username');
+            $this->newLine();
+        }
 
         try {
             $login = $client->login();
@@ -142,6 +155,11 @@ class InspectCxpApi extends Command
                 $this->line('  php artisan cxp:inspect --auth=bearer');
                 $this->line('  php artisan cxp:inspect --auth=token');
                 $this->line('  php artisan cxp:inspect --auth=x-api-key');
+            }
+
+            if ($e->status === 422 && str_contains(strtolower($e->getMessage()), 'email')) {
+                $this->line('API TransCXP memvalidasi field email. Kalau akun memakai username, coba:');
+                $this->line('  php artisan cxp:inspect --login-field=username');
             }
 
             return self::FAILURE;

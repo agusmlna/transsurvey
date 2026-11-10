@@ -23,9 +23,10 @@ class CxpApiClient
         private readonly int $timeout = 30,
         private readonly string $authHeader = 'Authorization',
         private readonly string $authPrefix = 'Bearer',
+        private readonly string $loginField = 'email',
     ) {}
 
-    public static function fromConfig(?string $authPreset = null): self
+    public static function fromConfig(?string $authPreset = null, ?string $loginFieldOverride = null): self
     {
         $config = (array) config('cxp.api', []);
 
@@ -42,7 +43,30 @@ class CxpApiClient
             max(5, (int) ($config['timeout'] ?? 30)),
             $header,
             $prefix,
+            self::resolveLoginField(
+                $loginFieldOverride,
+                (string) ($config['login_field'] ?? 'email'),
+            ),
         );
+    }
+
+    /**
+     * API resmi memakai field email. Beberapa akun internal memakai username,
+     * jadi field-nya bisa diganti lewat .env atau opsi command.
+     */
+    public static function resolveLoginField(?string $override, string $default): string
+    {
+        $field = strtolower(trim((string) $override));
+
+        if ($field === '' || $field === 'config') {
+            $field = strtolower(trim($default)) ?: 'email';
+        }
+
+        if (! in_array($field, ['email', 'username'], true)) {
+            throw new \InvalidArgumentException('Field login tidak dikenal: '.$field);
+        }
+
+        return $field;
     }
 
     /**
@@ -72,6 +96,16 @@ class CxpApiClient
         return $this->baseUrl;
     }
 
+    public function identifier(): string
+    {
+        return $this->email;
+    }
+
+    public function loginField(): string
+    {
+        return $this->loginField;
+    }
+
     public function authLabel(): string
     {
         $prefix = trim($this->authPrefix);
@@ -91,7 +125,7 @@ class CxpApiClient
                 ->asJson()
                 ->timeout($this->timeout)
                 ->post($this->baseUrl.'/api/v1/login-user', [
-                    'email' => $this->email,
+                    $this->loginField => $this->email,
                     'password' => $this->password,
                 ]);
         } catch (ConnectionException $e) {

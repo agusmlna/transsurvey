@@ -18,6 +18,7 @@ CXP_API_BASE_URL=https://crm.trans-cosmos.id
 CXP_API_EMAIL=akun-api@trans-cosmos.id
 CXP_API_PASSWORD=isi-password-di-sini
 CXP_API_TIMEOUT=30
+CXP_API_LOGIN_FIELD=email
 CXP_API_AUTH_HEADER=Authorization
 CXP_API_AUTH_PREFIX=Bearer
 ```
@@ -28,6 +29,12 @@ Catatan:
 - Production: `https://transcxp.trans-cosmos.id`
 - `CXP_API_AUTH_PREFIX` boleh dikosongkan kalau TransCXP ternyata memakai
   header tanpa awalan (mis. `X-API-KEY: <token>`).
+- `CXP_API_LOGIN_FIELD` default `email`. API resmi **memvalidasi field email**,
+  jadi username murni akan ditolak dengan pesan
+  `The email must be a valid email address.` Kalau akun API ternyata memakai
+  username, coba `CXP_API_LOGIN_FIELD=username` atau opsi
+  `--login-field=username`. Kalau tetap ditolak, minta tim TransCXP memastikan
+  email yang terdaftar untuk akun API tersebut.
 
 Setelah mengubah `.env`:
 
@@ -105,6 +112,15 @@ Kalau login sendiri gagal:
 | `401 Incorrect password!` | Password salah. |
 | `404 User not found!` | Email tidak terdaftar. |
 | `422 Validation failed` | Email/password kosong atau format email salah. |
+
+Kalau kredensial yang dipegang berbentuk username, bukan email, coba:
+
+```bash
+php artisan cxp:inspect --login-field=username
+```
+
+atau set `CXP_API_LOGIN_FIELD=username` di `.env`. Ini hanya diagnosis: kalau
+TransCXP tetap menolak, akun API harus memakai email yang valid.
 
 ---
 

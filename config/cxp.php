@@ -78,6 +78,10 @@ return [
         'password' => env('CXP_API_PASSWORD'),
         'timeout' => max(5, (int) env('CXP_API_TIMEOUT', 30)),
 
+        // Field login di body. API resmi memakai email, tetapi beberapa akun
+        // internal bisa memakai username. Bisa diubah tanpa mengubah kode.
+        'login_field' => env('CXP_API_LOGIN_FIELD', 'email'),
+
         // Skema header belum didokumentasikan TransCXP. Default Bearer.
         'auth_header' => env('CXP_API_AUTH_HEADER', 'Authorization'),
         'auth_prefix' => env('CXP_API_AUTH_PREFIX', 'Bearer'),
