@@ -725,5 +725,7 @@
   "Pengiriman": "Deliveries",
   "Status": "Status",
   "Edit": "Edit",
-  "Buat salinan template ini?": "Duplicate this template?"
+  "Buat salinan template ini?": "Duplicate this template?",
+  "Nomor WhatsApp": "WhatsApp number",
+  "Nomor WhatsApp customer tidak valid.": "Customer WhatsApp number is invalid."
 }

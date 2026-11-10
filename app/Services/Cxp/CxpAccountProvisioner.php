@@ -4,6 +4,7 @@ namespace App\Services\Cxp;
 
 use App\Exceptions\CxpSsoException;
 use App\Models\{User, Workspace};
+use App\Services\Csat\WhatsAppNumber;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -93,6 +94,7 @@ class CxpAccountProvisioner
                     'id' => $identity['customer_id'],
                     'name' => $identity['customer_name'],
                     'email' => $identity['customer_email'],
+                    'wa' => $identity['customer_wa'],
                 ];
             }
 
@@ -125,6 +127,7 @@ class CxpAccountProvisioner
         $customerId = $this->claim($payload, 'customer.id', 191);
         $customerEmail = mb_strtolower($this->claim($payload, 'customer.email', 255));
         $customerName = $this->claim($payload, 'customer.name', 255) ?: $customerEmail;
+        $customerWa = $this->whatsapp($payload);
 
         // Token boleh hanya berisi identitas login (user + project). Data tiket
         // menyusul lewat API pada Fase 4. Tapi kalau salah satu dikirim, keduanya
@@ -158,7 +161,38 @@ class CxpAccountProvisioner
             'customer_id' => $customerId,
             'customer_email' => $customerEmail,
             'customer_name' => $customerName,
+            'customer_wa' => $customerWa,
         ];
+    }
+
+    /**
+     * Nomor WhatsApp dinormalisasi ke format 62... supaya siap dipakai
+     * broadcast. Beberapa nama field diterima karena sumber datanya bisa
+     * berbeda-beda.
+     */
+    private function whatsapp(array $payload): string
+    {
+        foreach (['customer.wa', 'customer.whatsapp', 'customer.phone', 'customer.mobile_phone', 'customer.phone_no'] as $path) {
+            $raw = $this->claim($payload, $path, 30);
+
+            if ($raw === '') {
+                continue;
+            }
+
+            $normalized = WhatsAppNumber::normalize($raw);
+
+            if ($normalized === '' || ! WhatsAppNumber::isValid($normalized)) {
+                throw CxpSsoException::invalid(
+                    'invalid_claim',
+                    __('Nomor WhatsApp customer tidak valid.'),
+                    ['claim' => $path]
+                );
+            }
+
+            return $normalized;
+        }
+
+        return '';
     }
 
     private function claim(array $payload, string $path, int $max, bool $required = false): string

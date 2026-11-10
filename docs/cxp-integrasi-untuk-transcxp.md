@@ -84,7 +84,8 @@ Body dengan satu tiket (opsional):
     "customer": {
       "id": "10",
       "name": "Customer A",
-      "email": "customerA@email.com"
+      "email": "customerA@email.com",
+      "wa": "081234567890"
     }
   }
 }
@@ -222,7 +223,8 @@ Token dibuat di backend, bukan di browser.
     "customer": {
       "id": "10",
       "name": "Customer A",
-      "email": "customerA@email.com"
+      "email": "customerA@email.com",
+      "wa": "081234567890"
     }
   }
 }
@@ -254,6 +256,7 @@ Penting:
 | `ticket.status` | Tidak | Sebaiknya string, mis. `open`, `resolved`. |
 | `ticket.channel` | Tidak | Sebaiknya string, mis. `whatsapp`, `email`. |
 | `customer.email` | Tidak | Wajib bila `ticket` dikirim. Email valid. |
+| `customer.wa` | Tidak | Nomor WhatsApp customer; dinormalkan ke format `62...` untuk broadcast. |
 | `customer.name` | Tidak | Kalau kosong, dipakai email. |
 
 \* Wajib bila `CXP_SSO_REQUIRE_ISS_AUD=true`. Default TransSurvey: `false`,
@@ -386,6 +389,7 @@ TransSurvey dengan penanda `CXP SSO rejected`.
 | `ticket.channel` | Tidak | Maksimal 100 karakter. Sebaiknya string enum. |
 | `customer.id` | Tidak | Maksimal 191 karakter. |
 | `customer.email` | Tidak | Wajib bila `ticket` dikirim; email valid. |
+| `customer.wa` | Tidak | Maksimal 30 karakter; nomor WhatsApp dinormalkan ke format `62...`. |
 | `customer.name` | Tidak | Maksimal 255 karakter; kalau kosong dipakai email. |
 
 Aturan tambahan:
@@ -398,6 +402,8 @@ Aturan tambahan:
 - Kalau `ticket` dikirim, `customer` berada di dalam `ticket`.
 - Jangan memakai kode workspace legacy untuk `project.code`; akan ditolak `409`.
 - Jangan mengirim array tiket berisi lebih dari satu elemen.
+- `customer.wa` opsional; kalau diisi, nomornya disimpan untuk kebutuhan
+  broadcast CSAT.
 - String tidak boleh memuat karakter kontrol.
 
 ---

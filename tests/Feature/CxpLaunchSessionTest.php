@@ -85,6 +85,7 @@ class CxpLaunchSessionTest extends TestCase
                     'id' => 'CUST-9',
                     'name' => 'Sari',
                     'email' => 'sari@example.test',
+                    'wa' => '0812-3456-7890',
                 ],
             ],
         ]);
@@ -96,6 +97,26 @@ class CxpLaunchSessionTest extends TestCase
         $this->assertSame('TCK-9', session('cxp.context.ticket.id'));
         $this->assertSame('Sari', session('cxp.context.customer.name'));
         $this->assertSame('sari@example.test', session('cxp.context.customer.email'));
+        $this->assertSame('6281234567890', session('cxp.context.customer.wa'));
+    }
+
+    public function test_invalid_customer_whatsapp_is_rejected(): void
+    {
+        $payload = $this->payload([
+            'ticket' => [
+                'id' => 'TCK-9',
+                'status' => 'open',
+                'channel' => 'whatsapp',
+                'customer' => [
+                    'email' => 'sari@example.test',
+                    'wa' => 'bukan-nomor',
+                ],
+            ],
+        ]);
+
+        $this->requestSession($payload)
+            ->assertStatus(422)
+            ->assertJsonPath('reason', 'invalid_claim');
     }
 
     public function test_invalid_api_key_is_rejected(): void

@@ -184,6 +184,40 @@ class CsatSendTest extends TestCase
         $this->assertStringContainsString('No time limit', $html);
     }
 
+    public function test_customer_whatsapp_is_saved_on_client_for_broadcast(): void
+    {
+        $template = $this->template();
+
+        $this->asOperation($this->context(['customer' => ['wa' => '0812-3456-7890']]))
+            ->post(route('csat.send.store'), ['template_id' => $template->id])
+            ->assertSessionHasNoErrors();
+
+        $client = Client::withoutGlobalScopes()->where('email', 'sari@example.test')->sole();
+
+        $this->assertSame('6281234567890', $client->wa);
+    }
+
+    public function test_existing_client_whatsapp_is_updated_from_latest_ticket(): void
+    {
+        $template = $this->template();
+        $client = new Client([
+            'name' => 'Sari',
+            'contact' => 'Sari',
+            'email' => 'sari@example.test',
+            'wa' => '6281111111111',
+            'project' => 'Brand A',
+            'active' => true,
+        ]);
+        $client->workspace_id = $this->workspace->id;
+        $client->save();
+
+        $this->asOperation($this->context(['customer' => ['wa' => '6282222222222']]))
+            ->post(route('csat.send.store'), ['template_id' => $template->id])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('6282222222222', $client->fresh()->wa);
+    }
+
     public function test_days_expiry_is_counted_from_successful_send(): void
     {
         $this->workspace->settings = ['csat' => ['expiry_unit' => 'days', 'expiry_value' => 3]];

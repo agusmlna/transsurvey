@@ -20,6 +20,7 @@
         $ticketId = trim((string) data_get($ticket, 'id', ''));
         $customerEmail = trim((string) data_get($customer, 'email', ''));
         $customerName = trim((string) data_get($customer, 'name', '')) ?: $customerEmail;
+        $customerWa = trim((string) data_get($customer, 'wa', ''));
         $hasContext = $ticketId !== '' && $customerEmail !== '';
     @endphp
 
@@ -62,6 +63,12 @@
                     <dt>{{ __('Email customer') }}</dt>
                     <dd>{{ $customerEmail }}</dd>
                 </div>
+                @if ($customerWa !== '')
+                    <div>
+                        <dt>{{ __('Nomor WhatsApp') }}</dt>
+                        <dd>{{ $customerWa }}</dd>
+                    </div>
+                @endif
             </dl>
         </section>
 

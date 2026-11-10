@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Client, Invitation, Survey, Workspace};
 use App\Services\Csat\CsatSettings;
+use App\Services\Csat\WhatsAppNumber;
 use App\Services\Cxp\CxpLaunchContext;
 use App\Services\CurrentWorkspace;
 use App\Services\DeliveryService;
@@ -66,6 +67,7 @@ class CsatSendController
         $ticketId = trim((string) data_get($context, 'ticket.id', ''));
         $customerEmail = mb_strtolower(trim((string) data_get($context, 'customer.email', '')));
         $customerName = trim((string) data_get($context, 'customer.name', '')) ?: $customerEmail;
+        $customerWa = WhatsAppNumber::normalize((string) data_get($context, 'customer.wa', ''));
 
         if ($ticketId === '' || $customerEmail === '') {
             throw ValidationException::withMessages([
@@ -76,6 +78,12 @@ class CsatSendController
         if (! filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
             throw ValidationException::withMessages([
                 'context' => __('Email customer pada data tiket tidak valid.'),
+            ]);
+        }
+
+        if ($customerWa !== '' && ! WhatsAppNumber::isValid($customerWa)) {
+            throw ValidationException::withMessages([
+                'context' => __('Nomor WhatsApp customer tidak valid.'),
             ]);
         }
 
@@ -94,7 +102,7 @@ class CsatSendController
             ]);
         }
 
-        $client = $this->client($workspace, $customerName, $customerEmail);
+        $client = $this->client($workspace, $customerName, $customerEmail, $customerWa);
 
         // Satu tiket hanya boleh menerima satu tautan CSAT, walaupun operation
         // memilih template yang berbeda pada klik berikutnya.
@@ -148,7 +156,7 @@ class CsatSendController
         return back()->with('success', __('Email CSAT masuk antrean. Pantau status pengiriman di riwayat bawah.'));
     }
 
-    private function client(Workspace $workspace, string $customerName, string $customerEmail): Client
+    private function client(Workspace $workspace, string $customerName, string $customerEmail, string $customerWa = ''): Client
     {
         $client = Client::withoutGlobalScopes()
             ->where('workspace_id', $workspace->id)
@@ -156,6 +164,13 @@ class CsatSendController
             ->first();
 
         if ($client !== null) {
+            // Nomor dari TransCXP dianggap sumber terbaru. Jangan menghapus
+            // nomor lama kalau payload berikutnya tidak membawa nomor.
+            if ($customerWa !== '' && $client->wa !== $customerWa) {
+                $client->wa = $customerWa;
+                $client->save();
+            }
+
             return $client;
         }
 
@@ -163,6 +178,7 @@ class CsatSendController
             'name' => $customerName,
             'contact' => $customerName,
             'email' => $customerEmail,
+            'wa' => $customerWa !== '' ? $customerWa : null,
             'project' => $workspace->name,
             'active' => true,
         ]);
