@@ -327,6 +327,31 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringNotContainsString(self::PASSWORD, $output);
     }
 
+    public function test_inspect_explains_email_required_when_username_is_sent(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/api/v1/login-user' => Http::response([
+                'statusCode' => 422,
+                'message' => 'Validation failed',
+                'errors' => [
+                    'email' => ['The email field is required.'],
+                ],
+            ], 422),
+        ]);
+
+        config([
+            'cxp.api.email' => 'operator-cxp',
+            'cxp.api.login_field' => 'username',
+        ]);
+
+        [$exitCode, $output] = $this->runInspect();
+
+        $this->assertNotSame(0, $exitCode);
+        $this->assertStringContainsString('hanya menerima field email', $output);
+        $this->assertStringContainsString('--login-field=email', $output);
+        $this->assertStringNotContainsString(self::PASSWORD, $output);
+    }
+
     public function test_inspect_rejects_unknown_login_field(): void
     {
         Http::fake();

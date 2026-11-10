@@ -64,7 +64,13 @@ class InspectCxpApi extends Command
             && $client->identifier() !== ''
             && filter_var($client->identifier(), FILTER_VALIDATE_EMAIL) === false) {
             $this->warn('CXP_API_EMAIL tidak berbentuk email, padahal API memvalidasi field email.');
-            $this->line('Kalau akun API memakai username, coba: php artisan cxp:inspect --login-field=username');
+            $this->line('Kalau ini username, coba --login-field=username hanya sebagai diagnosis.');
+            $this->line('API resmi tetap membutuhkan email akun API yang terdaftar.');
+            $this->newLine();
+        }
+
+        if ($client->loginField() === 'username') {
+            $this->warn('API resmi TransCXP hanya menerima field email; username hanya untuk diagnosis.');
             $this->newLine();
         }
 
@@ -157,9 +163,18 @@ class InspectCxpApi extends Command
                 $this->line('  php artisan cxp:inspect --auth=x-api-key');
             }
 
-            if ($e->status === 422 && str_contains(strtolower($e->getMessage()), 'email')) {
-                $this->line('API TransCXP memvalidasi field email. Kalau akun memakai username, coba:');
-                $this->line('  php artisan cxp:inspect --login-field=username');
+            if ($e->status === 422) {
+                $message = strtolower($e->getMessage());
+
+                if (str_contains($message, 'email field is required')) {
+                    $this->line('API TransCXP hanya menerima field email, bukan username.');
+                    $this->line('Isi CXP_API_EMAIL dengan email akun API yang terdaftar, lalu jalankan:');
+                    $this->line('  php artisan cxp:inspect --login-field=email');
+                } elseif (str_contains($message, 'email must be a valid email')) {
+                    $this->line('Nilai CXP_API_EMAIL bukan email valid. API membutuhkan email akun API.');
+                    $this->line('Kalau ini username, minta email akun API ke tim TransCXP.');
+                    $this->line('Untuk diagnosis saja: php artisan cxp:inspect --login-field=username');
+                }
             }
 
             return self::FAILURE;
