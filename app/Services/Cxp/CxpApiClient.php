@@ -243,11 +243,20 @@ class CxpApiClient
             $message = 'Permintaan ke API TransCXP gagal.';
         }
 
+        $context = [
+            'action' => $action,
+            'content_type' => trim((string) $response->header('Content-Type')),
+        ];
+
+        if (is_array($json)) {
+            $context['keys'] = array_keys($json);
+        }
+
         throw new CxpApiException(
             'http_error',
             $message,
             $response->status(),
-            ['action' => $action],
+            $context,
         );
     }
 

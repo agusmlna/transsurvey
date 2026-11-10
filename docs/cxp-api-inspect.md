@@ -113,14 +113,32 @@ Kalau login sendiri gagal:
 | `404 User not found!` | Email tidak terdaftar. |
 | `422 Validation failed` | Email/password kosong atau format email salah. |
 
-Kalau kredensial yang dipegang berbentuk username, bukan email, coba:
+### Kalau kredensial berbentuk username
 
-```bash
-php artisan cxp:inspect --login-field=username
+Sudah diuji di staging: API TransCXP **tidak menerima username**.
+
+| Yang dikirim | Balasan |
+| --- | --- |
+| `email` berisi username | `The email must be a valid email address.` |
+| `username` | `The email field is required.` |
+
+Artinya endpoint `login-user` hanya punya field `email` dan mewajibkan format
+email. `--login-field=username` hanya untuk diagnosis, bukan solusi.
+
+Yang harus dilakukan: minta tim TransCXP memastikan **email yang terdaftar**
+untuk akun API tersebut. Setelah dapat emailnya:
+
+```dotenv
+CXP_API_EMAIL=email-akun-api@domain
+CXP_API_LOGIN_FIELD=email
 ```
 
-atau set `CXP_API_LOGIN_FIELD=username` di `.env`. Ini hanya diagnosis: kalau
-TransCXP tetap menolak, akun API harus memakai email yang valid.
+lalu:
+
+```bash
+php artisan optimize:clear
+php artisan cxp:inspect --per-page=5
+```
 
 ---
 
