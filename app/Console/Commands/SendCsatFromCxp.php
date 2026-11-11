@@ -190,7 +190,10 @@ class SendCsatFromCxp extends Command
                 $project = $this->value($row, ['id_project', 'project.id', 'customer.id_project']);
 
                 if ($project !== '') {
-                    $ticketWorkspace = $this->projectWorkspace($project);
+                    $ticketWorkspace = $this->projectWorkspace(
+                        $project,
+                        $this->value($row, ['project_name', 'project.name']),
+                    );
 
                     if ($ticketWorkspace === null) {
                         $counts['project_tidak_dikenal']++;
@@ -363,25 +366,43 @@ class SendCsatFromCxp extends Command
     }
 
     /**
-     * Cari workspace berdasarkan kode project TransCXP.
+     * Cari workspace tujuan untuk tiket TransCXP.
      *
-     * Konvensi: kode workspace sama dengan id_project. Tiket dengan project
-     * yang tidak dikenal sengaja dilewati, bukan masuk ke workspace default,
-     * supaya data customer tidak mendarat di tempat yang salah.
+     * Urutan pencocokan:
+     * 1. kode workspace sama dengan id_project (project.code dari SSO);
+     * 2. nama workspace sama dengan project_name, hanya kalau hasilnya unik.
+     *
+     * Tiket dengan project yang tidak dikenal sengaja dilewati, bukan masuk
+     * ke workspace default, supaya data customer tidak mendarat di tempat
+     * yang salah.
      */
-    private function projectWorkspace(string $project): ?Workspace
+    private function projectWorkspace(string $project, string $projectName = ''): ?Workspace
     {
-        $code = mb_strtolower(trim($project));
+        $key = mb_strtolower(trim($project)).'|'.mb_strtolower(trim($projectName));
 
-        if (! array_key_exists($code, $this->projectWorkspaces)) {
-            $workspace = Workspace::query()->whereRaw('lower(code) = ?', [$code])->first();
-
-            $this->projectWorkspaces[$code] = $workspace !== null && ! $workspace->is_legacy
-                ? $workspace
-                : null;
+        if (array_key_exists($key, $this->projectWorkspaces)) {
+            return $this->projectWorkspaces[$key];
         }
 
-        return $this->projectWorkspaces[$code];
+        $workspace = Workspace::query()
+            ->whereRaw('lower(code) = ?', [mb_strtolower(trim($project))])
+            ->first();
+
+        if ($workspace === null && trim($projectName) !== '') {
+            // project_name tidak unik di database, jadi hanya dipakai kalau
+            // tepat satu workspace yang cocok.
+            $matches = Workspace::query()
+                ->where('is_legacy', false)
+                ->whereRaw('lower(name) = ?', [mb_strtolower(trim($projectName))])
+                ->limit(2)
+                ->get();
+
+            $workspace = $matches->count() === 1 ? $matches->first() : null;
+        }
+
+        return $this->projectWorkspaces[$key] = $workspace !== null && ! $workspace->is_legacy
+            ? $workspace
+            : null;
     }
 
     /**

@@ -425,6 +425,25 @@ class CxpCsatAutoSendTest extends TestCase
         $this->assertSame($brandB->id, $client->workspace_id);
     }
 
+    public function test_project_name_is_used_when_id_project_is_numeric(): void
+    {
+        [$brandB] = $this->workspaceWithTemplate('brand-b', 'Brand B');
+
+        $this->fakeTickets([[
+            array_replace($this->ticket('000001'), [
+                'id_project' => '6',
+                'project_name' => 'Brand B',
+            ]),
+        ]]);
+
+        [$exitCode] = $this->runCommand(['--send' => true]);
+
+        $this->assertSame(0, $exitCode);
+
+        $invitation = Invitation::withoutGlobalScopes()->where('ticket_id', '000001')->sole();
+        $this->assertSame($brandB->id, $invitation->workspace_id);
+    }
+
     public function test_ticket_with_unknown_or_legacy_project_is_skipped(): void
     {
         Workspace::create(['name' => 'Legacy', 'code' => 'legacy-x', 'is_legacy' => true]);

@@ -104,18 +104,22 @@ Jangan lupa permission `.env` staging tetap `640 itsol:www-data`.
 User Guide API TransCXP v1.0 (10 halaman) mencantumkan field `id_project` dan
 `project_name` pada `GET /api/v1/dataTicketcxp`, tetapi di production endpoint
 itu masih **404** dan `/api/v2/tickets` belum memuat field project. Karena itu
-command disiapkan untuk dua kondisi:
+command disiapkan untuk beberapa kondisi:
 
 | Respons tiket | Perilaku |
 | --- | --- |
 | ada `id_project` | Cari workspace dengan `lower(code) = lower(id_project)` |
+| `id_project` tidak cocok | Coba `project_name` ke nama workspace, hanya kalau hasilnya unik |
 | tidak ada `id_project` | Pakai workspace `CXP_CSAT_WORKSPACE` |
 
 Aturan penting:
 
-- Kode workspace **harus sama** dengan `id_project` TransCXP (mis. project
-  `BRAND-A` → workspace code `brand-a`; pencocokan tidak membedakan huruf
-  besar/kecil).
+- `id_project` di User Guide berupa angka (contoh `"6"`), sedangkan
+  `project_name` berupa nama (contoh `"DIPOOPL"`). Karena SSO memakai
+  `project.code` sebagai kode workspace, cara paling akurat adalah membuat
+  kode workspace sama dengan `project.code`/`id_project` (mis. `6`). Kalau
+  tidak, command mencoba mencocokkan `project_name` dengan **nama** workspace
+  secara unik.
 - Project yang tidak punya workspace, atau workspace-nya `legacy`, **dilewati**
   dan dihitung di baris `Project tanpa workspace`. Tidak ada fallback diam-diam
   ke workspace default supaya data customer tidak mendarat di tempat salah.
