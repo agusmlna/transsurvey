@@ -222,5 +222,14 @@ menit). `withoutOverlapping` mencegah dua proses berjalan bersamaan.
   cenderung kecil. Itu diharapkan.
 - `/api/v1/dataTicketcxp` sudah aktif, tetapi `/api/v1/detailChoose` masih 404.
   Command tidak memakai detailChoose, jadi tidak menghalangi.
-- v1 tidak mendukung filter `status`; command membaca semua halaman lalu
-  menyaring `Close` di sisi aplikasi.
+- v1 **mengabaikan semua filter** (`id_ticket`, `status_ticket`, `status`,
+  `start_date`, `update_date`, `id_project`, `ticket_id`, `q`, `search`,
+  `project_id`, `status_id`): `pagination.total` tetap ~1.046.390. Hanya
+  `page` dan `per_page` yang bekerja.
+- Karena itu v1 belum layak untuk polling: 1,05 juta baris / ~10.464 halaman
+  @`per_page=100` × ~1,8 detik ≈ 5 jam per scan. Urutan baris juga tidak stabil
+  (baris bisa bergeser antar panggilan), sehingga full scan berisiko melewatkan
+  tiket.
+- `CXP_API_TICKET_PATH=/api/v1/dataTicketcxp` baru aman dipakai kalau TransCXP
+  menambahkan filter (mis. `status_ticket`/`update_date`) atau menambahkan
+  `id_project` ke v2. Sampai itu terjadi, biarkan `CXP_CSAT_AUTOSEND=false`.
