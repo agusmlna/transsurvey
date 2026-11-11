@@ -127,6 +127,72 @@ class CxpCsatAutoSendTest extends TestCase
     }
 
     /**
+     * Respons /api/v1/dataTicketcxp: envelope "status/code/data" dengan
+     * pagination di kunci "pagination", bukan "meta" seperti v2.
+     *
+     * @param  array<int, array<int, array<string, mixed>>>  $pages
+     */
+    private function fakeV1Tickets(array $pages): void
+    {
+        $lastPage = max(1, count($pages));
+
+        Http::fake(function (Request $request) use ($pages, $lastPage) {
+            if (str_contains($request->url(), '/api/v1/login-user')) {
+                return Http::response([
+                    'statusCode' => 200,
+                    'userInfo' => [
+                        'name' => 'API User',
+                        'email' => 'api-user@example.test',
+                        'token' => 'token-tidak-boleh-tampil',
+                        'expired_date' => '2027-02-11 10:00:00',
+                    ],
+                ], 200);
+            }
+
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $page = (int) ($query['page'] ?? 1);
+
+            return Http::response([
+                'status' => 'success',
+                'code' => 200,
+                'message' => 'Ticket data has been successfully retrieved.',
+                'data' => array_values($pages[$page - 1] ?? []),
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => 20,
+                    'total' => array_sum(array_map('count', $pages)),
+                    'last_page' => $lastPage,
+                    'next_page_url' => $page < $lastPage ? 'next' : null,
+                    'prev_page_url' => $page > 1 ? 'prev' : null,
+                ],
+            ], 200);
+        });
+    }
+
+    /**
+     * Satu baris tiket format v1: email/status/wa ada di root.
+     *
+     * @return array<string, mixed>
+     */
+    private function ticketV1(string $id, string $project = 'brand-a', array $overrides = []): array
+    {
+        return array_merge([
+            'id_ticket' => $id,
+            'id_project' => $project,
+            'project_name' => 'Brand A',
+            'name_customer' => 'Sari',
+            'email' => 'sari@example.test',
+            'wa' => null,
+            'phone_no' => null,
+            'mobile_phone' => null,
+            'status_ticket' => 'Close',
+            'source' => 'Email',
+            'start_date' => '2026-11-11 08:00:00',
+            'update_date' => '2026-11-11 10:00:00',
+        ], $overrides);
+    }
+
+    /**
      * @param  array<string, mixed>  $customer
      * @return array<string, mixed>
      */
@@ -308,6 +374,31 @@ class CxpCsatAutoSendTest extends TestCase
             ['000001', '000002', '000004'],
             Invitation::withoutGlobalScopes()->pluck('ticket_id')->all(),
         );
+    }
+
+    public function test_v1_pagination_and_project_fields_are_used(): void
+    {
+        [$brandB] = $this->workspaceWithTemplate('brand-b', 'Brand B');
+
+        $this->fakeV1Tickets([
+            [$this->ticketV1('000001')],
+            [$this->ticketV1('000002', 'brand-b')],
+            [$this->ticketV1('000003', 'brand-tidak-ada', ['project_name' => 'Brand Tidak Ada'])],
+        ]);
+
+        [$exitCode, $output] = $this->runCommand(['--send' => true]);
+
+        $this->assertSame(0, $exitCode);
+
+        // Halaman 2 dan 3 hanya terbaca kalau pagination.last_page dipakai.
+        $this->assertEqualsCanonicalizing(
+            ['000001', '000002'],
+            Invitation::withoutGlobalScopes()->pluck('ticket_id')->all(),
+        );
+
+        $invitation = Invitation::withoutGlobalScopes()->where('ticket_id', '000002')->sole();
+        $this->assertSame($brandB->id, $invitation->workspace_id);
+        $this->assertStringContainsString('Project tanpa workspace', $output);
     }
 
     public function test_max_pages_and_limit_stop_processing_early(): void

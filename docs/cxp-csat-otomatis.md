@@ -7,8 +7,12 @@ pengiriman WhatsApp pada fase ini; nomor WA hanya disimpan di `clients.wa`.
 ## 1. Cara kerja
 
 1. Login ke API TransCXP memakai kredensial `CXP_API_*`.
-2. Ambil `GET /api/v2/tickets?status=Close`, halaman per halaman sampai
-   `meta.last_page`.
+2. Ambil daftar tiket dari endpoint yang diatur `CXP_API_TICKET_PATH`,
+   halaman per halaman sampai `last_page`:
+   - `/api/v1/dataTicketcxp` (disarankan): pagination di kunci `pagination`,
+     dan setiap baris memuat `id_project`/`project_name`;
+   - `/api/v2/tickets` (default lama): pagination di kunci `meta`, tanpa field
+     project.
 3. Untuk tiap tiket:
    - hanya status `Close` yang diproses;
    - `update_date` harus `>= CXP_CSAT_SINCE`;
@@ -24,10 +28,9 @@ pengiriman WhatsApp pada fase ini; nomor WA hanya disimpan di `clients.wa`.
    Kirim CSAT manual, lalu email masuk antrean `email_deliveries`.
 
 Command menerima dua bentuk respons: v2 (`customer.email`,
-`status_name`, `source`) dan v1 (`email`, `status_ticket`,
-`name_customer`, `wa` di root). Jadi kalau TransCXP mengaktifkan
-`/api/v1/dataTicketcxp` sesuai User Guide baru, command tetap jalan tanpa
-perubahan.
+`status_name`, `source`, pagination `meta`) dan v1 (`email`, `status_ticket`,
+`name_customer`, `wa` di root, pagination `pagination`). Perpindahan endpoint
+cukup lewat `CXP_API_TICKET_PATH`; tidak perlu ubah kode.
 
 Tanpa opsi `--send`, command hanya **simulasi**: tidak ada baris database yang
 ditulis dan tidak ada email yang diantrekan.
@@ -58,11 +61,10 @@ tanggal tutup di server. Karena itu:
 Kalau nanti TransCXP menambahkan filter `update_date` atau sort by update,
 command bisa dipersempit tanpa mengubah aturan bisnis.
 
-Catatan: User Guide API Integration TransCXP v1.0 mendokumentasikan
-`/api/v1/dataTicketcxp` dan `/api/v1/detailChoose`, tetapi pada 11 Nov 2026
-keduanya masih 404 di production. Integrasi saat ini memakai
-`/api/v2/tickets`; bentuk field v1 tetap didukung supaya tidak perlu ubah kode
-kalau endpoint itu diaktifkan.
+Catatan status endpoint (11 Nov 2026): `/api/v1/dataTicketcxp` sudah membalas
+**200** dengan envelope `status/code/data/pagination` dan memuat `id_project`,
+`project_name`, serta `wa`. `/api/v1/detailChoose` masih **404**, tetapi tidak
+dipakai oleh command. `/api/v2/tickets` tetap jalan namun tanpa field project.
 
 ## 3. Konfigurasi
 
@@ -81,7 +83,13 @@ CXP_CSAT_SINCE=2026-11-11
 
 # 0 = baca semua halaman status Close.
 CXP_CSAT_MAX_PAGES=0
+
+# Endpoint daftar tiket. Pakai v1 kalau production melayani banyak project,
+# karena hanya v1 yang mengirim id_project/project_name.
+CXP_API_TICKET_PATH=/api/v1/dataTicketcxp
 ```
+
+`CXP_API_DETAIL_PATH` tidak perlu diubah; detail tiket belum dipakai command.
 
 Workspace wajib punya **template CSAT aktif** yang dijadikan default
 (menu CSAT → Template). Workspace `legacy` ditolak.
@@ -102,9 +110,10 @@ Jangan lupa permission `.env` staging tetap `640 itsol:www-data`.
 ## 4. Mapping project ke workspace
 
 User Guide API TransCXP v1.0 (10 halaman) mencantumkan field `id_project` dan
-`project_name` pada `GET /api/v1/dataTicketcxp`, tetapi di production endpoint
-itu masih **404** dan `/api/v2/tickets` belum memuat field project. Karena itu
-command disiapkan untuk beberapa kondisi:
+`project_name` pada `GET /api/v1/dataTicketcxp`. Endpoint itu sudah aktif
+(200), sehingga mapping project berjalan otomatis kalau
+`CXP_API_TICKET_PATH=/api/v1/dataTicketcxp`. `/api/v2/tickets` tidak memuat
+field project, jadi hanya aman untuk satu project.
 
 | Respons tiket | Perilaku |
 | --- | --- |
@@ -129,8 +138,9 @@ Aturan penting:
   unik antar project.
 
 Sebelum mengaktifkan `CXP_CSAT_AUTOSEND`, pastikan kode workspace sudah cocok
-dengan `id_project` di TransCXP. Selama v2 belum mengirim project, semua tiket
-tetap masuk ke workspace default; baris `Project tanpa workspace` akan tetap 0.
+dengan `id_project` di TransCXP. Kalau `CXP_API_TICKET_PATH` masih v2, semua
+tiket masuk ke workspace default dan baris `Project tanpa workspace` akan
+selalu 0.
 
 ## 5. Menjalankan
 
@@ -204,11 +214,13 @@ menit). `withoutOverlapping` mencegah dua proses berjalan bersamaan.
 
 - Tidak ada backfill tiket lama: `CXP_CSAT_SINCE` mencegah email massal saat
   pertama kali dijalankan.
-- Mapping project baru aktif kalau API tiket benar-benar mengirim
-  `id_project`. Selama itu, satu workspace default dipakai.
+- Mapping project aktif kalau endpoint tiket mengirim `id_project`
+  (`CXP_API_TICKET_PATH=/api/v1/dataTicketcxp`). Dengan v2, semua tiket masuk
+  ke satu workspace default.
 - Tidak ada pengiriman WhatsApp; hanya penyimpanan nomor.
 - 17 dari 20 tiket terbaru tidak punya email, jadi volume CSAT otomatis
   cenderung kecil. Itu diharapkan.
-- `/api/v1/dataTicketcxp` dan `/api/v1/detailChoose` dari User Guide baru masih
-  404 di production. Command sudah menerima bentuk field v1, jadi tinggal
-  menunggu endpoint/field itu aktif.
+- `/api/v1/dataTicketcxp` sudah aktif, tetapi `/api/v1/detailChoose` masih 404.
+  Command tidak memakai detailChoose, jadi tidak menghalangi.
+- v1 tidak mendukung filter `status`; command membaca semua halaman lalu
+  menyaring `Close` di sisi aplikasi.

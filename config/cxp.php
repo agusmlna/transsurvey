@@ -86,10 +86,13 @@ return [
         'auth_header' => env('CXP_API_AUTH_HEADER', 'Authorization'),
         'auth_prefix' => env('CXP_API_AUTH_PREFIX', 'Bearer'),
 
-        // Path endpoint tiket. PDF menyebut /api/v1/dataTicketcxp, tetapi
-        // server production membalas 404 HTML untuk path itu. Path yang
-        // benar-benar ada di production adalah /api/v2/tickets (401 JSON
-        // "The token is required!" tanpa token).
+        // Path endpoint tiket. /api/v1/dataTicketcxp (User Guide v1.0) memuat
+        // id_project/project_name/wa sehingga wajib dipakai kalau TransCXP
+        // melayani banyak project. /api/v2/tickets tidak memuat field project,
+        // jadi hanya cocok untuk satu project. Default dipertahankan v2 agar
+        // deployment lama tidak berubah perilaku; isi CXP_API_TICKET_PATH di
+        // .env untuk memakai v1. Detail tiket (detailChoose) belum tersedia,
+        // sehingga detail_path tetap memakai endpoint daftar tiket.
         'ticket_path' => env('CXP_API_TICKET_PATH', '/api/v2/tickets'),
         'detail_path' => env('CXP_API_DETAIL_PATH', '/api/v2/tickets'),
     ],

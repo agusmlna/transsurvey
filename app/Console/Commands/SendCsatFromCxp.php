@@ -135,7 +135,7 @@ class SendCsatFromCxp extends Command
                 return self::FAILURE;
             }
 
-            $lastPage = max($current, (int) data_get($response, 'meta.last_page', $current));
+            $lastPage = max($current, $this->lastPage($response, $current));
             $rows = array_values(array_filter((array) ($response['data'] ?? []), 'is_array'));
 
             if ($rows === []) {
@@ -363,6 +363,22 @@ class SendCsatFromCxp extends Command
                 $invitation->workspace_id.'|'.$invitation->ticket_id => true,
             ])
             ->all();
+    }
+
+    /**
+     * Nomor halaman terakhir.
+     *
+     * API v2 membungkus pagination di "meta", sedangkan /api/v1/dataTicketcxp
+     * (User Guide v1.0) memakai kunci "pagination". Keduanya didukung supaya
+     * perpindahan endpoint cukup lewat CXP_API_TICKET_PATH.
+     *
+     * @param  array<string, mixed>  $response
+     */
+    private function lastPage(array $response, int $current): int
+    {
+        return (int) data_get($response, 'pagination.last_page')
+            ?: (int) data_get($response, 'meta.last_page')
+            ?: $current;
     }
 
     /**
