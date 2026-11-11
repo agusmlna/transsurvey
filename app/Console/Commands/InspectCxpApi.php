@@ -16,6 +16,23 @@ use Illuminate\Support\Str;
  */
 class InspectCxpApi extends Command
 {
+    /**
+     * Kemungkinan nama field untuk data yang sama. Kontrak PDF memakai bentuk
+     * flat, sedangkan /api/v2/tickets menyimpan customer di objek terpisah.
+     */
+    private const ROW_PATHS = [
+        'email' => ['email', 'customer.email', 'customer_email'],
+        'status' => ['status_ticket', 'status_name', 'status', 'customer.status_name'],
+        'project_id' => ['id_project', 'project.id', 'customer.id_project'],
+        'project_name' => ['project_name', 'project.name', 'customer.project_name'],
+        'end_date' => ['end_date', 'finish_date', 'closed_date'],
+    ];
+
+    private const WA_PATHS = [
+        'wa', 'phone_no', 'mobile_phone',
+        'customer.wa', 'customer.phone_no', 'customer.mobile_phone', 'customer.phone',
+    ];
+
     protected $signature = 'cxp:inspect
         {--ticket= : ID tiket untuk diuji, mis. 000033}
         {--project= : Filter lokal berdasarkan id_project}
@@ -115,7 +132,7 @@ class InspectCxpApi extends Command
             if ($project !== '') {
                 $rows = array_values(array_filter(
                     $rows,
-                    fn (array $row) => (string) ($row['id_project'] ?? '') === $project,
+                    fn (array $row) => (string) $this->rowValue($row, 'project_id') === $project,
                 ));
             }
 
@@ -229,14 +246,7 @@ class InspectCxpApi extends Command
     private function renderKeys(array $response, array $rows): void
     {
         $this->line('<options=bold>Field envelope</>');
-
-        if ($response === []) {
-            $this->line('  (kosong)');
-        }
-
-        foreach ($response as $key => $value) {
-            $this->line('  - '.$key.' ('.$this->valueType($value).')');
-        }
+        $this->dumpShape($this->shapeOf($response, 0)['children']);
 
         $this->newLine();
         $this->line('<options=bold>Field tiket</> ('.count($rows).' baris)');
@@ -247,16 +257,92 @@ class InspectCxpApi extends Command
             return;
         }
 
-        $types = [];
+        $shape = [];
 
         foreach (array_slice($rows, 0, 5) as $row) {
-            foreach ($row as $key => $value) {
-                $types[$key][] = $this->valueType($value);
+            $shape = $this->mergeShapes($shape, $this->shapeOfObject($row, 1));
+        }
+
+        $this->dumpShape($shape);
+    }
+
+    /**
+     * @return array{type: string, children: array<string, mixed>}
+     */
+    private function shapeOf(mixed $value, int $depth): array
+    {
+        if (! is_array($value)) {
+            return ['type' => $this->valueType($value), 'children' => []];
+        }
+
+        $children = [];
+        $type = array_is_list($value) ? 'list' : 'objek';
+
+        if ($depth < 3) {
+            $sample = array_is_list($value) ? ($value[0] ?? null) : $value;
+
+            if (is_array($sample)) {
+                $children = $this->shapeOfObject($sample, $depth + 1);
             }
         }
 
-        foreach ($types as $key => $found) {
-            $this->line('  - '.$key.' ('.implode('/', array_unique($found)).')');
+        return ['type' => $type, 'children' => $children];
+    }
+
+    /**
+     * @return array<string, array{type: string, children: array<string, mixed>}>
+     */
+    private function shapeOfObject(array $object, int $depth): array
+    {
+        $shape = [];
+
+        foreach ($object as $key => $value) {
+            $shape[(string) $key] = $this->shapeOf($value, $depth);
+        }
+
+        return $shape;
+    }
+
+    /**
+     * Gabungkan bentuk beberapa baris supaya tipe yang berbeda ikut terlihat.
+     *
+     * @param  array<string, array{type: string, children: array<string, mixed>}>  $left
+     * @param  array<string, array{type: string, children: array<string, mixed>}>  $right
+     * @return array<string, array{type: string, children: array<string, mixed>}>
+     */
+    private function mergeShapes(array $left, array $right): array
+    {
+        foreach ($right as $key => $node) {
+            if (! isset($left[$key])) {
+                $left[$key] = $node;
+
+                continue;
+            }
+
+            $types = array_unique(array_merge(
+                explode('/', $left[$key]['type']),
+                explode('/', $node['type']),
+            ));
+
+            $left[$key]['type'] = implode('/', $types);
+            $left[$key]['children'] = $this->mergeShapes($left[$key]['children'], $node['children']);
+        }
+
+        return $left;
+    }
+
+    /**
+     * @param  array<string, array{type: string, children: array<string, mixed>}>  $shape
+     */
+    private function dumpShape(array $shape, string $indent = '  ', string $path = ''): void
+    {
+        foreach ($shape as $key => $node) {
+            $full = $path === '' ? (string) $key : $path.'.'.$key;
+            $this->line($indent.'- '.$full.' ('.$node['type'].')');
+
+            if ($node['children'] !== []) {
+                $this->dumpShape($node['children'], $indent.'  ', $full);
+            }
         }
     }
 
@@ -297,10 +383,10 @@ class InspectCxpApi extends Command
         if ($asJson) {
             $this->line((string) json_encode([
                 'source' => $source,
-                'status' => $response['status'] ?? null,
-                'code' => $response['code'] ?? null,
+                'status' => $response['status'] ?? $response['statusCode'] ?? null,
+                'code' => $response['code'] ?? $response['statusCode'] ?? null,
                 'message' => $response['message'] ?? null,
-                'pagination' => $response['pagination'] ?? null,
+                'pagination' => $this->pagination($response),
                 'filters' => array_filter([
                     'id_ticket' => $ticketId !== '' ? $ticketId : null,
                     'id_project' => $project !== '' ? $project : null,
@@ -316,7 +402,7 @@ class InspectCxpApi extends Command
 
         $this->line('<options=bold>'.$source.'</>');
 
-        $pagination = is_array($response['pagination'] ?? null) ? $response['pagination'] : [];
+        $pagination = $this->pagination($response);
         $this->line(sprintf(
             'Halaman %s dari %s | total %s | %s per halaman',
             $this->scalar($pagination['current_page'] ?? '-'),
@@ -335,14 +421,14 @@ class InspectCxpApi extends Command
 
         foreach ($rows as $row) {
             $table[] = [
-                $this->scalar($row['id_ticket'] ?? '-'),
+                $this->scalar(data_get($row, 'id_ticket') ?? '-'),
                 $this->projectLabel($row),
-                $this->scalar($row['status_ticket'] ?? '-'),
-                $this->scalar($row['source'] ?? '-'),
-                $this->maskEmail($row['email'] ?? null, $showPii),
+                $this->scalar($this->rowValue($row, 'status') ?? '-'),
+                $this->scalar(data_get($row, 'source') ?? '-'),
+                $this->maskEmail($this->rowValue($row, 'email'), $showPii),
                 $this->whatsappLabel($row),
-                $this->scalar($row['end_date'] ?? '-'),
-                Str::limit($this->scalar($row['subject'] ?? '-'), 32),
+                $this->scalar($this->rowValue($row, 'end_date') ?? '-'),
+                Str::limit($this->scalar(data_get($row, 'subject') ?? '-'), 32),
             ];
         }
 
@@ -351,12 +437,15 @@ class InspectCxpApi extends Command
             $table,
         );
 
-        $noEmail = count(array_filter($rows, fn (array $row) => trim((string) ($row['email'] ?? '')) === ''));
+        $noEmail = count(array_filter(
+            $rows,
+            fn (array $row) => trim((string) $this->rowValue($row, 'email')) === '',
+        ));
         $noWa = count(array_filter($rows, fn (array $row) => $this->normalizedWhatsapp($row) === ''));
         $solvedWithoutEnd = count(array_filter(
             $rows,
-            fn (array $row) => mb_strtolower(trim((string) ($row['status_ticket'] ?? ''))) === 'solved'
-                && trim((string) ($row['end_date'] ?? '')) === '',
+            fn (array $row) => mb_strtolower(trim((string) $this->rowValue($row, 'status'))) === 'solved'
+                && trim((string) $this->rowValue($row, 'end_date')) === '',
         ));
 
         $this->newLine();
@@ -402,8 +491,8 @@ class InspectCxpApi extends Command
 
     private function projectLabel(array $row): string
     {
-        $id = trim((string) ($row['id_project'] ?? ''));
-        $name = trim((string) ($row['project_name'] ?? ''));
+        $id = trim((string) $this->rowValue($row, 'project_id'));
+        $name = trim((string) $this->rowValue($row, 'project_name'));
 
         if ($id === '' && $name === '') {
             return '-';
@@ -421,8 +510,8 @@ class InspectCxpApi extends Command
 
     private function normalizedWhatsapp(array $row): string
     {
-        foreach (['wa', 'phone_no', 'mobile_phone'] as $key) {
-            $raw = trim((string) ($row[$key] ?? ''));
+        foreach (self::WA_PATHS as $path) {
+            $raw = trim((string) data_get($row, $path, ''));
 
             if ($raw === '') {
                 continue;
@@ -438,38 +527,75 @@ class InspectCxpApi extends Command
         return '';
     }
 
+    /**
+     * Ambil nilai baris dengan beberapa kemungkinan nama field. Bentuk JSON
+     * TransCXP berbeda antara kontrak PDF (flat) dan /api/v2/tickets (bersarang).
+     */
+    private function rowValue(array $row, string $field): mixed
+    {
+        foreach (self::ROW_PATHS[$field] ?? [] as $path) {
+            $value = data_get($row, $path);
+
+            if ($value !== null && $value !== '' && $value !== []) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function pagination(array $response): array
+    {
+        foreach (['pagination', 'meta'] as $key) {
+            if (is_array($response[$key] ?? null)) {
+                return $response[$key];
+            }
+        }
+
+        return [];
+    }
+
     private function sanitizeRow(array $row, bool $showPii): array
     {
         $normalized = $this->normalizedWhatsapp($row);
 
         // Bentuk JSON bisa berbeda dari PDF, jadi samarkan juga field yang
         // namanya tidak kita kenal tetapi isinya email atau nomor telepon.
-        foreach ($row as $key => $value) {
-            if (! is_string($value) || trim($value) === '') {
-                continue;
-            }
+        $row = $this->sanitizeValue($row, null, $showPii);
 
-            if (str_contains($value, '@')) {
-                $row[$key] = $this->maskEmail($value, $showPii);
-
-                continue;
-            }
-
-            if (preg_match('/phone|mobile|telp|contact|whatsapp|(^|_)wa($|_)/i', (string) $key) === 1
-                && strlen(preg_replace('/\D+/', '', $value) ?? '') >= 8) {
-                $row[$key] = $this->maskPhone($value, $showPii);
-            }
-        }
-
-        $row['email'] = $this->maskEmail($row['email'] ?? null, $showPii);
-
-        foreach (['wa', 'phone_no', 'mobile_phone'] as $key) {
-            $row[$key] = $this->maskPhone($row[$key] ?? null, $showPii);
-        }
-
+        $row['email'] = $this->maskEmail($this->rowValue($row, 'email'), $showPii);
         $row['wa_normalized'] = $normalized !== '' ? $normalized : null;
 
         return $row;
+    }
+
+    private function sanitizeValue(mixed $value, ?string $key, bool $showPii): mixed
+    {
+        if (is_array($value)) {
+            $clean = [];
+
+            foreach ($value as $childKey => $childValue) {
+                $clean[$childKey] = $this->sanitizeValue($childValue, (string) $childKey, $showPii);
+            }
+
+            return $clean;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return $value;
+        }
+
+        if (str_contains($value, '@')) {
+            return $this->maskEmail($value, $showPii);
+        }
+
+        if ($key !== null
+            && preg_match('/phone|mobile|telp|contact|whatsapp|(^|_)wa($|_)/i', $key) === 1
+            && strlen(preg_replace('/\D+/', '', $value) ?? '') >= 8) {
+            return $this->maskPhone($value, $showPii);
+        }
+
+        return $value;
     }
 
     private function maskEmail(mixed $value, bool $showPii): string

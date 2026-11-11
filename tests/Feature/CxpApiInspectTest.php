@@ -470,6 +470,99 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringNotContainsString(self::TOKEN, $output);
     }
 
+    public function test_inspect_maps_v2_nested_customer_fields(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/api/v1/login-user' => Http::response([
+                'statusCode' => 200,
+                'userInfo' => [
+                    'name' => 'User Access 1',
+                    'email' => 'api-user@example.test',
+                    'token' => self::TOKEN,
+                    'expired_date' => '2026-12-31 23:59:59',
+                ],
+            ], 200),
+            self::BASE_URL.'/api/v2/tickets*' => Http::response([
+                'statusCode' => 200,
+                'message' => 'ok',
+                'data' => [
+                    [
+                        'id' => 74,
+                        'id_ticket' => '001074',
+                        'subject' => 'test',
+                        'source' => 'Email',
+                        'status_name' => 'Solved',
+                        'start_date' => '2026-11-09 15:00:00',
+                        'end_date' => '2026-11-09 17:00:28',
+                        'customer' => [
+                            'name' => 'Budi',
+                            'email' => 'budi@example.test',
+                            'wa' => '081234567890',
+                        ],
+                    ],
+                ],
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 2,
+                    'total' => 21,
+                    'per_page' => 20,
+                ],
+            ], 200),
+        ]);
+
+        [$exitCode, $output] = $this->runInspect(['--per-page' => 5]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Halaman 1 dari 2 | total 21 | 20 per halaman', $output);
+        $this->assertStringContainsString('Solved', $output);
+        $this->assertStringContainsString('b***@example.test', $output);
+        $this->assertStringContainsString('6281234567890', $output);
+        $this->assertStringContainsString('2026-11-09 17:00:28', $output);
+        $this->assertStringNotContainsString('budi@example.test', $output);
+        $this->assertStringNotContainsString('081234567890', $output);
+    }
+
+    public function test_inspect_keys_mode_shows_nested_fields(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/api/v1/login-user' => Http::response([
+                'statusCode' => 200,
+                'userInfo' => [
+                    'name' => 'User Access 1',
+                    'email' => 'api-user@example.test',
+                    'token' => self::TOKEN,
+                    'expired_date' => '2026-12-31 23:59:59',
+                ],
+            ], 200),
+            self::BASE_URL.'/api/v2/tickets*' => Http::response([
+                'statusCode' => 200,
+                'message' => 'ok',
+                'data' => [
+                    [
+                        'id_ticket' => '001074',
+                        'status_name' => 'Solved',
+                        'customer' => [
+                            'name' => 'Budi',
+                            'email' => 'budi@example.test',
+                            'wa' => '081234567890',
+                        ],
+                    ],
+                ],
+                'meta' => ['current_page' => 1, 'total' => 1],
+            ], 200),
+        ]);
+
+        [$exitCode, $output] = $this->runInspect(['--keys' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('customer (objek)', $output);
+        $this->assertStringContainsString('customer.email (string)', $output);
+        $this->assertStringContainsString('customer.wa (string)', $output);
+        $this->assertStringContainsString('meta.current_page (int)', $output);
+        $this->assertStringNotContainsString('budi@example.test', $output);
+        $this->assertStringNotContainsString('081234567890', $output);
+    }
+
     public function test_inspect_json_masks_unknown_email_and_phone_fields(): void
     {
         Http::fake([

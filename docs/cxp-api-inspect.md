@@ -144,6 +144,30 @@ Endpoint detail belum ditemukan; defaultnya memakai path yang sama dengan
 filter `id_ticket`. Kalau nanti tim TransCXP memberi path detail yang benar,
 cukup isi `CXP_API_DETAIL_PATH`.
 
+### Bentuk respons `/api/v2/tickets`
+
+Berbeda dari contoh di PDF:
+
+| Bagian | Isi |
+| --- | --- |
+| Envelope | `statusCode`, `message`, `data`, `meta` (bukan `pagination`) |
+| Baris tiket | `id`, `id_ticket`, `subject`, `source`, `status_name`, `start_date`, `end_date`, `customer`, `agent`, dll |
+| Customer | objek bersarang (`customer.email`, `customer.wa`, ...) |
+
+Kolom tabel dipetakan dengan beberapa kemungkinan nama field sekaligus:
+
+| Kolom | Urutan field yang dicoba |
+| --- | --- |
+| Status | `status_ticket` → `status_name` → `status` |
+| Email | `email` → `customer.email` → `customer_email` |
+| WA | `wa` → `phone_no` → `mobile_phone` → `customer.wa` → `customer.phone_no` → `customer.mobile_phone` |
+| Selesai | `end_date` → `finish_date` → `closed_date` |
+| Project | `id_project` → `project.id` → `customer.id_project` |
+
+Jadi command tetap jalan untuk kedua bentuk respons. Kalau ada field yang
+masih `-`, jalankan `--keys` untuk melihat nama aslinya (termasuk yang
+bersarang seperti `customer.email`).
+
 ### Kalau kredensial berbentuk username
 
 Sudah diuji di staging: API TransCXP **tidak menerima username**.
@@ -190,7 +214,8 @@ php artisan cxp:inspect --per-page=5 --keys
 ```
 
 Mode ini hanya mencetak nama field dan tipenya (`string`, `int`, `null`,
-`list`, `objek`), baik untuk envelope maupun tiap baris tiket.
+`list`, `objek`), baik untuk envelope maupun tiap baris tiket. Field bersarang
+ikut ditampilkan dengan titik, mis. `customer.email (string)`.
 
 ---
 
