@@ -93,4 +93,22 @@ return [
         'ticket_path' => env('CXP_API_TICKET_PATH', '/api/v2/tickets'),
         'detail_path' => env('CXP_API_DETAIL_PATH', '/api/v2/tickets'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSAT otomatis dari tiket TransCXP (Fase 5)
+    |--------------------------------------------------------------------------
+    |
+    | Command cxp:csat-send membaca tiket status Close, lalu mengantrekan email
+    | CSAT untuk tiket yang update_date-nya >= since. enabled hanya mengatur
+    | jadwal otomatis; command tetap bisa dijalankan manual.
+    |
+    */
+
+    'csat' => [
+        'enabled' => filter_var(env('CXP_CSAT_AUTOSEND', false), FILTER_VALIDATE_BOOL),
+        'workspace' => env('CXP_CSAT_WORKSPACE'),
+        'since' => env('CXP_CSAT_SINCE'),
+        'max_pages' => max(0, (int) env('CXP_CSAT_MAX_PAGES', 0)),
+    ],
 ];
