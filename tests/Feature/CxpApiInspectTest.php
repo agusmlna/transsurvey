@@ -575,6 +575,44 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringContainsString('Sesuai', $output);
     }
 
+    public function test_inspect_probe_paths_reports_status_without_project_values(): void
+    {
+        Http::fake(function (Request $request) {
+            if (str_contains($request->url(), '/api/v1/login-user')) {
+                return Http::response([
+                    'statusCode' => 200,
+                    'userInfo' => [
+                        'name' => 'User Access 1',
+                        'email' => 'api-user@example.test',
+                        'token' => self::TOKEN,
+                        'expired_date' => '2026-12-31 23:59:59',
+                    ],
+                ], 200);
+            }
+
+            if (str_contains($request->url(), '/api/v2/projects')) {
+                return Http::response([
+                    'statusCode' => 200,
+                    'message' => 'ok',
+                    'data' => [['id' => 6, 'name' => 'DIPOOPL']],
+                ], 200);
+            }
+
+            return Http::response(['message' => 'Not Found'], 404);
+        });
+
+        [$exitCode, $output] = $this->runInspect(['--paths' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Probe endpoint project', $output);
+        $this->assertStringContainsString('/api/v2/projects', $output);
+        $this->assertStringContainsString('200', $output);
+        $this->assertStringContainsString('404', $output);
+        $this->assertStringContainsString('statusCode', $output);
+        $this->assertStringNotContainsString('DIPOOPL', $output);
+        $this->assertStringNotContainsString(self::TOKEN, $output);
+    }
+
     public function test_inspect_maps_v2_nested_customer_fields(): void
     {
         Http::fake([

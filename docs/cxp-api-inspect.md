@@ -248,6 +248,18 @@ di dalam rentang yang diminta — ini cara memastikan filter tanggal berlaku pad
 field apa. Kalau `Total` tidak berubah antar baris, parameter itu diabaikan
 server.
 
+Respons `/api/v2/tickets` tidak memuat project, padahal PDF kontrak menyebut
+`id_project`/`project_name`. Untuk mencari endpoint project yang mungkin
+tersedia:
+
+```bash
+php artisan cxp:inspect --paths
+```
+
+Mode ini mencoba beberapa path (`/api/v2/projects`, `/api/v1/project`,
+`/api/v1/dataProjectcxp`, dst.) dan hanya menampilkan status HTTP, content-type,
+serta nama field — bukan isi datanya. Status `200` berarti endpoint ada.
+
 ---
 
 ## 6. Yang perlu dicatat untuk mode otomatis

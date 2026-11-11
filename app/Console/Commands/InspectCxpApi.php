@@ -47,6 +47,7 @@ class InspectCxpApi extends Command
         {--json : Tampilkan JSON ringkas yang sudah disanitasi}
         {--keys : Tampilkan nama field respons tanpa nilainya}
         {--probe : Coba kombinasi filter dan tampilkan jumlah hasilnya}
+        {--paths : Coba beberapa endpoint project dan tampilkan statusnya}
         {--show-pii : Tampilkan email/nomor apa adanya}';
 
     protected $description = 'Uji read-only API TransCXP: login, daftar tiket, dan detail tiket.';
@@ -119,6 +120,14 @@ class InspectCxpApi extends Command
                 $this->line('Expired  : '.$this->scalar($login['expired_date']));
             }
             $this->newLine();
+
+            if ((bool) $this->option('paths')) {
+                $this->probePaths($client, $login['token']);
+                $this->newLine();
+                $this->comment('Read-only: tidak ada data yang disimpan dan tidak ada pesan yang dikirim.');
+
+                return self::SUCCESS;
+            }
 
             if ((bool) $this->option('probe')) {
                 $this->probe($client, $login['token'], $perPage);
@@ -264,6 +273,49 @@ class InspectCxpApi extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Coba beberapa endpoint yang mungkin memuat daftar project. Respons tiket
+     * v2 tidak memuat project, jadi endpoint terpisah perlu dicek. Hanya status
+     * HTTP dan nama field yang ditampilkan, bukan isinya.
+     */
+    private function probePaths(CxpApiClient $client, string $token): void
+    {
+        $candidates = [
+            '/api/v2/projects',
+            '/api/v2/project',
+            '/api/v1/projects',
+            '/api/v1/project',
+            '/api/v1/dataProjectcxp',
+            '/api/v2/ticket-projects',
+            '/api/v2/tickets/000001',
+        ];
+
+        $this->line('<options=bold>Probe endpoint project</>');
+
+        $table = [];
+
+        foreach ($candidates as $path) {
+            try {
+                $result = $client->probeGet($token, $path, ['page' => 1, 'per_page' => 5]);
+                $keys = implode(', ', array_slice($result['keys'], 0, 6));
+
+                $table[] = [
+                    $path,
+                    (string) $result['status'],
+                    Str::limit($result['content_type'], 24) ?: '-',
+                    $keys !== '' ? $keys : '-',
+                    Str::limit($result['message'], 32) ?: '-',
+                ];
+            } catch (CxpApiException $e) {
+                $table[] = [$path, 'error', '-', '-', Str::limit($e->getMessage(), 32)];
+            }
+        }
+
+        $this->table(['Path', 'Status', 'Content-Type', 'Field', 'Pesan'], $table);
+        $this->line('Status 200 + field project berarti endpoint itu bisa dipakai untuk mapping.');
+        $this->line('Status 404 berarti path tidak ada.');
     }
 
     /**
