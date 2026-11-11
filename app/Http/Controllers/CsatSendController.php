@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Client, Invitation, Survey, Workspace};
+use App\Models\{Invitation, Survey, Workspace};
+use App\Services\Csat\CsatInvitationService;
 use App\Services\Csat\CsatSettings;
 use App\Services\Csat\WhatsAppNumber;
 use App\Services\Cxp\CxpLaunchContext;
 use App\Services\CurrentWorkspace;
-use App\Services\DeliveryService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -55,7 +54,7 @@ class CsatSendController
         ]);
     }
 
-    public function store(Request $request, DeliveryService $delivery)
+    public function store(Request $request, CsatInvitationService $invitations)
     {
         $workspace = $this->workspace();
         $context = CxpLaunchContext::get($request->session());
@@ -102,90 +101,28 @@ class CsatSendController
             ]);
         }
 
-        $client = $this->client($workspace, $customerName, $customerEmail, $customerWa);
-
-        // Satu tiket hanya boleh menerima satu tautan CSAT, walaupun operation
-        // memilih template yang berbeda pada klik berikutnya.
-        $invitation = Invitation::withoutGlobalScopes()
-            ->where('workspace_id', $workspace->id)
-            ->where('ticket_id', $ticketId)
-            ->whereHas('survey', fn ($query) => $query->withoutGlobalScopes()->where('type', 'csat'))
-            ->first();
-
-        if ($invitation === null) {
-            $token = Str::random(64);
-            $invitation = Invitation::create([
-                'survey_id' => $template->id,
-                'client_id' => $client->id,
+        $result = $invitations->send(
+            $workspace,
+            [
                 'ticket_id' => $ticketId,
                 'ticket_status' => (string) data_get($context, 'ticket.status', ''),
                 'channel' => (string) data_get($context, 'ticket.channel', ''),
-                'token' => $token,
-                'token_hash' => hash('sha256', $token),
-                'recipient_name' => $customerName,
-                'recipient_email' => $customerEmail,
-                'is_demo' => false,
-            ]);
-        } else {
-            // Tautan yang sudah dikirim atau sudah diisi tidak boleh berubah
-            // hanya karena operation memilih template lain.
-            if ($invitation->completed_at) {
-                throw ValidationException::withMessages([
-                    'template_id' => __('Customer sudah mengisi CSAT untuk tiket ini.'),
-                ]);
-            }
+            ],
+            [
+                'name' => $customerName,
+                'email' => $customerEmail,
+                'wa' => $customerWa,
+            ],
+            $template,
+        );
 
-            if ($invitation->sent_at) {
-                return back()->with('success', __('CSAT untuk tiket ini sudah dikirim. Tidak ada email baru yang dibuat.'));
-            }
-
-            $invitation->fill([
-                'survey_id' => $template->id,
-                'ticket_status' => (string) data_get($context, 'ticket.status', ''),
-                'channel' => (string) data_get($context, 'ticket.channel', ''),
-                'recipient_name' => $customerName,
-                'recipient_email' => $customerEmail,
-            ]);
-            if ($invitation->isDirty()) {
-                $invitation->save();
-            }
-        }
-
-        $delivery->enqueue($invitation, 'invitation');
-
-        return back()->with('success', __('Email CSAT masuk antrean. Pantau status pengiriman di riwayat bawah.'));
-    }
-
-    private function client(Workspace $workspace, string $customerName, string $customerEmail, string $customerWa = ''): Client
-    {
-        $client = Client::withoutGlobalScopes()
-            ->where('workspace_id', $workspace->id)
-            ->where('email', $customerEmail)
-            ->first();
-
-        if ($client !== null) {
-            // Nomor dari TransCXP dianggap sumber terbaru. Jangan menghapus
-            // nomor lama kalau payload berikutnya tidak membawa nomor.
-            if ($customerWa !== '' && $client->wa !== $customerWa) {
-                $client->wa = $customerWa;
-                $client->save();
-            }
-
-            return $client;
-        }
-
-        $client = new Client([
-            'name' => $customerName,
-            'contact' => $customerName,
-            'email' => $customerEmail,
-            'wa' => $customerWa !== '' ? $customerWa : null,
-            'project' => $workspace->name,
-            'active' => true,
-        ]);
-        $client->workspace_id = $workspace->id;
-        $client->save();
-
-        return $client;
+        return match ($result['outcome']) {
+            CsatInvitationService::OUTCOME_COMPLETED => throw ValidationException::withMessages([
+                'template_id' => __('Customer sudah mengisi CSAT untuk tiket ini.'),
+            ]),
+            CsatInvitationService::OUTCOME_ALREADY_SENT => back()->with('success', __('CSAT untuk tiket ini sudah dikirim. Tidak ada email baru yang dibuat.')),
+            default => back()->with('success', __('Email CSAT masuk antrean. Pantau status pengiriman di riwayat bawah.')),
+        };
     }
 
     private function workspace(): Workspace
