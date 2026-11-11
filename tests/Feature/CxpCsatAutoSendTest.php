@@ -24,6 +24,8 @@ class CxpCsatAutoSendTest extends TestCase
 
     private Survey $template;
 
+    private User $admin;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -55,6 +57,7 @@ class CxpCsatAutoSendTest extends TestCase
             'password' => 'OnlyTesting123!',
             'role' => 'superadmin',
         ]);
+        $this->admin = $admin;
 
         $this->template = new Survey([
             'title' => 'Survei Kepuasan Layanan',
@@ -172,6 +175,35 @@ class CxpCsatAutoSendTest extends TestCase
             'recipient_email' => 'sari@example.test',
             'is_demo' => false,
         ], $attributes));
+    }
+
+    /**
+     * Workspace kedua lengkap dengan template CSAT default aktif.
+     *
+     * @return array{0: Workspace, 1: Survey}
+     */
+    private function workspaceWithTemplate(string $code, string $name): array
+    {
+        $workspace = Workspace::create(['name' => $name, 'code' => $code]);
+
+        $template = new Survey([
+            'title' => 'CSAT '.$name,
+            'description' => 'Template CSAT '.$name,
+            'type' => 'csat',
+            'status' => 'active',
+            'starts_at' => today(),
+            'ends_at' => null,
+            'is_template' => true,
+            'version' => 1,
+            'created_by' => $this->admin->id,
+        ]);
+        $template->workspace_id = $workspace->id;
+        $template->save();
+
+        $workspace->default_csat_survey_id = $template->id;
+        $workspace->save();
+
+        return [$workspace, $template];
     }
 
     public function test_dry_run_reports_eligible_tickets_without_writing_anything(): void
@@ -370,5 +402,92 @@ class CxpCsatAutoSendTest extends TestCase
         $this->assertNotSame(0, $exitCode);
         $this->assertStringContainsString('tidak ditemukan', $output);
         Http::assertNothingSent();
+    }
+
+    public function test_ticket_with_known_project_uses_that_workspace_and_template(): void
+    {
+        [$brandB, $templateB] = $this->workspaceWithTemplate('brand-b', 'Brand B');
+
+        $this->fakeTickets([[
+            array_replace($this->ticket('000001'), ['id_project' => 'brand-b']),
+        ]]);
+
+        [$exitCode, $output] = $this->runCommand(['--send' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Email diantrekan', $output);
+
+        $invitation = Invitation::withoutGlobalScopes()->where('ticket_id', '000001')->sole();
+        $this->assertSame($brandB->id, $invitation->workspace_id);
+        $this->assertSame($templateB->id, $invitation->survey_id);
+
+        $client = Client::withoutGlobalScopes()->where('email', 'sari@example.test')->sole();
+        $this->assertSame($brandB->id, $client->workspace_id);
+    }
+
+    public function test_ticket_with_unknown_or_legacy_project_is_skipped(): void
+    {
+        Workspace::create(['name' => 'Legacy', 'code' => 'legacy-x', 'is_legacy' => true]);
+
+        $this->fakeTickets([[
+            array_replace($this->ticket('000001'), ['id_project' => 'brand-tidak-ada']),
+            array_replace($this->ticket('000002'), ['id_project' => 'legacy-x']),
+        ]]);
+
+        [$exitCode, $output] = $this->runCommand(['--send' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Project tanpa workspace', $output);
+        $this->assertSame(0, Invitation::withoutGlobalScopes()->count());
+        $this->assertSame(0, Client::withoutGlobalScopes()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_ticket_without_project_uses_default_workspace_and_v1_fields(): void
+    {
+        // Bentuk kontrak v1: data customer dan status ada di root, tanpa objek customer.
+        $this->fakeTickets([[
+            [
+                'id_ticket' => '000010',
+                'status_ticket' => 'Close',
+                'name_customer' => 'Sari',
+                'email' => 'sari@example.test',
+                'wa' => '0812-3456-7890',
+                'update_date' => '2026-11-11 10:00:00',
+            ],
+        ]]);
+
+        [$exitCode] = $this->runCommand(['--send' => true]);
+
+        $this->assertSame(0, $exitCode);
+
+        $invitation = Invitation::withoutGlobalScopes()->where('ticket_id', '000010')->sole();
+        $this->assertSame($this->workspace->id, $invitation->workspace_id);
+        $this->assertSame('sari@example.test', $invitation->recipient_email);
+        $this->assertSame('Close', $invitation->ticket_status);
+
+        $client = Client::withoutGlobalScopes()->sole();
+        $this->assertSame('6281234567890', $client->wa);
+    }
+
+    public function test_same_ticket_id_in_another_project_is_not_a_duplicate(): void
+    {
+        $this->existingInvitation('000001', ['sent_at' => now()]);
+        [$brandB] = $this->workspaceWithTemplate('brand-b', 'Brand B');
+
+        $this->fakeTickets([[
+            $this->ticket('000001'),
+            array_replace($this->ticket('000001'), ['id_project' => 'brand-b']),
+        ]]);
+
+        [$exitCode, $output] = $this->runCommand(['--send' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Sudah pernah dibuatkan CSAT', $output);
+        $this->assertSame(2, Invitation::withoutGlobalScopes()->where('ticket_id', '000001')->count());
+        $this->assertSame(1, Invitation::withoutGlobalScopes()
+            ->where('workspace_id', $brandB->id)
+            ->where('ticket_id', '000001')
+            ->count());
     }
 }
