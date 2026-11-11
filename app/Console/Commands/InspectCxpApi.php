@@ -274,6 +274,8 @@ class InspectCxpApi extends Command
     {
         $today = now()->toDateString();
         $weekAgo = now()->subDays(7)->toDateString();
+        $pastStart = now()->subMonthNoOverflow()->startOfMonth()->toDateString();
+        $pastEnd = now()->subMonthNoOverflow()->startOfMonth()->addDays(4)->toDateString();
 
         $candidates = [
             'tanpa filter' => [],
@@ -284,13 +286,22 @@ class InspectCxpApi extends Command
             '7 hari tanpa status' => ['start_date' => $weekAgo, 'end_date' => $today],
             'start_date saja' => ['start_date' => $weekAgo],
             'end_date saja' => ['end_date' => $today],
+            'bulan lalu tgl 1-5' => ['start_date' => $pastStart, 'end_date' => $pastEnd],
+            'update_date=hari ini' => ['update_date' => $today],
+            'updated_at=hari ini' => ['updated_at' => $today],
+            'last_update=hari ini' => ['last_update' => $today],
+            'close_date=hari ini' => ['close_date' => $today],
+            'closed_at=hari ini' => ['closed_at' => $today],
+            'finish_date=hari ini' => ['finish_date' => $today],
+            'order_by=update_date' => ['order_by' => 'update_date', 'order' => 'desc'],
+            'sort_by=update_date' => ['sort_by' => 'update_date', 'direction' => 'desc'],
             'status=Close halaman 2' => ['status' => 'Close', 'page' => 2],
             'id_ticket=000001' => ['id_ticket' => '000001'],
             'status_name=Close (kontrol)' => ['status_name' => 'Close'],
         ];
 
         $this->line('<options=bold>Probe filter ('.$client->ticketPath().')</>');
-        $this->line('Rentang uji: '.$weekAgo.' s.d. '.$today);
+        $this->line('Rentang uji: '.$weekAgo.' s.d. '.$today.' | bulan lalu: '.$pastStart.' s.d. '.$pastEnd);
 
         $table = [];
 
@@ -308,15 +319,44 @@ class InspectCxpApi extends Command
                     (string) count($items),
                     $this->dateSpan($items, 'start_date'),
                     $this->dateSpan($items, 'update_date'),
+                    $this->withinRange($items, $query),
                 ];
             } catch (CxpApiException $e) {
-                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40), '-', '-'];
+                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40), '-', '-', '-'];
             }
         }
 
-        $this->table(['Filter', 'Total', 'Baris', 'Mulai', 'Update'], $table);
+        $this->table(['Filter', 'Total', 'Baris', 'Mulai', 'Update', 'Sesuai'], $table);
         $this->line('Kalau Total tidak berubah, parameter itu diabaikan server.');
-        $this->line('Kolom Mulai/Update = rentang tanggal baris yang dikembalikan, bukan data pribadi.');
+        $this->line('Kolom Mulai/Update = rentang tanggal baris, bukan data pribadi.');
+        $this->line('Sesuai = semua start_date baris ada di dalam rentang yang diminta.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function withinRange(array $rows, array $query): string
+    {
+        if (! isset($query['start_date']) || $rows === []) {
+            return '-';
+        }
+
+        $from = (string) $query['start_date'];
+        $to = (string) ($query['end_date'] ?? $from);
+
+        foreach ($rows as $row) {
+            $start = substr(trim((string) data_get($row, 'start_date', '')), 0, 10);
+
+            if ($start === '') {
+                continue;
+            }
+
+            if ($start < $from || $start > $to) {
+                return 'tidak';
+            }
+        }
+
+        return 'ya';
     }
 
     /**
