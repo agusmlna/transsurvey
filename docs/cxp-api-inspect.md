@@ -182,6 +182,16 @@ php artisan cxp:inspect --per-page=10 --json > /tmp/cxp-tickets.json
 JSON sudah disanitasi (email/nomor disamarkan) dan menambahkan
 `wa_normalized`. Jangan simpan hasil `--show-pii` di repo.
 
+Kalau bentuk JSON berbeda dari PDF (kolom tabel penuh tanda `-`), lihat nama
+field-nya dulu tanpa membocorkan nilai:
+
+```bash
+php artisan cxp:inspect --per-page=5 --keys
+```
+
+Mode ini hanya mencetak nama field dan tipenya (`string`, `int`, `null`,
+`list`, `objek`), baik untuk envelope maupun tiap baris tiket.
+
 ---
 
 ## 6. Yang perlu dicatat untuk mode otomatis

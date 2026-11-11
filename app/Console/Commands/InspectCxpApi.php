@@ -25,6 +25,7 @@ class InspectCxpApi extends Command
         {--auth=config : Skema auth: config, bearer, token, x-api-key, x-token}
         {--login-field=config : Field login: config, email, username}
         {--json : Tampilkan JSON ringkas yang sudah disanitasi}
+        {--keys : Tampilkan nama field respons tanpa nilainya}
         {--show-pii : Tampilkan email/nomor apa adanya}';
 
     protected $description = 'Uji read-only API TransCXP: login, daftar tiket, dan detail tiket.';
@@ -95,6 +96,14 @@ class InspectCxpApi extends Command
             );
 
             $rows = $this->ticketRows($response);
+
+            if ((bool) $this->option('keys')) {
+                $this->renderKeys($response, $rows);
+                $this->newLine();
+                $this->comment('Read-only: tidak ada data yang disimpan dan tidak ada pesan yang dikirim.');
+
+                return self::SUCCESS;
+            }
 
             if ($ticketId !== '') {
                 $rows = array_values(array_filter(
@@ -210,6 +219,70 @@ class InspectCxpApi extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Cetak nama field saja, tanpa nilai, supaya aman dibagikan.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function renderKeys(array $response, array $rows): void
+    {
+        $this->line('<options=bold>Field envelope</>');
+
+        if ($response === []) {
+            $this->line('  (kosong)');
+        }
+
+        foreach ($response as $key => $value) {
+            $this->line('  - '.$key.' ('.$this->valueType($value).')');
+        }
+
+        $this->newLine();
+        $this->line('<options=bold>Field tiket</> ('.count($rows).' baris)');
+
+        if ($rows === []) {
+            $this->line('  (tidak ada baris)');
+
+            return;
+        }
+
+        $types = [];
+
+        foreach (array_slice($rows, 0, 5) as $row) {
+            foreach ($row as $key => $value) {
+                $types[$key][] = $this->valueType($value);
+            }
+        }
+
+        foreach ($types as $key => $found) {
+            $this->line('  - '.$key.' ('.implode('/', array_unique($found)).')');
+        }
+    }
+
+    private function valueType(mixed $value): string
+    {
+        if (is_null($value)) {
+            return 'null';
+        }
+
+        if (is_bool($value)) {
+            return 'bool';
+        }
+
+        if (is_int($value)) {
+            return 'int';
+        }
+
+        if (is_float($value)) {
+            return 'float';
+        }
+
+        if (is_array($value)) {
+            return array_is_list($value) ? 'list' : 'objek';
+        }
+
+        return 'string';
     }
 
     private function render(
@@ -368,6 +441,25 @@ class InspectCxpApi extends Command
     private function sanitizeRow(array $row, bool $showPii): array
     {
         $normalized = $this->normalizedWhatsapp($row);
+
+        // Bentuk JSON bisa berbeda dari PDF, jadi samarkan juga field yang
+        // namanya tidak kita kenal tetapi isinya email atau nomor telepon.
+        foreach ($row as $key => $value) {
+            if (! is_string($value) || trim($value) === '') {
+                continue;
+            }
+
+            if (str_contains($value, '@')) {
+                $row[$key] = $this->maskEmail($value, $showPii);
+
+                continue;
+            }
+
+            if (preg_match('/phone|mobile|telp|contact|whatsapp|(^|_)wa($|_)/i', (string) $key) === 1
+                && strlen(preg_replace('/\D+/', '', $value) ?? '') >= 8) {
+                $row[$key] = $this->maskPhone($value, $showPii);
+            }
+        }
 
         $row['email'] = $this->maskEmail($row['email'] ?? null, $showPii);
 

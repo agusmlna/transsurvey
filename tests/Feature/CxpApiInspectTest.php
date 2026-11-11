@@ -454,6 +454,55 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringNotContainsString(self::TOKEN, $output);
     }
 
+    public function test_inspect_keys_mode_prints_field_names_without_values(): void
+    {
+        $this->fakeApi();
+
+        [$exitCode, $output] = $this->runInspect(['--keys' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Field envelope', $output);
+        $this->assertStringContainsString('Field tiket', $output);
+        $this->assertStringContainsString('id_ticket', $output);
+        $this->assertStringContainsString('status_ticket', $output);
+        $this->assertStringNotContainsString('dewi@example.test', $output);
+        $this->assertStringNotContainsString('Testing add new field', $output);
+        $this->assertStringNotContainsString(self::TOKEN, $output);
+    }
+
+    public function test_inspect_json_masks_unknown_email_and_phone_fields(): void
+    {
+        Http::fake([
+            self::BASE_URL.'/api/v1/login-user' => Http::response([
+                'statusCode' => 200,
+                'userInfo' => [
+                    'name' => 'User Access 1',
+                    'email' => 'api-user@example.test',
+                    'token' => self::TOKEN,
+                    'expired_date' => '2026-12-31 23:59:59',
+                ],
+            ], 200),
+            self::BASE_URL.'/api/v2/tickets*' => Http::response([
+                'data' => [
+                    [
+                        'id_ticket' => '001074',
+                        'customer_email' => 'rahasia@example.test',
+                        'customer_phone' => '081234567890',
+                        'subject' => 'test',
+                    ],
+                ],
+                'meta' => ['total' => 1],
+            ], 200),
+        ]);
+
+        [$exitCode, $output] = $this->runInspect(['--json' => true]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('r***@example.test', $output);
+        $this->assertStringNotContainsString('rahasia@example.test', $output);
+        $this->assertStringNotContainsString('081234567890', $output);
+    }
+
     public function test_inspect_explains_ticket_endpoint_auth_rejection(): void
     {
         Http::fake([
