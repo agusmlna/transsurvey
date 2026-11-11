@@ -211,6 +211,14 @@ class CxpApiClient
         ]);
     }
 
+    /**
+     * Kirim query bebas ke endpoint tiket, dipakai untuk probe filter.
+     */
+    public function ticketsQuery(string $token, array $query): array
+    {
+        return $this->get($this->ticketPath, $token, $query);
+    }
+
     private function get(string $path, string $token, array $query): array
     {
         try {

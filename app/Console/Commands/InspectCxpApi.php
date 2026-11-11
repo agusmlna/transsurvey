@@ -43,6 +43,7 @@ class InspectCxpApi extends Command
         {--login-field=config : Field login: config, email, username}
         {--json : Tampilkan JSON ringkas yang sudah disanitasi}
         {--keys : Tampilkan nama field respons tanpa nilainya}
+        {--probe : Coba kombinasi filter dan tampilkan jumlah hasilnya}
         {--show-pii : Tampilkan email/nomor apa adanya}';
 
     protected $description = 'Uji read-only API TransCXP: login, daftar tiket, dan detail tiket.';
@@ -104,6 +105,14 @@ class InspectCxpApi extends Command
                 $this->line('Expired  : '.$this->scalar($login['expired_date']));
             }
             $this->newLine();
+
+            if ((bool) $this->option('probe')) {
+                $this->probe($client, $login['token'], $perPage);
+                $this->newLine();
+                $this->comment('Read-only: tidak ada data yang disimpan dan tidak ada pesan yang dikirim.');
+
+                return self::SUCCESS;
+            }
 
             $response = $client->tickets(
                 $login['token'],
@@ -236,6 +245,53 @@ class InspectCxpApi extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Coba beberapa kombinasi query dan bandingkan jumlah hasil. Hanya
+     * menampilkan angka, bukan isi tiket.
+     */
+    private function probe(CxpApiClient $client, string $token, int $perPage): void
+    {
+        $candidates = [
+            'tanpa filter' => [],
+            'status=Close' => ['status' => 'Close'],
+            'status_name=Close' => ['status_name' => 'Close'],
+            'ticket_status=Close' => ['ticket_status' => 'Close'],
+            'id_ticket=000001' => ['id_ticket' => '000001'],
+            'start_date+end_date' => ['start_date' => '2026-11-01', 'end_date' => '2026-11-10'],
+            'date_from+date_to' => ['date_from' => '2026-11-01', 'date_to' => '2026-11-10'],
+            'from+to' => ['from' => '2026-11-01', 'to' => '2026-11-10'],
+            'id_project=6' => ['id_project' => '6'],
+            'search=test' => ['search' => 'test'],
+            'per_page=100' => ['per_page' => 100],
+            'sort=latest' => ['sort' => 'latest'],
+        ];
+
+        $this->line('<options=bold>Probe filter ('.$client->ticketPath().')</>');
+
+        $table = [];
+
+        foreach ($candidates as $label => $query) {
+            $query += ['page' => 1, 'per_page' => $perPage];
+
+            try {
+                $response = $client->ticketsQuery($token, $query);
+                $meta = $this->pagination($response);
+                $count = count(array_filter((array) ($response['data'] ?? []), 'is_array'));
+
+                $table[] = [
+                    $label,
+                    $this->scalar($meta['total'] ?? '-'),
+                    (string) $count,
+                ];
+            } catch (CxpApiException $e) {
+                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40)];
+            }
+        }
+
+        $this->table(['Filter', 'Total', 'Baris'], $table);
+        $this->line('Kalau Total tidak berubah, parameter itu diabaikan server.');
     }
 
     /**

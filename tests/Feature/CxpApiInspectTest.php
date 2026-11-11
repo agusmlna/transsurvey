@@ -470,6 +470,45 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringNotContainsString(self::TOKEN, $output);
     }
 
+    public function test_inspect_probe_reports_filter_counts_without_ticket_values(): void
+    {
+        Http::fake(function (Request $request) {
+            if (str_contains($request->url(), '/api/v1/login-user')) {
+                return Http::response([
+                    'statusCode' => 200,
+                    'userInfo' => [
+                        'name' => 'User Access 1',
+                        'email' => 'api-user@example.test',
+                        'token' => self::TOKEN,
+                        'expired_date' => '2026-12-31 23:59:59',
+                    ],
+                ], 200);
+            }
+
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $total = ($query['status'] ?? null) === 'Close' ? 900 : 1042;
+
+            return Http::response([
+                'statusCode' => 200,
+                'message' => 'ok',
+                'data' => [
+                    ['id_ticket' => '001074', 'customer' => ['email' => 'budi@example.test']],
+                ],
+                'meta' => ['current_page' => 1, 'total' => $total, 'per_page' => 5],
+            ], 200);
+        });
+
+        [$exitCode, $output] = $this->runInspect(['--probe' => true, '--per-page' => 5]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertStringContainsString('Probe filter', $output);
+        $this->assertStringContainsString('status=Close', $output);
+        $this->assertStringContainsString('900', $output);
+        $this->assertStringContainsString('1042', $output);
+        $this->assertStringNotContainsString('budi@example.test', $output);
+        $this->assertStringNotContainsString(self::TOKEN, $output);
+    }
+
     public function test_inspect_maps_v2_nested_customer_fields(): void
     {
         Http::fake([
