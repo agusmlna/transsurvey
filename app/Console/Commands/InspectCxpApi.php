@@ -35,6 +35,9 @@ class InspectCxpApi extends Command
 
     protected $signature = 'cxp:inspect
         {--ticket= : ID tiket untuk diuji, mis. 000033}
+        {--status= : Filter status di server, mis. Close}
+        {--from= : Tanggal awal (Y-m-d) untuk start_date}
+        {--to= : Tanggal akhir (Y-m-d) untuk end_date}
         {--project= : Filter lokal berdasarkan id_project}
         {--page=1 : Halaman data tiket}
         {--per-page=5 : Jumlah tiket per halaman (1-50)}
@@ -54,6 +57,9 @@ class InspectCxpApi extends Command
         $perPage = (int) $this->option('per-page');
         $ticketId = trim((string) $this->option('ticket'));
         $project = trim((string) $this->option('project'));
+        $status = trim((string) $this->option('status'));
+        $from = trim((string) $this->option('from'));
+        $to = trim((string) $this->option('to'));
         $showPii = (bool) $this->option('show-pii');
         $asJson = (bool) $this->option('json');
 
@@ -61,6 +67,14 @@ class InspectCxpApi extends Command
             $this->error('Nilai --page minimal 1 dan --per-page harus 1-50.');
 
             return self::FAILURE;
+        }
+
+        foreach (['--from' => $from, '--to' => $to] as $name => $value) {
+            if ($value !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+                $this->error($name.' harus berformat Y-m-d, mis. 2026-11-01.');
+
+                return self::FAILURE;
+            }
         }
 
         try {
@@ -119,6 +133,11 @@ class InspectCxpApi extends Command
                 $page,
                 $perPage,
                 $ticketId !== '' ? $ticketId : null,
+                array_filter([
+                    'status' => $status !== '' ? $status : null,
+                    'start_date' => $from !== '' ? $from : null,
+                    'end_date' => $to !== '' ? $to : null,
+                ]),
             );
 
             $rows = $this->ticketRows($response);
@@ -253,22 +272,25 @@ class InspectCxpApi extends Command
      */
     private function probe(CxpApiClient $client, string $token, int $perPage): void
     {
+        $today = now()->toDateString();
+        $weekAgo = now()->subDays(7)->toDateString();
+
         $candidates = [
             'tanpa filter' => [],
             'status=Close' => ['status' => 'Close'],
-            'status_name=Close' => ['status_name' => 'Close'],
-            'ticket_status=Close' => ['ticket_status' => 'Close'],
+            'status=Open' => ['status' => 'Open'],
+            'status=Close + 7 hari' => ['status' => 'Close', 'start_date' => $weekAgo, 'end_date' => $today],
+            'status=Close + hari ini' => ['status' => 'Close', 'start_date' => $today, 'end_date' => $today],
+            '7 hari tanpa status' => ['start_date' => $weekAgo, 'end_date' => $today],
+            'start_date saja' => ['start_date' => $weekAgo],
+            'end_date saja' => ['end_date' => $today],
+            'status=Close halaman 2' => ['status' => 'Close', 'page' => 2],
             'id_ticket=000001' => ['id_ticket' => '000001'],
-            'start_date+end_date' => ['start_date' => '2026-11-01', 'end_date' => '2026-11-10'],
-            'date_from+date_to' => ['date_from' => '2026-11-01', 'date_to' => '2026-11-10'],
-            'from+to' => ['from' => '2026-11-01', 'to' => '2026-11-10'],
-            'id_project=6' => ['id_project' => '6'],
-            'search=test' => ['search' => 'test'],
-            'per_page=100' => ['per_page' => 100],
-            'sort=latest' => ['sort' => 'latest'],
+            'status_name=Close (kontrol)' => ['status_name' => 'Close'],
         ];
 
         $this->line('<options=bold>Probe filter ('.$client->ticketPath().')</>');
+        $this->line('Rentang uji: '.$weekAgo.' s.d. '.$today);
 
         $table = [];
 
@@ -278,20 +300,49 @@ class InspectCxpApi extends Command
             try {
                 $response = $client->ticketsQuery($token, $query);
                 $meta = $this->pagination($response);
-                $count = count(array_filter((array) ($response['data'] ?? []), 'is_array'));
+                $items = array_values(array_filter((array) ($response['data'] ?? []), 'is_array'));
 
                 $table[] = [
                     $label,
                     $this->scalar($meta['total'] ?? '-'),
-                    (string) $count,
+                    (string) count($items),
+                    $this->dateSpan($items, 'start_date'),
+                    $this->dateSpan($items, 'update_date'),
                 ];
             } catch (CxpApiException $e) {
-                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40)];
+                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40), '-', '-'];
             }
         }
 
-        $this->table(['Filter', 'Total', 'Baris'], $table);
+        $this->table(['Filter', 'Total', 'Baris', 'Mulai', 'Update'], $table);
         $this->line('Kalau Total tidak berubah, parameter itu diabaikan server.');
+        $this->line('Kolom Mulai/Update = rentang tanggal baris yang dikembalikan, bukan data pribadi.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function dateSpan(array $rows, string $key): string
+    {
+        $dates = [];
+
+        foreach ($rows as $row) {
+            $value = trim((string) data_get($row, $key, ''));
+
+            if ($value !== '') {
+                $dates[] = substr($value, 0, 10);
+            }
+        }
+
+        if ($dates === []) {
+            return '-';
+        }
+
+        sort($dates);
+        $first = $dates[0];
+        $last = $dates[count($dates) - 1];
+
+        return $first === $last ? $first : $first.'..'.$last;
     }
 
     /**

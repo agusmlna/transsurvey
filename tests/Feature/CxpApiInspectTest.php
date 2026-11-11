@@ -470,6 +470,37 @@ class CxpApiInspectTest extends TestCase
         $this->assertStringNotContainsString(self::TOKEN, $output);
     }
 
+    public function test_inspect_sends_server_side_filters(): void
+    {
+        $this->fakeApi();
+
+        [$exitCode] = $this->runInspect([
+            '--status' => 'Close',
+            '--from' => '2026-11-01',
+            '--to' => '2026-11-10',
+            '--per-page' => 5,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), '/api/v2/tickets')
+            && str_contains($request->url(), 'status=Close')
+            && str_contains($request->url(), 'start_date=2026-11-01')
+            && str_contains($request->url(), 'end_date=2026-11-10'));
+    }
+
+    public function test_inspect_rejects_invalid_date_filter(): void
+    {
+        Http::fake();
+
+        [$exitCode, $output] = $this->runInspect(['--from' => '01-11-2026']);
+
+        $this->assertNotSame(0, $exitCode);
+        $this->assertStringContainsString('--from harus berformat Y-m-d', $output);
+
+        Http::assertNothingSent();
+    }
+
     public function test_inspect_probe_reports_filter_counts_without_ticket_values(): void
     {
         Http::fake(function (Request $request) {
