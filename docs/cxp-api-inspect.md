@@ -240,10 +240,25 @@ Untuk mengetahui apakah server mendukung filter, jalankan:
 php artisan cxp:inspect --probe --per-page=20
 ```
 
-Perintah ini mengirim beberapa kombinasi query (`status`, `status_name`,
-`start_date`+`end_date`, `id_project`, `search`, `per_page`, dst.) lalu
-menampilkan **jumlah hasilnya saja**. Kalau `Total` tidak berubah antar baris,
-berarti parameter itu diabaikan server.
+Perintah ini mengirim beberapa kombinasi query (`status`, `start_date`,
+`end_date`, `update_date`, `order_by`, `search`, dst.) lalu menampilkan
+**jumlah hasilnya saja**, ditambah rentang `start_date`/`update_date` baris yang
+dikembalikan. Kolom `Sesuai` menunjukkan apakah semua `start_date` baris berada
+di dalam rentang yang diminta — ini cara memastikan filter tanggal berlaku pada
+field apa. Kalau `Total` tidak berubah antar baris, parameter itu diabaikan
+server.
+
+Respons `/api/v2/tickets` tidak memuat project, padahal PDF kontrak menyebut
+`id_project`/`project_name`. Untuk mencari endpoint project yang mungkin
+tersedia:
+
+```bash
+php artisan cxp:inspect --paths
+```
+
+Mode ini mencoba beberapa path (`/api/v2/projects`, `/api/v1/project`,
+`/api/v1/dataProjectcxp`, dst.) dan hanya menampilkan status HTTP, content-type,
+serta nama field — bukan isi datanya. Status `200` berarti endpoint ada.
 
 ---
 
@@ -260,9 +275,15 @@ Hasil inspeksi `/api/v2/tickets` (production, 10 Nov 2026):
 - Email ada di `customer.email`, nomor di `customer.wa` /
   `customer.phone_no` / `customer.mobile_phone`.
 - Dari 20 tiket terbaru: 17 tanpa email, 4 tanpa nomor WA.
-- Filter server yang terbukti bekerja: `status`, `id_ticket`, `start_date`,
-  `end_date`. Contoh: `status=Close` → 464 tiket.
+- Filter server yang terbukti bekerja: `status`, `id_ticket`, `start_date`.
+  Contoh: `status=Close` → 464 tiket.
+- `end_date` **diabaikan** saat dikirim sendiri (total tetap 1042). Filter
+  tanggal hanya menyaring tanggal **dibuat** (`start_date`), bukan tanggal
+  tutup. Tiket lama yang baru ditutup tidak akan muncul di jendela tanggal
+  terbaru.
 - `per_page` diikuti sampai 20; nilai 100 tetap mengembalikan 20 baris.
+- Urutan default menurun berdasarkan `start_date`, jadi tiket `Close` terbaru
+  berdasarkan tanggal tutup tidak selalu ada di halaman awal.
 
 Saat inspeksi, catat:
 

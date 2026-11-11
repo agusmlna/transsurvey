@@ -225,6 +225,38 @@ class CxpApiClient
         return $this->get($this->ticketPath, $token, $query);
     }
 
+    /**
+     * GET read-only ke path bebas untuk menebak endpoint yang tersedia.
+     * Tidak melempar exception saat status bukan 2xx: status dan field
+     * dikembalikan apa adanya supaya bisa ditampilkan sebagai hasil probe.
+     *
+     * @return array{status: int, content_type: string, keys: array<int, string>, message: string}
+     */
+    public function probeGet(string $token, string $path, array $query = []): array
+    {
+        $path = self::normalizePath($path, '/');
+
+        try {
+            $response = $this->request($token)->get($this->baseUrl.$path, $query);
+        } catch (ConnectionException $e) {
+            throw new CxpApiException(
+                'connection',
+                'Tidak bisa terhubung ke API TransCXP.',
+                0,
+                ['path' => $path, 'base_url' => $this->baseUrl],
+            );
+        }
+
+        $json = $response->json();
+
+        return [
+            'status' => $response->status(),
+            'content_type' => trim((string) $response->header('Content-Type')),
+            'keys' => is_array($json) ? array_keys($json) : [],
+            'message' => is_array($json) ? trim((string) data_get($json, 'message', '')) : '',
+        ];
+    }
+
     private function get(string $path, string $token, array $query): array
     {
         try {

@@ -47,6 +47,7 @@ class InspectCxpApi extends Command
         {--json : Tampilkan JSON ringkas yang sudah disanitasi}
         {--keys : Tampilkan nama field respons tanpa nilainya}
         {--probe : Coba kombinasi filter dan tampilkan jumlah hasilnya}
+        {--paths : Coba beberapa endpoint project dan tampilkan statusnya}
         {--show-pii : Tampilkan email/nomor apa adanya}';
 
     protected $description = 'Uji read-only API TransCXP: login, daftar tiket, dan detail tiket.';
@@ -119,6 +120,14 @@ class InspectCxpApi extends Command
                 $this->line('Expired  : '.$this->scalar($login['expired_date']));
             }
             $this->newLine();
+
+            if ((bool) $this->option('paths')) {
+                $this->probePaths($client, $login['token']);
+                $this->newLine();
+                $this->comment('Read-only: tidak ada data yang disimpan dan tidak ada pesan yang dikirim.');
+
+                return self::SUCCESS;
+            }
 
             if ((bool) $this->option('probe')) {
                 $this->probe($client, $login['token'], $perPage);
@@ -267,6 +276,49 @@ class InspectCxpApi extends Command
     }
 
     /**
+     * Coba beberapa endpoint yang mungkin memuat daftar project. Respons tiket
+     * v2 tidak memuat project, jadi endpoint terpisah perlu dicek. Hanya status
+     * HTTP dan nama field yang ditampilkan, bukan isinya.
+     */
+    private function probePaths(CxpApiClient $client, string $token): void
+    {
+        $candidates = [
+            '/api/v2/projects',
+            '/api/v2/project',
+            '/api/v1/projects',
+            '/api/v1/project',
+            '/api/v1/dataProjectcxp',
+            '/api/v2/ticket-projects',
+            '/api/v2/tickets/000001',
+        ];
+
+        $this->line('<options=bold>Probe endpoint project</>');
+
+        $table = [];
+
+        foreach ($candidates as $path) {
+            try {
+                $result = $client->probeGet($token, $path, ['page' => 1, 'per_page' => 5]);
+                $keys = implode(', ', array_slice($result['keys'], 0, 6));
+
+                $table[] = [
+                    $path,
+                    (string) $result['status'],
+                    Str::limit($result['content_type'], 24) ?: '-',
+                    $keys !== '' ? $keys : '-',
+                    Str::limit($result['message'], 32) ?: '-',
+                ];
+            } catch (CxpApiException $e) {
+                $table[] = [$path, 'error', '-', '-', Str::limit($e->getMessage(), 32)];
+            }
+        }
+
+        $this->table(['Path', 'Status', 'Content-Type', 'Field', 'Pesan'], $table);
+        $this->line('Status 200 + field project berarti endpoint itu bisa dipakai untuk mapping.');
+        $this->line('Status 404 berarti path tidak ada.');
+    }
+
+    /**
      * Coba beberapa kombinasi query dan bandingkan jumlah hasil. Hanya
      * menampilkan angka, bukan isi tiket.
      */
@@ -274,6 +326,8 @@ class InspectCxpApi extends Command
     {
         $today = now()->toDateString();
         $weekAgo = now()->subDays(7)->toDateString();
+        $pastStart = now()->subMonthNoOverflow()->startOfMonth()->toDateString();
+        $pastEnd = now()->subMonthNoOverflow()->startOfMonth()->addDays(4)->toDateString();
 
         $candidates = [
             'tanpa filter' => [],
@@ -284,13 +338,22 @@ class InspectCxpApi extends Command
             '7 hari tanpa status' => ['start_date' => $weekAgo, 'end_date' => $today],
             'start_date saja' => ['start_date' => $weekAgo],
             'end_date saja' => ['end_date' => $today],
+            'bulan lalu tgl 1-5' => ['start_date' => $pastStart, 'end_date' => $pastEnd],
+            'update_date=hari ini' => ['update_date' => $today],
+            'updated_at=hari ini' => ['updated_at' => $today],
+            'last_update=hari ini' => ['last_update' => $today],
+            'close_date=hari ini' => ['close_date' => $today],
+            'closed_at=hari ini' => ['closed_at' => $today],
+            'finish_date=hari ini' => ['finish_date' => $today],
+            'order_by=update_date' => ['order_by' => 'update_date', 'order' => 'desc'],
+            'sort_by=update_date' => ['sort_by' => 'update_date', 'direction' => 'desc'],
             'status=Close halaman 2' => ['status' => 'Close', 'page' => 2],
             'id_ticket=000001' => ['id_ticket' => '000001'],
             'status_name=Close (kontrol)' => ['status_name' => 'Close'],
         ];
 
         $this->line('<options=bold>Probe filter ('.$client->ticketPath().')</>');
-        $this->line('Rentang uji: '.$weekAgo.' s.d. '.$today);
+        $this->line('Rentang uji: '.$weekAgo.' s.d. '.$today.' | bulan lalu: '.$pastStart.' s.d. '.$pastEnd);
 
         $table = [];
 
@@ -308,15 +371,44 @@ class InspectCxpApi extends Command
                     (string) count($items),
                     $this->dateSpan($items, 'start_date'),
                     $this->dateSpan($items, 'update_date'),
+                    $this->withinRange($items, $query),
                 ];
             } catch (CxpApiException $e) {
-                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40), '-', '-'];
+                $table[] = [$label, 'error '.$e->status, Str::limit($e->getMessage(), 40), '-', '-', '-'];
             }
         }
 
-        $this->table(['Filter', 'Total', 'Baris', 'Mulai', 'Update'], $table);
+        $this->table(['Filter', 'Total', 'Baris', 'Mulai', 'Update', 'Sesuai'], $table);
         $this->line('Kalau Total tidak berubah, parameter itu diabaikan server.');
-        $this->line('Kolom Mulai/Update = rentang tanggal baris yang dikembalikan, bukan data pribadi.');
+        $this->line('Kolom Mulai/Update = rentang tanggal baris, bukan data pribadi.');
+        $this->line('Sesuai = semua start_date baris ada di dalam rentang yang diminta.');
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function withinRange(array $rows, array $query): string
+    {
+        if (! isset($query['start_date']) || $rows === []) {
+            return '-';
+        }
+
+        $from = (string) $query['start_date'];
+        $to = (string) ($query['end_date'] ?? $from);
+
+        foreach ($rows as $row) {
+            $start = substr(trim((string) data_get($row, 'start_date', '')), 0, 10);
+
+            if ($start === '') {
+                continue;
+            }
+
+            if ($start < $from || $start > $to) {
+                return 'tidak';
+            }
+        }
+
+        return 'ya';
     }
 
     /**
