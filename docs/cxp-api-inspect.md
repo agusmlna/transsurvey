@@ -217,26 +217,50 @@ Mode ini hanya mencetak nama field dan tipenya (`string`, `int`, `null`,
 `list`, `objek`), baik untuk envelope maupun tiap baris tiket. Field bersarang
 ikut ditampilkan dengan titik, mis. `customer.email (string)`.
 
+Untuk mengetahui apakah server mendukung filter, jalankan:
+
+```bash
+php artisan cxp:inspect --probe --per-page=20
+```
+
+Perintah ini mengirim beberapa kombinasi query (`status`, `status_name`,
+`start_date`+`end_date`, `id_project`, `search`, `per_page`, dst.) lalu
+menampilkan **jumlah hasilnya saja**. Kalau `Total` tidak berubah antar baris,
+berarti parameter itu diabaikan server.
+
 ---
 
 ## 6. Yang perlu dicatat untuk mode otomatis
+
+Hasil inspeksi `/api/v2/tickets` (production, 10 Nov 2026):
+
+- Total 1.042 tiket, 20 baris per halaman, 53 halaman.
+- Urutan default: tiket terbaru lebih dulu (`id` menurun).
+- Status yang terlihat: `Open` dan `Close` — **bukan** `Solved`.
+- `end_date` **`null` untuk semua baris**, termasuk yang berstatus `Close`.
+- **Project tidak tersedia** di respons: tidak ada `id_project` maupun
+  `project_name`, termasuk di dalam `customer`.
+- Email ada di `customer.email`, nomor di `customer.wa` /
+  `customer.phone_no` / `customer.mobile_phone`.
+- Dari 20 tiket terbaru: 17 tanpa email, 4 tanpa nomor WA.
 
 Saat inspeksi, catat:
 
 1. Apakah `wa` selalu terisi, atau perlu fallback `phone_no` / `mobile_phone`.
    Command sudah memakai urutan fallback tersebut.
-2. Format `status_ticket` yang menandakan tiket selesai (`Solved`? `Closed`?).
-3. Apakah `end_date` bisa kosong walaupun status `Solved` (terlihat di contoh
-   PDF: ya).
-4. Mapping `id_project` (angka) ke `workspaces.code` (string) di TransSurvey.
-5. Nama field sumber CSAT: `source`, `category_name*`, `section_name`,
-   `sub_section_name`, `subject`.
-6. Apakah API bisa memfilter status/tanggal. Dari PDF, endpoint hanya menerima
-   `id_ticket`, `page`, `per_page`; filter lain harus dilakukan di sisi
+2. Status mana yang menandakan tiket selesai (`Close`? `Open`?). Ini yang
+   dipakai mode otomatis, karena `end_date` tidak bisa diandalkan.
+3. Parameter yang benar-benar difilter server (`--probe`). Kalau tidak ada,
+   mode otomatis harus membaca `meta.last_page` dan menyaring di sisi
    TransSurvey.
-7. Perilaku pagination: `per_page` tidak selalu diikuti dan `next_page_url`
-   pada contoh memakai `127.0.0.1`. Gunakan `page` + `last_page`, jangan
-   `next_page_url`.
+4. Mapping project ke `workspaces.code` di TransSurvey. Respons tiket tidak
+   memuat project sama sekali, jadi mapping ini **belum bisa** dilakukan dari
+   API tiket; perlu endpoint project atau kesepakatan satu workspace default.
+5. Nama field sumber CSAT: `source`, `category_name`, `section_name`,
+   `subject`.
+6. Perilaku pagination: pakai `page` + `meta.last_page`, jangan `next_url`
+   (contoh di PDF memakai `127.0.0.1`). `per_page` di production mengikuti
+   nilai yang dikirim (diuji 20).
 
 ---
 
