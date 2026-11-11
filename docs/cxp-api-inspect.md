@@ -88,6 +88,23 @@ Filter project dilakukan di sisi lokal, bukan API:
 php artisan cxp:inspect --project=6 --per-page=10
 ```
 
+Filter yang **didukung server** (diuji di production):
+
+```bash
+php artisan cxp:inspect --status=Close --from=2026-11-01 --to=2026-11-10 --per-page=20
+```
+
+| Opsi | Query yang dikirim |
+| --- | --- |
+| `--status=Close` | `status=Close` |
+| `--from=2026-11-01` | `start_date=2026-11-01` |
+| `--to=2026-11-10` | `end_date=2026-11-10` |
+| `--ticket=000001` | `id_ticket=000001` |
+| `--page=2` | `page=2` |
+
+Parameter yang **diabaikan** server: `status_name`, `id_project`, `search`,
+`per_page` di atas 20.
+
 ---
 
 ## 4. Kalau autentikasi ditolak
@@ -243,6 +260,9 @@ Hasil inspeksi `/api/v2/tickets` (production, 10 Nov 2026):
 - Email ada di `customer.email`, nomor di `customer.wa` /
   `customer.phone_no` / `customer.mobile_phone`.
 - Dari 20 tiket terbaru: 17 tanpa email, 4 tanpa nomor WA.
+- Filter server yang terbukti bekerja: `status`, `id_ticket`, `start_date`,
+  `end_date`. Contoh: `status=Close` → 464 tiket.
+- `per_page` diikuti sampai 20; nilai 100 tetap mengembalikan 20 baris.
 
 Saat inspeksi, catat:
 

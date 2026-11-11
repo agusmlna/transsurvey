@@ -188,12 +188,18 @@ class CxpApiClient
         ];
     }
 
-    public function tickets(string $token, int $page = 1, int $perPage = 10, ?string $ticketId = null): array
+    public function tickets(string $token, int $page = 1, int $perPage = 10, ?string $ticketId = null, array $filters = []): array
     {
         $query = [
             'page' => $page,
             'per_page' => $perPage,
         ];
+
+        foreach ($filters as $key => $value) {
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                $query[$key] = $value;
+            }
+        }
 
         if ($ticketId !== null && trim($ticketId) !== '') {
             $query['id_ticket'] = trim($ticketId);
