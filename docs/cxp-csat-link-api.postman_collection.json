@@ -1,0 +1,147 @@
+{
+  "info": {
+    "_postman_id": "3c7a9e42-8d1b-4f6a-b2c5-cxp-csat-link",
+    "name": "TransCXP → TransSurvey CSAT Link",
+    "description": "Kontrak POST /api/cxp/csat-links. Isi variable api_key lewat environment Postman, jangan disimpan di koleksi ini. Endpoint ini membuat tautan CSAT untuk satu tiket TANPA mengirim email.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://10.0.24.118"
+    },
+    {
+      "key": "api_key",
+      "value": ""
+    },
+    {
+      "key": "ticket_id",
+      "value": "075750"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Ambil tautan CSAT untuk satu tiket",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user\": {\n    \"id\": \"5\",\n    \"name\": \"Agent A\",\n    \"email\": \"agent@email.com\"\n  },\n  \"project\": {\n    \"code\": \"6\",\n    \"name\": \"DIPOOPL\"\n  },\n  \"ticket\": {\n    \"id\": \"{{ticket_id}}\",\n    \"status\": \"Close\",\n    \"channel\": \"whatsapp\",\n    \"customer\": {\n      \"id\": \"10\",\n      \"name\": \"Customer A\",\n      \"email\": \"customerA@email.com\",\n      \"wa\": \"081234567890\"\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/cxp/csat-links",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "cxp",
+            "csat-links"
+          ]
+        },
+        "description": "Balasan 201 berisi url dan expires_at. URL ini yang dikirim TransCXP ke customer. Tidak ada email yang dikirim oleh TransSurvey."
+      }
+    },
+    {
+      "name": "2. Panggil ulang tiket yang sama (idempotent)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user\": {\n    \"id\": \"5\",\n    \"name\": \"Agent A\",\n    \"email\": \"agent@email.com\"\n  },\n  \"project\": {\n    \"code\": \"6\",\n    \"name\": \"DIPOOPL\"\n  },\n  \"ticket\": {\n    \"id\": \"{{ticket_id}}\",\n    \"status\": \"Close\",\n    \"channel\": \"whatsapp\",\n    \"customer\": {\n      \"id\": \"10\",\n      \"name\": \"Customer A\",\n      \"email\": \"customerA@email.com\",\n      \"wa\": \"081234567890\"\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/cxp/csat-links",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "cxp",
+            "csat-links"
+          ]
+        },
+        "description": "Harus balas 200 dengan created=false dan url yang sama. Berguna untuk retry atau klik tombol berulang."
+      }
+    },
+    {
+      "name": "3. Contoh error: project tidak terdaftar",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user\": {\n    \"id\": \"5\",\n    \"name\": \"Agent A\",\n    \"email\": \"agent@email.com\"\n  },\n  \"project\": {\n    \"code\": \"999999\",\n    \"name\": \"Tidak Ada\"\n  },\n  \"ticket\": {\n    \"id\": \"TICKET-1\",\n    \"customer\": {\n      \"email\": \"customer@email.com\"\n    }\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/cxp/csat-links",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "cxp",
+            "csat-links"
+          ]
+        },
+        "description": "Harus balas 404 dengan reason workspace_not_found. Endpoint ini tidak pernah membuat workspace baru."
+      }
+    }
+  ]
+}
