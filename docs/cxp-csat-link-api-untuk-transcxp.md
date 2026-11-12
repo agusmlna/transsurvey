@@ -7,6 +7,8 @@ bukan meminta TransSurvey mengirim email.
 | Item | Nilai |
 | --- | --- |
 | Method & endpoint | `POST /api/cxp/csat-links` |
+| Base URL staging | `http://10.0.24.118` |
+| Base URL production | `https://<transsurvey-production-host>` |
 | Autentikasi | API key yang sama dengan launch session (`Authorization: Bearer` atau `X-CXP-Key`) |
 | Content-Type | `application/json` |
 | Rate limit | 60 permintaan/menit per IP, 300/menit global |
@@ -15,6 +17,10 @@ bukan meminta TransSurvey mengirim email.
 > Kalau TransCXP ingin TransSurvey yang mengirim email CSAT, jangan pakai
 > endpoint ini. Pakai alur `POST /api/cxp/launch-sessions` + halaman Kirim CSAT,
 > atau autosend per jam yang sudah berjalan.
+
+> **Status di staging:** endpoint ini baru aktif setelah kode di-merge dan
+> server staging menjalankan `git pull` + `php artisan optimize:clear`.
+> Sebelum itu, request ke staging akan dibalas `404`.
 
 ---
 
@@ -49,6 +55,10 @@ Authorization: Bearer <API_KEY>
 Content-Type: application/json
 Accept: application/json
 ```
+
+`<API_KEY>` adalah nilai `CXP_LAUNCH_API_KEY` di server TransSurvey — **key yang
+sama** dengan yang dipakai `POST /api/cxp/launch-sessions`. Jangan membuat key
+baru. Kalau tim TransCXP belum punya, kirim lewat kanal aman (bukan chat/repo).
 
 atau:
 
@@ -118,7 +128,7 @@ Tautan baru (`201 Created`):
   "project": "6",
   "ticket_id": "075750",
   "survey_id": 2,
-  "url": "https://<transsurvey-host>/s/9f2c...",
+  "url": "http://10.0.24.118/s/9f2c...",
   "expires_at": "2026-11-19T11:26:51+07:00",
   "created": true
 }
@@ -170,7 +180,7 @@ Contoh:
 ## 6. Contoh curl
 
 ```sh
-curl -sS -X POST "https://<transsurvey-host>/api/cxp/csat-links" \
+curl -sS -X POST "http://10.0.24.118/api/cxp/csat-links" \
   -H "Authorization: Bearer $TRANSSURVEY_CXP_LAUNCH_API_KEY" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
