@@ -224,7 +224,7 @@ class InspectCxpApi extends Command
                 if ($e->status === 404) {
                     $this->line('Endpoint tidak ditemukan ('.($e->context['path'] ?? 'path tidak diketahui').').');
                     $this->line('Path bisa diubah lewat CXP_API_TICKET_PATH dan CXP_API_DETAIL_PATH.');
-                    $this->line('Catatan: /api/v1/dataTicketcxp di PDF sudah 404 di server TransCXP.');
+                    $this->line('Catatan: /api/v1/dataTicketcxp kini tersedia (200); /api/v1/detailChoose masih 404.');
                 }
 
                 if ($e->status === 405) {

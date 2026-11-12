@@ -86,12 +86,15 @@ return [
         'auth_header' => env('CXP_API_AUTH_HEADER', 'Authorization'),
         'auth_prefix' => env('CXP_API_AUTH_PREFIX', 'Bearer'),
 
-        // Path endpoint tiket. PDF menyebut /api/v1/dataTicketcxp, tetapi
-        // server production membalas 404 HTML untuk path itu. Path yang
-        // benar-benar ada di production adalah /api/v2/tickets (401 JSON
-        // "The token is required!" tanpa token).
+        // Path endpoint tiket lama. Masih dipakai cxp:inspect dan probe.
+        // /api/v1/dataTicketcxp memuat id_project/project_name/wa, sedangkan
+        // /api/v2/tickets tidak memuat field project.
         'ticket_path' => env('CXP_API_TICKET_PATH', '/api/v2/tickets'),
         'detail_path' => env('CXP_API_DETAIL_PATH', '/api/v2/tickets'),
+
+        // Endpoint filter status + project. Hanya endpoint ini yang benar-benar
+        // menyaring di server: status=Close&project=<id_project>&per_page=100.
+        'status_path' => env('CXP_API_STATUS_PATH', '/api/v1/dataTicketByStatus'),
     ],
 
     /*
@@ -99,16 +102,25 @@ return [
     | CSAT otomatis dari tiket TransCXP (Fase 5)
     |--------------------------------------------------------------------------
     |
-    | Command cxp:csat-send membaca tiket status Close, lalu mengantrekan email
-    | CSAT untuk tiket yang update_date-nya >= since. enabled hanya mengatur
-    | jadwal otomatis; command tetap bisa dijalankan manual.
+    | Command cxp:csat-send memanggil /api/v1/dataTicketByStatus per workspace
+    | (status=Close&project=<kode workspace>), lalu membandingkan hasilnya
+    | dengan snapshot cxp_ticket_seen. Hanya tiket yang BARU masuk Close yang
+    | dikirimi CSAT. enabled hanya mengatur jadwal otomatis; command tetap
+    | bisa dijalankan manual.
     |
     */
 
     'csat' => [
         'enabled' => filter_var(env('CXP_CSAT_AUTOSEND', false), FILTER_VALIDATE_BOOL),
+
+        // Opsional: batasi ke satu kode workspace. Kosong = semua workspace
+        // non-legacy yang punya template CSAT default.
         'workspace' => env('CXP_CSAT_WORKSPACE'),
-        'since' => env('CXP_CSAT_SINCE'),
+
+        // Server membatasi per_page di 100, walaupun nilai lebih besar dikirim.
+        'per_page' => min(100, max(1, (int) env('CXP_CSAT_PER_PAGE', 100))),
+
+        // 0 = baca semua halaman per project.
         'max_pages' => max(0, (int) env('CXP_CSAT_MAX_PAGES', 0)),
     ],
 ];
