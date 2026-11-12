@@ -26,6 +26,7 @@ class CxpApiClient
         private readonly string $loginField = 'email',
         private readonly string $ticketPath = '/api/v2/tickets',
         private readonly string $detailPath = '/api/v2/tickets',
+        private readonly string $statusPath = '/api/v1/dataTicketByStatus',
     ) {}
 
     public static function fromConfig(?string $authPreset = null, ?string $loginFieldOverride = null): self
@@ -51,6 +52,7 @@ class CxpApiClient
             ),
             self::normalizePath((string) ($config['ticket_path'] ?? ''), '/api/v2/tickets'),
             self::normalizePath((string) ($config['detail_path'] ?? ''), '/api/v2/tickets'),
+            self::normalizePath((string) ($config['status_path'] ?? ''), '/api/v1/dataTicketByStatus'),
         );
     }
 
@@ -134,6 +136,11 @@ class CxpApiClient
         return $this->detailPath;
     }
 
+    public function statusPath(): string
+    {
+        return $this->statusPath;
+    }
+
     public function authLabel(): string
     {
         $prefix = trim($this->authPrefix);
@@ -206,6 +213,30 @@ class CxpApiClient
         }
 
         return $this->get($this->ticketPath, $token, $query);
+    }
+
+    /**
+     * Daftar tiket dengan filter status + project.
+     *
+     * Satu-satunya endpoint yang terbukti menyaring di server:
+     * GET /api/v1/dataTicketByStatus?status=Close&project=<id_project>.
+     * Server membatasi per_page di 100.
+     *
+     * @return array<string, mixed>
+     */
+    public function ticketsByStatus(
+        string $token,
+        string $project,
+        string $status = 'Close',
+        int $page = 1,
+        int $perPage = 100,
+    ): array {
+        return $this->get($this->statusPath, $token, [
+            'status' => trim($status),
+            'project' => trim($project),
+            'page' => max(1, $page),
+            'per_page' => max(1, $perPage),
+        ]);
     }
 
     public function detail(string $token, string $ticketId, int $page = 1, int $perPage = 10): array

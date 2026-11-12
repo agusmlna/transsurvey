@@ -1,72 +1,92 @@
 # CSAT otomatis dari tiket TransCXP
 
-Fase 5: command `cxp:csat-send` membaca tiket TransCXP yang **sudah ditutup**,
-lalu mengantrekan email CSAT memakai template default workspace. Tidak ada
-pengiriman WhatsApp pada fase ini; nomor WA hanya disimpan di `clients.wa`.
+Fase 5: command `cxp:csat-send` membaca tiket TransCXP yang **baru masuk status
+Close**, lalu mengantrekan email CSAT memakai template default workspace.
+Tidak ada pengiriman WhatsApp pada fase ini; nomor WA hanya disimpan di
+`clients.wa`.
 
 ## 1. Cara kerja
 
-1. Login ke API TransCXP memakai kredensial `CXP_API_*`.
-2. Ambil daftar tiket dari endpoint yang diatur `CXP_API_TICKET_PATH`,
-   halaman per halaman sampai `last_page`:
-   - `/api/v1/dataTicketcxp` (disarankan): pagination di kunci `pagination`,
-     dan setiap baris memuat `id_project`/`project_name`;
-   - `/api/v2/tickets` (default lama): pagination di kunci `meta`, tanpa field
-     project.
-3. Untuk tiap tiket:
-   - hanya status `Close` yang diproses;
-   - `update_date` harus `>= CXP_CSAT_SINCE`;
-   - wajib ada email customer yang valid (kalau tidak, dilewati);
-   - kalau respons membawa `id_project`, tiket masuk ke workspace yang
-     kodenya sama dengan `id_project` (lihat bagian 4);
-   - tiket yang sudah punya undangan CSAT di workspace tujuan dilewati;
-   - nomor WA diambil dari `customer.wa` → `customer.phone_no` →
-     `customer.mobile_phone` (atau field root `wa`/`phone_no`/`mobile_phone`
-     pada kontrak v1), dinormalisasi ke `62...`, dan hanya disimpan kalau
-     valid.
-4. Undangan dibuat lewat `CsatInvitationService` yang sama dengan halaman
-   Kirim CSAT manual, lalu email masuk antrean `email_deliveries`.
+```text
+tiap jam (atau manual)
+  login ke API TransCXP
+  untuk tiap workspace (kode = id_project):
+      GET /api/v1/dataTicketByStatus?status=Close&project=<kode>&per_page=100
+      baca semua halaman
+      bandingkan dengan snapshot cxp_ticket_seen
+      tiket yang belum pernah terlihat → kirim CSAT
+      simpan snapshot
+  email masuk antrean → queue worker mengirim
+```
 
-Command menerima dua bentuk respons: v2 (`customer.email`,
-`status_name`, `source`, pagination `meta`) dan v1 (`email`, `status_ticket`,
-`name_customer`, `wa` di root, pagination `pagination`). Perpindahan endpoint
-cukup lewat `CXP_API_TICKET_PATH`; tidak perlu ubah kode.
+Endpoint `/api/v1/dataTicketByStatus` adalah satu-satunya endpoint TransCXP
+yang terbukti **menyaring status dan project di server**. Hasil probe production
+12 Nov 2026:
 
-Tanpa opsi `--send`, command hanya **simulasi**: tidak ada baris database yang
-ditulis dan tidak ada email yang diantrekan.
+| Query | total | Isi halaman |
+| --- | --- | --- |
+| `Close` + `project=22` | 132 | `Close` 100/100 |
+| `Close` + `project=10` | 8 | `Close` 8/8 |
+| `Close` + `project=21` | 8.460 | `Close` 100/100 |
+| `Close` + `project=6` | 28 | `Close` 28/28 |
+| `Close` tanpa project | 53.148 | `Close` 100/100 |
+| `Open` + `project=22` | 91.377 | `Open` 100/100 |
 
-## 2. Kenapa memakai `update_date`, bukan `end_date`
+Catatan server:
 
-Hasil probe production (11 Nov 2026):
+- `per_page` dibatasi **100**, walaupun nilai lebih besar dikirim;
+- kecepatan ±0,45 detik per halaman;
+- tidak ada duplikat antar halaman;
+- project yang tidak ada menghasilkan `total=0`;
+- pagination ada di kunci `pagination.last_page`.
 
-| Parameter | Hasil |
+Endpoint lama tidak dipakai lagi untuk CSAT otomatis:
+
+- `/api/v1/dataTicketcxp` mengabaikan semua filter (±1,05 juta baris, ±10.464
+  halaman);
+- `/api/v2/tickets` tidak membawa `id_project` sehingga tidak aman untuk
+  banyak project.
+
+## 2. Snapshot dan baseline
+
+Tabel `cxp_ticket_seen` menyimpan pasangan `project_code + ticket_id` yang
+pernah terlihat berstatus Close.
+
+| Kondisi | Perilaku |
 | --- | --- |
-| `status=Close` | didukung (464 tiket) |
-| `start_date` | didukung, menyaring tanggal **dibuat** |
-| `end_date` | diabaikan |
-| `update_date`, `updated_at`, `last_update` | diabaikan |
-| `order_by`, `sort_by` | diabaikan |
-| `id_project`, `search` | diabaikan |
-| `per_page` > 20 | diabaikan (tetap 20) |
+| Project belum punya snapshot | Run pertama hanya **baseline**: simpan semua tiket Close, tidak mengirim |
+| Project sudah punya snapshot | Kirim hanya tiket yang belum ada di snapshot |
+| Tiket sudah punya undangan CSAT | Dilewati (unique `workspace + ticket_id`) |
+| Tiket tidak punya email / email tidak valid | Dilewati, tetap dicatat di snapshot |
+| Scan satu project gagal di tengah | Snapshot project itu tidak ditulis; tiket yang terlewat dianggap baru pada run berikutnya |
+| Project gagal | Project lain tetap diproses |
 
-`end_date` selalu `null`, termasuk untuk tiket `Close`, dan tidak ada filter
-tanggal tutup di server. Karena itu:
+Baseline mencegah ratusan tiket lama terkirim saat pertama kali dijalankan.
+Tiket yang saat baseline masih `Open` dan nanti berubah menjadi `Close` **akan**
+terkirim, karena belum ada di snapshot.
 
-- Command membaca **seluruh** halaman `status=Close` (sekitar 24 halaman untuk
-  464 tiket). Ini sekitar 24 request per jam, masih ringan.
-- Waktu tutup didekati dengan `update_date`, lalu dibandingkan dengan
-  `CXP_CSAT_SINCE`. Tiket lama yang baru ditutup tetap ikut terkirim, sedangkan
-  tiket lama yang sudah ditutup sebelum go-live dilewati.
+Tanpa `--send`, command hanya simulasi: tidak menulis snapshot, tidak membuat
+undangan, dan tidak mengantrekan email. Karena itu simulasi pada project baru
+selalu menampilkan baseline.
 
-Kalau nanti TransCXP menambahkan filter `update_date` atau sort by update,
-command bisa dipersempit tanpa mengubah aturan bisnis.
+## 3. Mapping project ke workspace
 
-Catatan status endpoint (11 Nov 2026): `/api/v1/dataTicketcxp` sudah membalas
-**200** dengan envelope `status/code/data/pagination` dan memuat `id_project`,
-`project_name`, serta `wa`. `/api/v1/detailChoose` masih **404**, tetapi tidak
-dipakai oleh command. `/api/v2/tickets` tetap jalan namun tanpa field project.
+Project TransCXP dikirim sebagai parameter `project`, diambil dari **kode
+workspace**. Kode workspace **wajib sama** dengan `id_project` TransCXP
+(mis. `6`, `10`, `21`, `22`).
 
-## 3. Konfigurasi
+| Situasi | Perilaku |
+| --- | --- |
+| Kode workspace = `id_project` | Tiket diproses untuk workspace itu |
+| Project tidak punya workspace | Tidak pernah dipanggil, jadi tidak ada salah kirim |
+| Workspace `legacy` | Dilewati |
+| Workspace tanpa template CSAT default aktif | Dilewati dan dihitung di ringkasan |
+
+Tidak ada fallback ke workspace default. Kalau kode workspace masih berupa nama
+(mis. `DIPOOPL`), endpoint akan mengembalikan `total=0`; perbaiki kodenya atau
+batasi run dengan `CXP_CSAT_WORKSPACE`.
+
+## 4. Konfigurasi
 
 Isi di `.env` server (jangan di repo):
 
@@ -74,30 +94,25 @@ Isi di `.env` server (jangan di repo):
 # Jadwal otomatis tiap jam. false = hanya bisa dijalankan manual.
 CXP_CSAT_AUTOSEND=false
 
-# Kode workspace penerima CSAT (bukan nama).
+# Opsional. Kosong = semua workspace non-legacy yang punya template default.
+# Isi kode workspace untuk membatasi satu project saat uji.
 CXP_CSAT_WORKSPACE=
 
-# Tiket dengan update_date sebelum tanggal ini dilewati.
-# Isi dengan tanggal go-live, mis. 2026-11-11.
-CXP_CSAT_SINCE=2026-11-11
+# Server membatasi per_page di 100.
+CXP_CSAT_PER_PAGE=100
 
-# 0 = baca semua halaman status Close.
+# 0 = baca semua halaman per project.
 CXP_CSAT_MAX_PAGES=0
 
-# Endpoint daftar tiket. Pakai v1 kalau production melayani banyak project,
-# karena hanya v1 yang mengirim id_project/project_name.
-CXP_API_TICKET_PATH=/api/v1/dataTicketcxp
+# Endpoint filter status + project.
+CXP_API_STATUS_PATH=/api/v1/dataTicketByStatus
 ```
 
-`CXP_API_DETAIL_PATH` tidak perlu diubah; detail tiket belum dipakai command.
+`CXP_API_TICKET_PATH` dan `CXP_API_DETAIL_PATH` tidak dipakai command CSAT;
+keduanya dipertahankan untuk `cxp:inspect` dan probe.
 
 Workspace wajib punya **template CSAT aktif** yang dijadikan default
-(menu CSAT → Template). Workspace `legacy` ditolak.
-
-`CXP_CSAT_WORKSPACE` adalah workspace **default**: dipakai kalau tiket tidak
-membawa `id_project`, atau kalau `id_project` sama dengan kode workspace ini.
-Kalau tiket membawa `id_project` lain, command mencari workspace dengan kode
-yang sama (bagian 4).
+(menu CSAT → Template).
 
 Setelah mengubah `.env`:
 
@@ -107,41 +122,6 @@ php artisan optimize:clear
 
 Jangan lupa permission `.env` staging tetap `640 itsol:www-data`.
 
-## 4. Mapping project ke workspace
-
-User Guide API TransCXP v1.0 (10 halaman) mencantumkan field `id_project` dan
-`project_name` pada `GET /api/v1/dataTicketcxp`. Endpoint itu sudah aktif
-(200), sehingga mapping project berjalan otomatis kalau
-`CXP_API_TICKET_PATH=/api/v1/dataTicketcxp`. `/api/v2/tickets` tidak memuat
-field project, jadi hanya aman untuk satu project.
-
-| Respons tiket | Perilaku |
-| --- | --- |
-| ada `id_project` | Cari workspace dengan `lower(code) = lower(id_project)` |
-| `id_project` tidak cocok | Coba `project_name` ke nama workspace, hanya kalau hasilnya unik |
-| tidak ada `id_project` | Pakai workspace `CXP_CSAT_WORKSPACE` |
-
-Aturan penting:
-
-- `id_project` di User Guide berupa angka (contoh `"6"`), sedangkan
-  `project_name` berupa nama (contoh `"DIPOOPL"`). Karena SSO memakai
-  `project.code` sebagai kode workspace, cara paling akurat adalah membuat
-  kode workspace sama dengan `project.code`/`id_project` (mis. `6`). Kalau
-  tidak, command mencoba mencocokkan `project_name` dengan **nama** workspace
-  secara unik.
-- Project yang tidak punya workspace, atau workspace-nya `legacy`, **dilewati**
-  dan dihitung di baris `Project tanpa workspace`. Tidak ada fallback diam-diam
-  ke workspace default supaya data customer tidak mendarat di tempat salah.
-- Workspace tujuan wajib punya template CSAT default aktif. Kalau tidak,
-  tiket dihitung di baris `Workspace tanpa template aktif`.
-- Dedupe memakai pasangan `workspace + ticket_id`, karena `id_ticket` tidak
-  unik antar project.
-
-Sebelum mengaktifkan `CXP_CSAT_AUTOSEND`, pastikan kode workspace sudah cocok
-dengan `id_project` di TransCXP. Kalau `CXP_API_TICKET_PATH` masih v2, semua
-tiket masuk ke workspace default dan baris `Project tanpa workspace` akan
-selalu 0.
-
 ## 5. Menjalankan
 
 Simulasi dulu (aman, tidak menulis apa pun):
@@ -150,36 +130,41 @@ Simulasi dulu (aman, tidak menulis apa pun):
 php artisan cxp:csat-send
 ```
 
-Periksa tabel ringkasan: berapa tiket dibaca, tanpa email, sudah pernah
-dikirim, dan berapa yang **akan** diantrekan.
+Periksa ringkasan: berapa project dibaca, baseline, tiket tanpa email, sudah
+pernah dapat CSAT, dan berapa yang **akan** diantrekan.
 
-Kalau angkanya wajar, kirim sungguhan:
+Kirim sungguhan:
 
 ```bash
 php artisan cxp:csat-send --send
 ```
 
-Uji satu tiket:
+Uji satu tiket pada satu project:
 
 ```bash
-php artisan cxp:csat-send --send --ticket=001060
+php artisan cxp:csat-send --send --workspace=6 --ticket=001027
 ```
 
-Batasi jumlah email per run:
+`--ticket` melewati snapshot supaya tiket itu tetap diproses walaupun sudah
+tercatat. Opsi ini wajib disertai `--workspace` (atau `CXP_CSAT_WORKSPACE`)
+agar tidak memindai semua project. Run pertama dengan `--ticket` tetap
+menyimpan baseline **penuh** project tersebut, agar sisa tiket tidak dianggap
+baru pada run berikutnya.
+
+Membatasi volume:
 
 ```bash
 php artisan cxp:csat-send --send --limit=5
+php artisan cxp:csat-send --send --max-pages=1
 ```
-
-Opsi lain:
 
 | Opsi | Arti |
 | --- | --- |
-| `--since=2026-11-11` | Mengganti `CXP_CSAT_SINCE` untuk run ini |
-| `--workspace=brand-a` | Mengganti `CXP_CSAT_WORKSPACE` |
-| `--page=1` | Halaman awal |
-| `--max-pages=0` | Batas halaman yang dibaca |
-| `--limit=0` | Batas email yang diantrekan |
+| `--send` | Antre email sungguhan; tanpa ini hanya simulasi |
+| `--workspace=<kode>` | Batasi ke satu workspace/project |
+| `--ticket=<id>` | Proses satu tiket; melewati snapshot |
+| `--max-pages=0` | Batas halaman per project (0 = semua) |
+| `--limit=0` | Batas email yang diantrekan (0 = semua) |
 
 ## 6. Jadwal otomatis
 
@@ -196,40 +181,46 @@ Aktifkan setelah uji manual sukses:
 CXP_CSAT_AUTOSEND=true
 ```
 
-Lalu pastikan scheduler server berjalan (cron `php artisan schedule:run` tiap
-menit). `withoutOverlapping` mencegah dua proses berjalan bersamaan.
+Pastikan scheduler server berjalan (cron `php artisan schedule:run` tiap menit)
+dan queue worker aktif. `withoutOverlapping` mencegah dua proses berjalan
+bersamaan.
 
-## 7. Idempotensi dan kegagalan
+## 7. Beban ke TransCXP
+
+Beban = jumlah halaman per project. Contoh untuk project yang punya workspace:
+
+| Project | Tiket Close | Halaman |
+| --- | --- | --- |
+| 22 | 132 | 2 |
+| 10 | 8 | 1 |
+| 21 | 8.460 | 85 |
+| 6 | 28 | 1 |
+| **Total** | | **89 request ≈ 40 detik** |
+
+Project tanpa workspace tidak dipanggil. Kalau `CXP_CSAT_WORKSPACE` diisi,
+hanya project itu yang dipanggil.
+
+## 8. Idempotensi dan kegagalan
 
 - Satu `ticket_id` hanya punya satu undangan CSAT per workspace. Run berikutnya
   melewati tiket itu walaupun email sebelumnya masih `pending`.
-- Kalau run berhenti di tengah, jalankan ulang: tiket yang sudah dibuatkan
-  undangan otomatis dilewati, sisanya dilanjutkan.
+- Snapshot mencegah tiket yang sama diproses ulang tiap jam.
+- Kegagalan sementara (mis. koneksi/API error) tidak dicatat ke snapshot,
+  sehingga dicoba lagi pada run berikutnya.
+- Data yang memang tidak valid (email tidak ada/tidak valid) dicatat ke
+  snapshot agar tidak dihitung ulang terus-menerus.
+- Error satu project tidak menghentikan project lain.
 - Email yang gagal dikirim tetap tercatat di `email_deliveries` dan bisa
   di-retry lewat mekanisme pengiriman yang sudah ada.
 - Ringkasan setiap run dicatat di log (`cxp.csat-send`) tanpa email/nomor
   customer.
 
-## 8. Batasan
+## 9. Batasan
 
-- Tidak ada backfill tiket lama: `CXP_CSAT_SINCE` mencegah email massal saat
-  pertama kali dijalankan.
-- Mapping project aktif kalau endpoint tiket mengirim `id_project`
-  (`CXP_API_TICKET_PATH=/api/v1/dataTicketcxp`). Dengan v2, semua tiket masuk
-  ke satu workspace default.
+- Tidak ada backfill tiket lama: run pertama per project adalah baseline.
 - Tidak ada pengiriman WhatsApp; hanya penyimpanan nomor.
-- 17 dari 20 tiket terbaru tidak punya email, jadi volume CSAT otomatis
-  cenderung kecil. Itu diharapkan.
-- `/api/v1/dataTicketcxp` sudah aktif, tetapi `/api/v1/detailChoose` masih 404.
-  Command tidak memakai detailChoose, jadi tidak menghalangi.
-- v1 **mengabaikan semua filter** (`id_ticket`, `status_ticket`, `status`,
-  `start_date`, `update_date`, `id_project`, `ticket_id`, `q`, `search`,
-  `project_id`, `status_id`): `pagination.total` tetap ~1.046.390. Hanya
-  `page` dan `per_page` yang bekerja.
-- Karena itu v1 belum layak untuk polling: 1,05 juta baris / ~10.464 halaman
-  @`per_page=100` × ~1,8 detik ≈ 5 jam per scan. Urutan baris juga tidak stabil
-  (baris bisa bergeser antar panggilan), sehingga full scan berisiko melewatkan
-  tiket.
-- `CXP_API_TICKET_PATH=/api/v1/dataTicketcxp` baru aman dipakai kalau TransCXP
-  menambahkan filter (mis. `status_ticket`/`update_date`) atau menambahkan
-  `id_project` ke v2. Sampai itu terjadi, biarkan `CXP_CSAT_AUTOSEND=false`.
+- Kode workspace harus sama dengan `id_project` TransCXP.
+- Kalau tiket berubah dari Close → Open → Close lagi, tiket itu tidak dikirim
+  ulang karena sudah ada di snapshot. Ini disengaja (satu tiket satu CSAT).
+- Schedule baru aman dinyalakan setelah staging terbukti dan kode workspace
+  production sudah diverifikasi.

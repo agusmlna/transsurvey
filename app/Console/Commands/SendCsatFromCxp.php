@@ -3,79 +3,63 @@
 namespace App\Console\Commands;
 
 use App\Exceptions\CxpApiException;
-use App\Models\{Invitation, Workspace};
+use App\Models\{CxpTicketSeen, Invitation, Survey, Workspace};
 use App\Services\Csat\CsatInvitationService;
 use App\Services\Csat\WhatsAppNumber;
 use App\Services\Cxp\CxpApiClient;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Kirim CSAT otomatis untuk tiket TransCXP yang berstatus Close.
+ * Kirim CSAT otomatis untuk tiket TransCXP yang BARU masuk status Close.
  *
- * Endpoint /api/v2/tickets hanya bisa memfilter status dan start_date, tidak
- * ada filter tanggal tutup maupun sort by update. Karena itu command membaca
- * seluruh halaman status=Close lalu menyaring secara lokal memakai update_date
- * sebagai perkiraan waktu tiket ditutup.
+ * Sumber data: GET /api/v1/dataTicketByStatus?status=Close&project=<kode>.
+ * Endpoint ini menyaring status dan project di server (dibuktikan pada probe
+ * production 12 Nov 2026), jadi command tidak lagi membaca 1 juta baris.
  *
- * Kalau respons membawa id_project, tiket diarahkan ke workspace yang kodenya
- * sama dengan id_project. Kalau tidak ada, dipakai workspace default
- * CXP_CSAT_WORKSPACE. Bentuk field v1 (email/status_ticket di root) dan v2
- * (customer.email/status_name) sama-sama didukung.
+ * Setiap project (kode workspace) dibandingkan dengan snapshot di tabel
+ * cxp_ticket_seen:
+ * - run pertama untuk project hanya mengisi snapshot (baseline), tidak kirim;
+ * - run berikutnya mengirim tiket yang belum ada di snapshot.
+ *
+ * Tiket diarahkan ke workspace yang kodenya sama dengan id_project. Project
+ * yang tidak punya workspace tidak pernah dipanggil, sehingga tidak ada
+ * fallback diam-diam ke workspace default.
  *
  * Tanpa opsi --send command hanya simulasi: tidak ada baris database yang
  * ditulis dan tidak ada email yang diantrekan.
  */
 class SendCsatFromCxp extends Command
 {
-    private const PER_PAGE = 20;
-
-    /**
-     * Cache resolusi kode project -> workspace selama satu run.
-     *
-     * @var array<string, Workspace|null>
-     */
-    private array $projectWorkspaces = [];
+    // Server membatasi per_page di 100, walaupun nilai lebih besar diterima.
+    private const MAX_PER_PAGE = 100;
 
     protected $signature = 'cxp:csat-send
         {--send : Antre email sungguhan; tanpa opsi ini hanya simulasi}
-        {--since= : Batas update_date (Y-m-d); default CXP_CSAT_SINCE}
-        {--workspace= : Kode workspace; default CXP_CSAT_WORKSPACE}
-        {--ticket= : Proses satu id_ticket saja, untuk uji}
-        {--page=1 : Halaman awal}
-        {--max-pages=0 : Batas halaman yang dibaca (0 = semua)}
+        {--workspace= : Batasi ke satu kode workspace; default semua workspace bertemplate}
+        {--ticket= : Proses satu id_ticket saja, untuk uji (melewati snapshot)}
+        {--max-pages= : Batas halaman per project (0 = semua; default CXP_CSAT_MAX_PAGES)}
         {--limit=0 : Batas email yang diantrekan (0 = semua)}';
 
-    protected $description = 'Antrekan CSAT untuk tiket TransCXP berstatus Close yang sudah ditutup setelah tanggal batas.';
+    protected $description = 'Antrekan CSAT untuk tiket TransCXP yang baru masuk status Close.';
 
     public function handle(CsatInvitationService $invitations): int
     {
         $client = CxpApiClient::fromConfig();
 
         $send = (bool) $this->option('send');
-        $since = trim((string) ($this->option('since') ?: config('cxp.csat.since')));
         $ticketId = trim((string) $this->option('ticket'));
-        $page = max(1, (int) $this->option('page'));
-        $maxPages = max(0, (int) $this->option('max-pages'));
+        $perPage = min(self::MAX_PER_PAGE, max(1, (int) config('cxp.csat.per_page', self::MAX_PER_PAGE)));
+        $maxPagesOption = $this->option('max-pages');
+        $maxPages = $maxPagesOption === null || trim((string) $maxPagesOption) === ''
+            ? max(0, (int) config('cxp.csat.max_pages', 0))
+            : max(0, (int) $maxPagesOption);
         $limit = max(0, (int) $this->option('limit'));
 
-        if ($since === '' || preg_match('/^\d{4}-\d{2}-\d{2}$/', $since) !== 1) {
-            $this->error('Isi CXP_CSAT_SINCE (format Y-m-d) atau pakai --since=2026-11-11.');
-            $this->line('Batas ini mencegah tiket lama ikut dikirimi CSAT saat pertama kali dijalankan.');
-
-            return self::FAILURE;
-        }
-
-        $workspace = $this->workspace();
-        if ($workspace === null) {
-            return self::FAILURE;
-        }
-
-        $template = $invitations->defaultTemplate($workspace);
-        if ($template === null) {
-            $this->error('Workspace '.$workspace->code.' belum punya template CSAT aktif sebagai default.');
-            $this->line('Buka menu CSAT > Template, lalu jadikan satu template sebagai default.');
+        if ($ticketId !== '' && trim((string) ($this->option('workspace') ?: config('cxp.csat.workspace'))) === '') {
+            $this->error('Opsi --ticket wajib disertai --workspace=<kode> atau isi CXP_CSAT_WORKSPACE.');
 
             return self::FAILURE;
         }
@@ -92,10 +76,51 @@ class SendCsatFromCxp extends Command
             return self::FAILURE;
         }
 
-        $this->line('Workspace : '.$workspace->name.' ('.$workspace->code.')');
-        $this->line('Template  : '.$template->title);
-        $this->line('Project   : id_project dicocokkan dengan kode workspace; tanpa project memakai workspace di atas');
-        $this->line('Batas     : update_date >= '.$since);
+        $workspaces = $this->workspaces();
+        if ($workspaces === null) {
+            return self::FAILURE;
+        }
+
+        $targets = [];
+        $counts = [
+            'project' => 0,
+            'baseline' => 0,
+            'dibaca' => 0,
+            'bukan_close' => 0,
+            'tanpa_id' => 0,
+            'tiket_tidak_ditemukan' => 0,
+            'tanpa_email' => 0,
+            'email_tidak_valid' => 0,
+            'tanpa_template' => 0,
+            'project_gagal' => 0,
+            'sudah_ada' => 0,
+            'dikirim' => 0,
+            'akan_dikirim' => 0,
+            'gagal' => 0,
+        ];
+
+        foreach ($workspaces as $workspace) {
+            $template = $invitations->defaultTemplate($workspace);
+
+            if ($template === null) {
+                $counts['tanpa_template']++;
+                $this->warn('Workspace '.$workspace->code.' dilewati: belum punya template CSAT aktif sebagai default.');
+
+                continue;
+            }
+
+            $targets[] = [$workspace, $template];
+        }
+
+        if ($targets === []) {
+            $this->error('Tidak ada workspace dengan template CSAT aktif sebagai default.');
+
+            return self::FAILURE;
+        }
+
+        $this->line('Endpoint  : '.$client->statusPath().' (status=Close, per_page='.$perPage.')');
+        $this->line('Workspace : '.count($targets).' diproses');
+        $this->line('Snapshot  : cxp_ticket_seen (run pertama = baseline, tidak mengirim)');
         $this->line('Mode      : '.($send ? 'KIRIM' : 'SIMULASI (tidak menulis database)'));
         $this->newLine();
 
@@ -107,167 +132,41 @@ class SendCsatFromCxp extends Command
             return self::FAILURE;
         }
 
-        $counts = [
-            'dibaca' => 0,
-            'bukan_close' => 0,
-            'terlalu_lama' => 0,
-            'tanpa_email' => 0,
-            'email_tidak_valid' => 0,
-            'project_tidak_dikenal' => 0,
-            'tanpa_template' => 0,
-            'sudah_ada' => 0,
-            'dikirim' => 0,
-            'akan_dikirim' => 0,
-            'gagal' => 0,
-        ];
         $handled = [];
         $stop = false;
-        $lastPage = $page;
 
-        for ($current = $page; ! $stop; $current++) {
+        foreach ($targets as [$workspace, $template]) {
+            if ($stop) {
+                break;
+            }
+
+            $counts['project']++;
+
             try {
-                $response = $client->tickets($login['token'], $current, self::PER_PAGE, $ticketId !== '' ? $ticketId : null, [
-                    'status' => 'Close',
-                ]);
+                $stop = $this->processWorkspace(
+                    $client,
+                    $invitations,
+                    $login['token'],
+                    $workspace,
+                    $template,
+                    $ticketId,
+                    $send,
+                    $perPage,
+                    $maxPages,
+                    $limit,
+                    $counts,
+                    $handled,
+                );
             } catch (CxpApiException $e) {
-                $this->error('Halaman '.$current.' gagal: '.$e->getMessage());
-
-                return self::FAILURE;
-            }
-
-            $lastPage = max($current, $this->lastPage($response, $current));
-            $rows = array_values(array_filter((array) ($response['data'] ?? []), 'is_array'));
-
-            if ($rows === []) {
-                break;
-            }
-
-            $existing = $this->existingTicketIds(
-                array_map(fn (array $row) => trim((string) ($row['id_ticket'] ?? '')), $rows),
-            );
-
-            foreach ($rows as $row) {
-                $counts['dibaca']++;
-                $rowTicketId = trim((string) ($row['id_ticket'] ?? ''));
-
-                if ($rowTicketId === '') {
-                    continue;
-                }
-
-                if (strcasecmp($this->value($row, ['status_name', 'status_ticket', 'status']), 'Close') !== 0) {
-                    $counts['bukan_close']++;
-
-                    continue;
-                }
-
-                $updated = trim((string) (data_get($row, 'update_date') ?: data_get($row, 'start_date')));
-                $updated = substr($updated, 0, 10);
-
-                if ($updated === '' || $updated < $since) {
-                    $counts['terlalu_lama']++;
-
-                    continue;
-                }
-
-                $email = mb_strtolower($this->value($row, ['customer.email', 'email', 'customer_email']));
-
-                if ($email === '') {
-                    $counts['tanpa_email']++;
-
-                    continue;
-                }
-
-                if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $counts['email_tidak_valid']++;
-
-                    continue;
-                }
-
-                // Project hanya ada di kontrak v1. Kalau nanti TransCXP
-                // menambahkannya ke v2, tiket otomatis masuk ke workspace
-                // dengan kode yang sama dengan id_project.
-                $ticketWorkspace = $workspace;
-                $project = $this->value($row, ['id_project', 'project.id', 'customer.id_project']);
-
-                if ($project !== '') {
-                    $ticketWorkspace = $this->projectWorkspace(
-                        $project,
-                        $this->value($row, ['project_name', 'project.name']),
-                    );
-
-                    if ($ticketWorkspace === null) {
-                        $counts['project_tidak_dikenal']++;
-
-                        continue;
-                    }
-                }
-
-                $ticketTemplate = $ticketWorkspace->is($workspace)
-                    ? $template
-                    : $invitations->defaultTemplate($ticketWorkspace);
-
-                if ($ticketTemplate === null) {
-                    $counts['tanpa_template']++;
-
-                    continue;
-                }
-
-                if (isset($existing[$ticketWorkspace->id.'|'.$rowTicketId])) {
-                    $counts['sudah_ada']++;
-
-                    continue;
-                }
-
-                $handled[] = $rowTicketId;
-
-                if (! $send) {
-                    $counts['akan_dikirim']++;
-
-                    if ($limit > 0 && $counts['akan_dikirim'] >= $limit) {
-                        $stop = true;
-                        break;
-                    }
-
-                    continue;
-                }
-
-                try {
-                    $invitations->send(
-                        $ticketWorkspace,
-                        [
-                            'ticket_id' => $rowTicketId,
-                            'ticket_status' => $this->value($row, ['status_name', 'status_ticket', 'status']),
-                            'channel' => $this->value($row, ['source', 'channel']),
-                        ],
-                        [
-                            'name' => $this->value($row, ['customer.name_customer', 'name_customer', 'customer.name', 'customer_name']),
-                            'email' => $email,
-                            'wa' => $this->wa($row),
-                        ],
-                        $ticketTemplate,
-                    );
-                    $counts['dikirim']++;
-                } catch (ValidationException $e) {
-                    $counts['gagal']++;
-                    $this->warn('Tiket '.$rowTicketId.' dilewati: '.$e->validator->errors()->first());
-                } catch (\Throwable $e) {
-                    report($e);
-                    $counts['gagal']++;
-                    $this->warn('Tiket '.$rowTicketId.' gagal diproses. Detail aman ada di log server.');
-                }
-
-                if ($limit > 0 && $counts['dikirim'] >= $limit) {
-                    $stop = true;
-                    break;
-                }
-            }
-
-            if ($current >= $lastPage) {
-                break;
-            }
-
-            if ($maxPages > 0 && ($current - $page + 1) >= $maxPages) {
-                break;
+                // Error satu project tidak menghentikan project lain. Snapshot
+                // project ini tidak ditulis, jadi tiket yang terlewat akan
+                // dianggap baru pada run berikutnya.
+                $counts['project_gagal']++;
+                $this->warn('Project '.$workspace->code.' gagal: '.$e->getMessage());
+                Log::warning('cxp.csat-send.project-failed', [
+                    'workspace' => $workspace->code,
+                    'message' => $e->getMessage(),
+                ]);
             }
         }
 
@@ -275,13 +174,16 @@ class SendCsatFromCxp extends Command
         $this->table(
             ['Hasil', 'Jumlah'],
             [
-                ['Tiket dibaca', $counts['dibaca']],
+                ['Project dibaca', $counts['project']],
+                ['Tiket Close dibaca', $counts['dibaca']],
                 ['Bukan status Close', $counts['bukan_close']],
-                ['Diperbarui sebelum batas', $counts['terlalu_lama']],
+                ['Tanpa id_ticket', $counts['tanpa_id']],
+                ['Baseline (snapshot awal)', $counts['baseline']],
+                ['Tiket tidak ditemukan', $counts['tiket_tidak_ditemukan']],
                 ['Tanpa email', $counts['tanpa_email']],
                 ['Email tidak valid', $counts['email_tidak_valid']],
-                ['Project tanpa workspace', $counts['project_tidak_dikenal']],
                 ['Workspace tanpa template aktif', $counts['tanpa_template']],
+                ['Project gagal diproses', $counts['project_gagal']],
                 ['Sudah pernah dibuatkan CSAT', $counts['sudah_ada']],
                 [$send ? 'Email diantrekan' : 'Akan diantrekan', $send ? $counts['dikirim'] : $counts['akan_dikirim']],
                 ['Gagal', $counts['gagal']],
@@ -302,75 +204,336 @@ class SendCsatFromCxp extends Command
         }
 
         Log::info('cxp.csat-send', [
-            'workspace' => $workspace->code,
             'send' => $send,
-            'since' => $since,
+            'ticket' => $ticketId !== '' ? $ticketId : null,
             'counts' => $counts,
         ]);
 
         return self::SUCCESS;
     }
 
-    private function workspace(): ?Workspace
-    {
-        $code = mb_strtolower(trim((string) ($this->option('workspace') ?: config('cxp.csat.workspace'))));
+    /**
+     * Proses satu workspace/project. Mengembalikan true kalau batas --limit
+     * tercapai sehingga project berikutnya tidak perlu diproses.
+     *
+     * @param  array<string, int>  $counts
+     * @param  array<int, string>  $handled
+     */
+    private function processWorkspace(
+        CxpApiClient $client,
+        CsatInvitationService $invitations,
+        string $token,
+        Workspace $workspace,
+        Survey $template,
+        string $ticketId,
+        bool $send,
+        int $perPage,
+        int $maxPages,
+        int $limit,
+        array &$counts,
+        array &$handled,
+    ): bool {
+        $project = trim((string) $workspace->code);
+        $projectKey = mb_strtolower($project);
 
-        if ($code === '') {
-            $this->error('Isi CXP_CSAT_WORKSPACE dengan kode workspace, atau pakai --workspace=<kode>.');
-
-            return null;
+        if ($project === '') {
+            return false;
         }
 
-        $workspace = Workspace::query()->whereRaw('lower(code) = ?', [$code])->first();
+        $rows = $this->closeRows($client, $token, $project, $perPage, $maxPages, $counts);
 
-        if ($workspace === null) {
-            $this->error('Workspace dengan kode '.$code.' tidak ditemukan.');
+        $hasSnapshot = CxpTicketSeen::query()
+            ->where('project_code', $projectKey)
+            ->exists();
 
-            return null;
+        if ($ticketId === '') {
+            if (! $hasSnapshot) {
+                // Baseline: simpan semua tiket Close saat ini, jangan kirim.
+                $counts['baseline']++;
+                if ($send) {
+                    $this->remember($projectKey, array_keys($rows));
+                }
+                $this->line('Project '.$project.': baseline '.count($rows).' tiket Close (tidak mengirim).');
+
+                return false;
+            }
+
+            $seen = CxpTicketSeen::query()
+                ->where('project_code', $projectKey)
+                ->pluck('ticket_id')
+                ->flip();
+
+            $newRows = array_filter(
+                $rows,
+                fn (array $row, string $id) => ! isset($seen[$id]),
+                ARRAY_FILTER_USE_BOTH,
+            );
+        } else {
+            if (! $hasSnapshot && $send) {
+                // Uji satu tiket tidak boleh membuat sisa project terlihat
+                // "baru" pada run berikutnya. Tetap simpan baseline penuh.
+                $this->remember($projectKey, array_keys($rows));
+            }
+
+            if (! $hasSnapshot) {
+                $counts['baseline']++;
+            }
+
+            if (! isset($rows[$ticketId])) {
+                $counts['tiket_tidak_ditemukan']++;
+
+                return false;
+            }
+
+            $newRows = [$ticketId => $rows[$ticketId]];
         }
 
-        if ($workspace->is_legacy) {
-            $this->error('Workspace legacy tidak boleh dipakai untuk CSAT otomatis.');
+        $newRows = array_filter(
+            $newRows,
+            fn (array $row) => strcasecmp($this->value($row, ['status_name', 'status_ticket', 'status']), 'Close') === 0,
+        );
 
-            return null;
+        $existing = $this->existingTicketIds($workspace->id, array_keys($newRows));
+        $toRemember = [];
+
+        foreach ($newRows as $rowTicketId => $row) {
+            $rowTicketId = (string) $rowTicketId;
+            $email = mb_strtolower($this->value($row, ['customer.email', 'email', 'customer_email']));
+
+            if ($email === '') {
+                $counts['tanpa_email']++;
+                $toRemember[] = $rowTicketId;
+
+                continue;
+            }
+
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $counts['email_tidak_valid']++;
+                $toRemember[] = $rowTicketId;
+
+                continue;
+            }
+
+            if (isset($existing[$rowTicketId])) {
+                $counts['sudah_ada']++;
+                $toRemember[] = $rowTicketId;
+
+                continue;
+            }
+
+            $handled[] = $project.':'.$rowTicketId;
+
+            if (! $send) {
+                $counts['akan_dikirim']++;
+
+                if ($limit > 0 && $counts['akan_dikirim'] >= $limit) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            try {
+                $result = $invitations->send(
+                    $workspace,
+                    [
+                        'ticket_id' => $rowTicketId,
+                        'ticket_status' => $this->value($row, ['status_name', 'status_ticket', 'status']),
+                        'channel' => $this->value($row, ['source', 'channel']),
+                    ],
+                    [
+                        'name' => $this->value($row, ['customer.name_customer', 'name_customer', 'customer.name', 'customer_name']),
+                        'email' => $email,
+                        'wa' => $this->wa($row),
+                    ],
+                    $template,
+                );
+
+                if (in_array($result['outcome'], [
+                    CsatInvitationService::OUTCOME_CREATED,
+                    CsatInvitationService::OUTCOME_QUEUED,
+                ], true)) {
+                    $counts['dikirim']++;
+                } else {
+                    $counts['sudah_ada']++;
+                }
+
+                $toRemember[] = $rowTicketId;
+            } catch (ValidationException $e) {
+                // Data yang memang tidak valid tidak perlu dicoba ulang tiap jam.
+                $counts['gagal']++;
+                $toRemember[] = $rowTicketId;
+                $this->warn('Tiket '.$rowTicketId.' dilewati: '.$e->validator->errors()->first());
+            } catch (\Throwable $e) {
+                // Kegagalan sementara tidak dimasukkan snapshot supaya dicoba
+                // lagi pada run berikutnya. Undangan yang sudah ada tetap
+                // mencegah duplikat.
+                report($e);
+                $counts['gagal']++;
+                $this->warn('Tiket '.$rowTicketId.' gagal diproses. Detail aman ada di log server.');
+            }
+
+            if ($limit > 0 && $counts['dikirim'] >= $limit) {
+                $this->remember($projectKey, $toRemember);
+
+                return true;
+            }
         }
 
-        return $workspace;
+        if ($send && $toRemember !== []) {
+            $this->remember($projectKey, $toRemember);
+        }
+
+        return false;
     }
 
     /**
-     * Kumpulkan pasangan workspace|id_ticket yang sudah punya undangan CSAT.
+     * Baca semua halaman status Close untuk satu project.
      *
-     * Dipakai untuk dedupe lintas workspace karena id_ticket tidak unik antar
-     * project, sedangkan unique index hanya per workspace + ticket_id.
+     * Kalau satu halaman gagal, seluruh project dianggap gagal (exception naik
+     * ke handle) supaya snapshot tidak terisi dari data yang tidak lengkap.
+     *
+     * @param  array<string, int>  $counts
+     * @return array<string, array<string, mixed>>
+     */
+    private function closeRows(
+        CxpApiClient $client,
+        string $token,
+        string $project,
+        int $perPage,
+        int $maxPages,
+        array &$counts,
+    ): array {
+        $rows = [];
+        $page = 1;
+        $lastPage = 1;
+
+        do {
+            $response = $client->ticketsByStatus($token, $project, 'Close', $page, $perPage);
+            $lastPage = max($page, $this->lastPage($response, $page));
+
+            foreach ((array) ($response['data'] ?? []) as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                $counts['dibaca']++;
+                $id = trim((string) ($row['id_ticket'] ?? ''));
+
+                if ($id === '') {
+                    $counts['tanpa_id']++;
+
+                    continue;
+                }
+
+                if (strcasecmp($this->value($row, ['status_name', 'status_ticket', 'status']), 'Close') !== 0) {
+                    $counts['bukan_close']++;
+
+                    continue;
+                }
+
+                // Kunci per id_ticket: duplikat antar halaman (kalau ada)
+                // tidak memicu dua undangan.
+                $rows[$id] = $row;
+            }
+
+            $page++;
+        } while ($page <= $lastPage && ($maxPages === 0 || $page <= $maxPages));
+
+        return $rows;
+    }
+
+    /**
+     * Semua workspace non-legacy dengan template CSAT default.
+     *
+     * Opsi --workspace (atau CXP_CSAT_WORKSPACE) membatasi ke satu kode.
+     *
+     * @return Collection<int, Workspace>|null
+     */
+    private function workspaces(): ?Collection
+    {
+        $code = trim((string) ($this->option('workspace') ?: config('cxp.csat.workspace')));
+
+        if ($code !== '') {
+            $workspace = Workspace::query()
+                ->where('is_legacy', false)
+                ->whereRaw('lower(code) = ?', [mb_strtolower($code)])
+                ->first();
+
+            if ($workspace === null) {
+                $this->error('Workspace dengan kode '.$code.' tidak ditemukan.');
+
+                return null;
+            }
+
+            return collect([$workspace]);
+        }
+
+        return Workspace::query()
+            ->where('is_legacy', false)
+            ->whereNotNull('code')
+            ->where('code', '<>', '')
+            ->whereNotNull('default_csat_survey_id')
+            ->orderBy('code')
+            ->get();
+    }
+
+    /**
+     * Simpan snapshot tiket tanpa menimpa baris yang sudah ada.
+     *
+     * @param  array<int, string>  $ticketIds
+     */
+    private function remember(string $projectKey, array $ticketIds): void
+    {
+        $ticketIds = array_values(array_unique(array_filter(
+            array_map(fn ($id) => trim((string) $id), $ticketIds),
+            fn (string $id) => $id !== '',
+        )));
+
+        if ($ticketIds === []) {
+            return;
+        }
+
+        $now = now();
+        $rows = array_map(fn (string $id) => [
+            'project_code' => $projectKey,
+            'ticket_id' => $id,
+            'first_seen_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $ticketIds);
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            CxpTicketSeen::query()->insertOrIgnore($chunk);
+        }
+    }
+
+    /**
+     * Kumpulkan id_ticket yang sudah punya undangan CSAT di workspace ini.
      *
      * @param  array<int, string>  $ticketIds
      * @return array<string, true>
      */
-    private function existingTicketIds(array $ticketIds): array
+    private function existingTicketIds(int $workspaceId, array $ticketIds): array
     {
-        $ticketIds = array_values(array_filter($ticketIds, fn (string $id) => $id !== ''));
+        $ticketIds = array_values(array_filter($ticketIds, fn ($id) => trim((string) $id) !== ''));
 
         if ($ticketIds === []) {
             return [];
         }
 
         return Invitation::withoutGlobalScopes()
+            ->where('workspace_id', $workspaceId)
             ->whereIn('ticket_id', $ticketIds)
             ->whereHas('survey', fn ($query) => $query->withoutGlobalScopes()->where('type', 'csat'))
-            ->get(['workspace_id', 'ticket_id'])
-            ->mapWithKeys(fn (Invitation $invitation) => [
-                $invitation->workspace_id.'|'.$invitation->ticket_id => true,
-            ])
+            ->pluck('ticket_id')
+            ->mapWithKeys(fn ($id) => [(string) $id => true])
             ->all();
     }
 
     /**
-     * Nomor halaman terakhir.
-     *
-     * API v2 membungkus pagination di "meta", sedangkan /api/v1/dataTicketcxp
-     * (User Guide v1.0) memakai kunci "pagination". Keduanya didukung supaya
-     * perpindahan endpoint cukup lewat CXP_API_TICKET_PATH.
+     * Nomor halaman terakhir. Endpoint status memakai kunci "pagination";
+     * kunci "meta" tetap didukung untuk endpoint lama.
      *
      * @param  array<string, mixed>  $response
      */
@@ -382,51 +545,7 @@ class SendCsatFromCxp extends Command
     }
 
     /**
-     * Cari workspace tujuan untuk tiket TransCXP.
-     *
-     * Urutan pencocokan:
-     * 1. kode workspace sama dengan id_project (project.code dari SSO);
-     * 2. nama workspace sama dengan project_name, hanya kalau hasilnya unik.
-     *
-     * Tiket dengan project yang tidak dikenal sengaja dilewati, bukan masuk
-     * ke workspace default, supaya data customer tidak mendarat di tempat
-     * yang salah.
-     */
-    private function projectWorkspace(string $project, string $projectName = ''): ?Workspace
-    {
-        $key = mb_strtolower(trim($project)).'|'.mb_strtolower(trim($projectName));
-
-        if (array_key_exists($key, $this->projectWorkspaces)) {
-            return $this->projectWorkspaces[$key];
-        }
-
-        $workspace = Workspace::query()
-            ->whereRaw('lower(code) = ?', [mb_strtolower(trim($project))])
-            ->first();
-
-        if ($workspace === null && trim($projectName) !== '') {
-            // project_name tidak unik di database, jadi hanya dipakai kalau
-            // tepat satu workspace yang cocok.
-            $matches = Workspace::query()
-                ->where('is_legacy', false)
-                ->whereRaw('lower(name) = ?', [mb_strtolower(trim($projectName))])
-                ->limit(2)
-                ->get();
-
-            $workspace = $matches->count() === 1 ? $matches->first() : null;
-        }
-
-        return $this->projectWorkspaces[$key] = $workspace !== null && ! $workspace->is_legacy
-            ? $workspace
-            : null;
-    }
-
-    /**
      * Ambil nilai pertama yang tidak kosong dari beberapa path.
-     *
-     * Kontrak v1 menaruh data di root (email, status_ticket, name_customer),
-     * sedangkan v2 membungkus customer. Keduanya didukung supaya command
-     * tetap jalan saat TransCXP menambah field atau mengaktifkan v1.
      *
      * @param  array<string, mixed>  $row
      * @param  array<int, string>  $paths
