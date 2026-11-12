@@ -12,6 +12,7 @@ class AppServiceProvider extends ServiceProvider {
   RateLimiter::for('respond',fn(Request $r)=>Limit::perMinute(30)->by($r->ip().'|'.hash('sha256',(string)$r->route('token'))));
   RateLimiter::for('cxp-sso',fn(Request $r)=>[Limit::perMinute(30)->by('cxp-ip:'.$r->ip()),Limit::perMinute(120)->by('cxp-global')]);
   RateLimiter::for('cxp-launch-api',fn(Request $r)=>[Limit::perMinute(60)->by('cxp-launch-api:'.$r->ip()),Limit::perMinute(300)->by('cxp-launch-api-global')]);
+  RateLimiter::for('cxp-csat-link-api',fn(Request $r)=>[Limit::perMinute(60)->by('cxp-csat-link-api:'.$r->ip()),Limit::perMinute(300)->by('cxp-csat-link-api-global')]);
   \Illuminate\Pagination\Paginator::useBootstrapFive();
  }
 }

@@ -111,7 +111,13 @@ class CxpAccountProvisioner
         $this->identity($payload);
     }
 
-    private function identity(array $payload): array
+    /**
+     * Validasi klaim dan kembalikan bentuk internalnya.
+     *
+     * Dipakai endpoint launch session dan endpoint tautan CSAT supaya aturan
+     * validasi payload TransCXP hanya ada di satu tempat.
+     */
+    public function identity(array $payload): array
     {
         $externalId = $this->claim($payload, 'user.id', 191, true);
         $email = mb_strtolower($this->claim($payload, 'user.email', 255, true));
