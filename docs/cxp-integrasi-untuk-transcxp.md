@@ -477,3 +477,15 @@ Aturan tambahan:
 - Kalau API key atau secret perlu dirotasi, koordinasikan dengan tim TransSurvey
   agar ada masa transisi.
 - Private key (ES256/RS256) tidak pernah dikirim ke TransSurvey.
+
+---
+
+## 8. API tautan CSAT (kirim manual dari TransCXP)
+
+Kalau TransCXP ingin **mengirim sendiri tautan CSAT** ke customer, gunakan
+`POST /api/cxp/csat-links` (API key yang sama). Endpoint ini membuat tautan
+tanpa mengirim email. Kontrak lengkap ada di
+[`cxp-csat-link-api-untuk-transcxp.md`](cxp-csat-link-api-untuk-transcxp.md).
+
+Jangan memakai endpoint ini kalau TransCXP tetap ingin TransSurvey yang
+mengirim email CSAT.
