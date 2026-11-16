@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{EmailDelivery, Invitation, Survey, User, Workspace};
+use App\Models\{Client, EmailDelivery, Invitation, Survey, User, Workspace};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\{Cache, Queue};
 use Illuminate\Testing\TestResponse;
@@ -265,5 +265,81 @@ class CxpCsatLinkApiTest extends TestCase
         $this->get($url)
             ->assertOk()
             ->assertSee('Survei Kepuasan Layanan');
+    }
+
+    public function test_link_is_issued_without_email_using_whatsapp(): void
+    {
+        $response = $this->requestLink($this->payload([
+            'ticket' => ['customer' => ['email' => null]],
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('created', true)
+            ->assertJsonStructure(['url', 'expires_at']);
+
+        $invitation = Invitation::withoutGlobalScopes()->sole();
+        $this->assertNull($invitation->recipient_email);
+        $this->assertSame('Sari', $invitation->recipient_name);
+        $this->assertSame('6281234567890', $invitation->client->wa);
+        $this->assertNull($invitation->client->email);
+
+        // Jalur manual tetap tidak mengirim email walau customer punya nomor.
+        $this->assertSame(0, EmailDelivery::withoutGlobalScopes()->count());
+        Queue::assertNothingPushed();
+    }
+
+    public function test_whatsapp_only_ticket_reuses_link_and_client(): void
+    {
+        $payload = $this->payload([
+            'ticket' => ['customer' => ['email' => null]],
+        ]);
+
+        $first = $this->requestLink($payload)->assertCreated();
+        $second = $this->requestLink($payload)
+            ->assertOk()
+            ->assertJsonPath('created', false);
+
+        $this->assertSame($first->json('url'), $second->json('url'));
+        $this->assertSame(1, Invitation::withoutGlobalScopes()->count());
+        $this->assertSame(1, Client::withoutGlobalScopes()->count());
+    }
+
+    public function test_link_is_issued_with_name_only_customer(): void
+    {
+        $this->requestLink($this->payload([
+            'ticket' => ['customer' => ['email' => null, 'wa' => null]],
+        ]))->assertCreated();
+
+        $invitation = Invitation::withoutGlobalScopes()->sole();
+        $this->assertNull($invitation->recipient_email);
+        $this->assertSame('Sari', $invitation->recipient_name);
+        $this->assertNull($invitation->client->email);
+        $this->assertNull($invitation->client->wa);
+    }
+
+    public function test_ticket_without_any_customer_identity_is_rejected(): void
+    {
+        $this->requestLink($this->payload([
+            'ticket' => ['customer' => ['email' => null, 'wa' => null, 'name' => null]],
+        ]))
+            ->assertStatus(422)
+            ->assertJsonPath('reason', 'invalid_claim');
+
+        $this->assertSame(0, Invitation::withoutGlobalScopes()->count());
+        $this->assertSame(0, Client::withoutGlobalScopes()->count());
+    }
+
+    public function test_two_tickets_with_the_same_whatsapp_number_share_one_client(): void
+    {
+        $this->requestLink($this->payload([
+            'ticket' => ['id' => 'WA-1', 'customer' => ['email' => null]],
+        ]))->assertCreated();
+
+        $this->requestLink($this->payload([
+            'ticket' => ['id' => 'WA-2', 'customer' => ['email' => null]],
+        ]))->assertCreated();
+
+        $this->assertSame(2, Invitation::withoutGlobalScopes()->count());
+        $this->assertSame(1, Client::withoutGlobalScopes()->count());
     }
 }

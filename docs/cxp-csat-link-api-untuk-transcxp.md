@@ -18,9 +18,9 @@ bukan meminta TransSurvey mengirim email.
 > endpoint ini. Pakai alur `POST /api/cxp/launch-sessions` + halaman Kirim CSAT,
 > atau autosend per jam yang sudah berjalan.
 
-> **Status di staging:** endpoint ini baru aktif setelah kode di-merge dan
-> server staging menjalankan `git pull` + `php artisan optimize:clear`.
-> Sebelum itu, request ke staging akan dibalas `404`.
+> **Status:** endpoint ini aktif di staging dan production sejak rilis
+> `CXP_LAUNCH_API_KEY`. Kalau server baru selesai `git pull`, jalankan
+> `php artisan optimize:clear` dulu supaya route baru terbaca.
 
 ---
 
@@ -106,13 +106,21 @@ membangun dua kontrak.
 | `ticket.id` | Ya | Satu tiket saja. |
 | `ticket.status` | Tidak | Status tiket, mis. `Close`. |
 | `ticket.channel` | Tidak | Kanal tiket, mis. `whatsapp`. |
-| `ticket.customer.email` | Ya | Email customer; dipakai sebagai identitas client. |
-| `ticket.customer.name` | Tidak | Kalau kosong dipakai email. |
-| `ticket.customer.wa` | Tidak | Dinormalkan ke `62...`. Nilai tidak valid ditolak `422`. |
+| `ticket.customer.email` | Tidak* | Email customer; dipakai sebagai identitas client. |
+| `ticket.customer.name` | Tidak | Kalau kosong dipakai email atau nomor WA. |
+| `ticket.customer.wa` | Tidak* | Dinormalkan ke `62...`. Nilai tidak valid ditolak `422`. |
+
+\* Wajib salah satu: `customer.email`, `customer.wa`, atau `customer.name`.
+Banyak tiket TransCXP hanya punya nomor telepon, jadi email **tidak wajib**
+untuk endpoint ini. Jalur email (autosend/halaman Kirim CSAT) tetap mewajibkan
+email.
 
 Aturan:
 
-- `ticket.id` dan `ticket.customer.email` harus dikirim bersama.
+- `ticket.id` wajib; customer minimal punya salah satu identitas di atas.
+- Kalau `customer.email` ada, email itu menjadi identitas client. Kalau tidak
+  ada, nomor WA menjadi identitas. Kalau keduanya tidak ada, client baru dibuat
+  dari nama (tidak bisa digabung antar tiket).
 - `project.code` **tidak** membuat workspace baru. Kode yang belum terdaftar
   ditolak `404`.
 - Workspace harus punya template CSAT aktif sebagai default.
@@ -202,13 +210,46 @@ curl -sS -X POST "http://10.0.24.118/api/cxp/csat-links" \
 
 ---
 
+## 6b. Contoh tiket tanpa email (WhatsApp/Instagram/Facebook)
+
+```sh
+curl -sS -X POST "http://10.0.24.118/api/cxp/csat-links" \
+  -H "Authorization: Bearer $TRANSSURVEY_CXP_LAUNCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{
+    "user":    {"id":"5","name":"Agent A","email":"agent@email.com"},
+    "project": {"code":"6","name":"DIPOOPL"},
+    "ticket": {
+      "id":"075750",
+      "status":"Close",
+      "channel":"WhatsApp",
+      "customer": {
+        "name":"Customer A",
+        "wa":"081234567890"
+      }
+    }
+  }'
+```
+
+Balasannya sama (`201` + `url`). Yang berubah hanya identitas client: dipakai
+nomor WA `6281234567890` karena email kosong. Kalau dua tiket berbeda memakai
+nomor WA yang sama, keduanya memakai satu client yang sama di workspace itu.
+
+Kalau `customer` hanya berisi nama (tanpa email dan WA), tautan tetap dibuat,
+tetapi setiap tiket akan membuat client baru — tidak ada kunci untuk
+menggabungkan customer yang sama.
+
+---
+
 ## 7. Hubungan dengan autosend
 
 - Undangan yang dibuat lewat endpoint ini **tidak** akan dikirimi email oleh
   autosend, karena aturan "satu tiket satu tautan" sudah terpenuhi.
 - Endpoint ini juga **tidak** menandai email sudah terkirim. Kalau operation
-  nanti membuka halaman Kirim CSAT untuk tiket yang sama, TransSurvey masih
-  bisa mengirim email dengan tautan yang sama (bukan tautan baru).
+  nanti membuka halaman Kirim CSAT untuk tiket yang sama dan tiket punya email,
+  TransSurvey masih bisa mengirim email dengan tautan yang sama (bukan tautan
+  baru). Tiket tanpa email tidak bisa memakai jalur email itu.
 - Kalau nanti TransCXP berubah pikiran dan ingin email tetap dikirim
   TransSurvey, jangan pakai endpoint ini untuk tiket tersebut.
 - Masa berlaku mengikuti pengaturan CSAT workspace (mis. 7 hari). Kalau
@@ -225,3 +266,7 @@ curl -sS -X POST "http://10.0.24.118/api/cxp/csat-links" \
 5. Pastikan tidak ada email baru yang terkirim (tidak ada baris
    `email_deliveries` baru).
 6. Isi CSAT, lalu panggil lagi: harus `409 csat_completed`.
+7. Ulangi langkah 1–2 dengan customer **tanpa email**, hanya `wa` (atau hanya
+   `name`): harus tetap `201` dan `url` bisa dibuka.
+8. Kirim tiket tanpa email, tanpa WA, dan tanpa nama: harus `422
+   invalid_claim`.

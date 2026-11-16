@@ -155,25 +155,27 @@
                     @forelse ($history as $item)
                         @php
                             $delivery = $item->deliveries->sortByDesc('id')->first();
-                            $status = $delivery?->status ?? 'pending';
+                            $status = $delivery?->status ?? ($item->recipient_email ? 'pending' : 'link');
                             $badges = [
                                 'sent' => 'green',
                                 'pending' => 'amber',
                                 'failed' => 'red',
                                 'skipped' => 'gray',
+                                'link' => 'gray',
                             ];
                             $labels = [
                                 'sent' => __('Terkirim'),
                                 'pending' => __('Menunggu'),
                                 'failed' => __('Gagal'),
                                 'skipped' => __('Dilewati'),
+                                'link' => __('Tautan'),
                             ];
                         @endphp
                         <tr>
                             <td>{{ $item->ticket_id }}</td>
                             <td>
                                 <strong>{{ $item->recipient_name }}</strong>
-                                <small class="csat-template-desc">{{ $item->recipient_email }}</small>
+                                <small class="csat-template-desc">{{ $item->recipient_email ?: ($item->client?->wa ?: '—') }}</small>
                             </td>
                             <td>{{ $item->survey?->title }}</td>
                             <td>
@@ -191,7 +193,7 @@
                         <tr>
                             <td colspan="6" class="empty">
                                 <strong>{{ __('Belum ada pengiriman CSAT.') }}</strong>
-                                <p>{{ __('Pengiriman akan muncul di sini setelah email CSAT masuk antrean.') }}</p>
+                                <p>{{ __('Pengiriman akan muncul di sini setelah email CSAT masuk antrean atau tautan manual dibuat.') }}</p>
                             </td>
                         </tr>
                     @endforelse

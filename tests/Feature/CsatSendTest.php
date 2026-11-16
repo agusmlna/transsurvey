@@ -260,6 +260,17 @@ class CsatSendTest extends TestCase
         Mail::assertSent(CsatInvitationMail::class, 1);
     }
 
+    public function test_ticket_without_email_cannot_use_the_email_path(): void
+    {
+        $template = $this->template();
+
+        $this->asOperation($this->context(['customer' => ['email' => null]]))
+            ->post(route('csat.send.store'), ['template_id' => $template->id])
+            ->assertSessionHasErrors('context');
+
+        $this->assertSame(0, Invitation::withoutGlobalScopes()->where('ticket_id', 'TCK-1')->count());
+    }
+
     public function test_csat_public_link_skips_code_verification_and_submits(): void
     {
         $template = $this->template();

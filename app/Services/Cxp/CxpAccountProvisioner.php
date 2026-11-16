@@ -116,8 +116,13 @@ class CxpAccountProvisioner
      *
      * Dipakai endpoint launch session dan endpoint tautan CSAT supaya aturan
      * validasi payload TransCXP hanya ada di satu tempat.
+     *
+     * $requireTicketEmail = false dipakai endpoint tautan CSAT: tiket yang
+     * hanya punya nomor WA (banyak tiket TransCXP) tetap boleh membuat
+     * tautan, karena TransCXP yang mengirim tautannya sendiri. Jalur email
+     * dan SSO tetap mewajibkan email.
      */
-    public function identity(array $payload): array
+    public function identity(array $payload, bool $requireTicketEmail = true): array
     {
         $externalId = $this->claim($payload, 'user.id', 191, true);
         $email = mb_strtolower($this->claim($payload, 'user.email', 255, true));
@@ -135,16 +140,28 @@ class CxpAccountProvisioner
         $customerName = $this->claim($payload, 'customer.name', 255) ?: $customerEmail;
         $customerWa = $this->whatsapp($payload);
 
+        // Identitas customer: email, nomor WA, atau minimal nama. Name-only
+        // diterima khusus untuk tautan manual; jalur email tetap butuh email.
+        $hasCustomerIdentity = $customerEmail !== ''
+            || $customerWa !== ''
+            || $customerName !== '';
+
         // Token boleh hanya berisi identitas login (user + project). Data tiket
         // menyusul lewat API pada Fase 4. Tapi kalau salah satu dikirim, keduanya
         // harus lengkap supaya tiket dan customer tidak tertukar.
-        if ($ticketId === '' && $customerEmail === '') {
+        if ($ticketId === '' && ! $hasCustomerIdentity) {
             // Login saja.
-        } elseif ($ticketId === '' || $customerEmail === '') {
+        } elseif ($ticketId === '') {
             throw CxpSsoException::invalid(
                 'invalid_claim',
                 __('Data pada token SSO tidak lengkap.'),
-                ['claim' => $ticketId === '' ? 'ticket.id' : 'customer.email']
+                ['claim' => 'ticket.id']
+            );
+        } elseif ($requireTicketEmail ? $customerEmail === '' : ! $hasCustomerIdentity) {
+            throw CxpSsoException::invalid(
+                'invalid_claim',
+                __('Data pada token SSO tidak lengkap.'),
+                ['claim' => 'customer.email']
             );
         }
 
