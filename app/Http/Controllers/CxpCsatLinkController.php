@@ -48,7 +48,7 @@ class CxpCsatLinkController
 
         try {
             $payload = $normalizer->normalize($request->all());
-            $identity = $provisioner->identity($payload);
+            $identity = $provisioner->identity($payload, false);
         } catch (CxpSsoException $e) {
             return $this->error($e->getMessage(), $e->reason, $e->status >= 500 ? 500 : 422);
         }

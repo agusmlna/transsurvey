@@ -41,7 +41,7 @@ class CsatInvitationService
 
     /**
      * @param  array{ticket_id: string, ticket_status?: string, channel?: string}  $ticket
-     * @param  array{name?: string, email: string, wa?: string}  $customer
+     * @param  array{name?: string, email?: string, wa?: string}  $customer
      * @return array{outcome: string, invitation: Invitation}
      */
     public function send(Workspace $workspace, array $ticket, array $customer, Survey $template): array
@@ -114,14 +114,12 @@ class CsatInvitationService
      * menjadi titik mulai pengiriman.
      *
      * @param  array{ticket_id: string, ticket_status?: string, channel?: string}  $ticket
-     * @param  array{name?: string, email: string, wa?: string}  $customer
+     * @param  array{name?: string, email?: string, wa?: string}  $customer
      * @return array{invitation: Invitation, created: bool, completed: bool}
      */
     public function issueLink(Workspace $workspace, array $ticket, array $customer, Survey $template): array
     {
-        [$ticketId, $customerEmail, $customerName, $customerWa] = $this->recipient($ticket, $customer);
-
-        $client = $this->client($workspace, $customerName, $customerEmail, $customerWa);
+        [$ticketId, $customerEmail, $customerName, $customerWa] = $this->recipient($ticket, $customer, false);
 
         $invitation = Invitation::withoutGlobalScopes()
             ->where('workspace_id', $workspace->id)
@@ -136,6 +134,10 @@ class CsatInvitationService
         $created = false;
 
         if ($invitation === null) {
+            // Client hanya dibuat kalau undangan belum ada, supaya pemanggilan
+            // ulang dengan data name-only tidak meninggalkan client yatim.
+            $client = $this->client($workspace, $customerName, $customerEmail, $customerWa);
+
             $token = Str::random(64);
             $invitation = Invitation::create([
                 'survey_id' => $template->id,
@@ -146,7 +148,7 @@ class CsatInvitationService
                 'token' => $token,
                 'token_hash' => hash('sha256', $token),
                 'recipient_name' => $customerName,
-                'recipient_email' => $customerEmail,
+                'recipient_email' => $customerEmail !== '' ? $customerEmail : null,
                 'expires_at' => CsatSettings::expiresAt($workspace, now()),
                 'is_demo' => false,
             ]);
@@ -157,7 +159,7 @@ class CsatInvitationService
                 'ticket_status' => (string) ($ticket['ticket_status'] ?? ''),
                 'channel' => (string) ($ticket['channel'] ?? ''),
                 'recipient_name' => $customerName,
-                'recipient_email' => $customerEmail,
+                'recipient_email' => $customerEmail !== '' ? $customerEmail : null,
             ]);
 
             // Tautan kedaluwarsa tidak boleh dipakai lagi. Token baru juga
@@ -181,41 +183,58 @@ class CsatInvitationService
      * Normalisasi data tiket/customer yang dipakai semua jalur pengiriman.
      *
      * @param  array{ticket_id: string, ticket_status?: string, channel?: string}  $ticket
-     * @param  array{name?: string, email: string, wa?: string}  $customer
+     * @param  array{name?: string, email?: string, wa?: string}  $customer
      * @return array{0: string, 1: string, 2: string, 3: string}
      */
-    private function recipient(array $ticket, array $customer): array
+    private function recipient(array $ticket, array $customer, bool $requireEmail = true): array
     {
         $ticketId = trim((string) ($ticket['ticket_id'] ?? ''));
         $customerEmail = mb_strtolower(trim((string) ($customer['email'] ?? '')));
-        $customerName = trim((string) ($customer['name'] ?? '')) ?: $customerEmail;
+        $customerName = trim((string) ($customer['name'] ?? ''));
         $customerWa = WhatsAppNumber::normalize((string) ($customer['wa'] ?? ''));
 
         if ($customerWa !== '' && ! WhatsAppNumber::isValid($customerWa)) {
             $customerWa = '';
         }
 
-        if ($ticketId === '' || $customerEmail === '') {
+        // Jalur email (halaman Kirim CSAT) tetap wajib email. Jalur tautan
+        // manual boleh tanpa email asalkan ada nomor WA atau nama customer.
+        $missingIdentity = $requireEmail
+            ? $customerEmail === ''
+            : ($customerEmail === '' && $customerWa === '' && $customerName === '');
+
+        if ($ticketId === '' || $missingIdentity) {
             throw ValidationException::withMessages([
                 'context' => __('Data tiket dan customer tidak ditemukan. Buka CSAT dari tiket TransCXP terlebih dahulu.'),
             ]);
         }
 
-        if (! filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+        if ($customerEmail !== '' && ! filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
             throw ValidationException::withMessages([
                 'context' => __('Email customer pada data tiket tidak valid.'),
             ]);
         }
+
+        $customerName = $customerName !== '' ? $customerName : ($customerEmail !== '' ? $customerEmail : $customerWa);
 
         return [$ticketId, $customerEmail, $customerName, $customerWa];
     }
 
     private function client(Workspace $workspace, string $customerName, string $customerEmail, string $customerWa = ''): Client
     {
-        $client = Client::withoutGlobalScopes()
-            ->where('workspace_id', $workspace->id)
-            ->where('email', $customerEmail)
-            ->first();
+        $query = Client::withoutGlobalScopes()->where('workspace_id', $workspace->id);
+
+        // Identitas utama tetap email. Untuk tiket tanpa email, nomor WA
+        // menjadi kunci supaya customer yang sama tidak terpecah.
+        if ($customerEmail !== '') {
+            $query->where('email', $customerEmail);
+        } elseif ($customerWa !== '') {
+            $query->where('wa', $customerWa);
+        } else {
+            $query = null;
+        }
+
+        $client = $query?->first();
 
         if ($client !== null) {
             // Nomor dari TransCXP dianggap sumber terbaru. Jangan menghapus
@@ -231,7 +250,7 @@ class CsatInvitationService
         $client = new Client([
             'name' => $customerName,
             'contact' => $customerName,
-            'email' => $customerEmail,
+            'email' => $customerEmail !== '' ? $customerEmail : null,
             'wa' => $customerWa !== '' ? $customerWa : null,
             'project' => $workspace->name,
             'active' => true,
