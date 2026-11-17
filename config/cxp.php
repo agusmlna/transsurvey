@@ -1,5 +1,11 @@
 <?php
 
+// Daftar nilai .env bergaya "a,b,c" dipakai beberapa kali di bawah.
+$csv = static fn (string $value): array => array_values(array_filter(array_map(
+    static fn ($item): string => trim((string) $item),
+    explode(',', $value),
+), static fn (string $item): bool => $item !== ''));
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -122,5 +128,110 @@ return [
 
         // 0 = baca semua halaman per project.
         'max_pages' => max(0, (int) env('CXP_CSAT_MAX_PAGES', 0)),
+
+        /*
+        | Routing kanal (Fase 6b). Nilai source dibandingkan tanpa peduli
+        | huruf besar/kecil, spasi, garis bawah, atau tanda hubung:
+        | "Google_business" == "Google Business".
+        |
+        | - wa_sources            : kirim WhatsApp; kalau nomor/akun tidak
+        |                           tersedia, pakai email bila ada, kalau
+        |                           tidak ada lewati.
+        | - email_sources         : selalu email; tanpa email dilewati.
+        | - email_fallback_sources: email bila ada, kalau tidak lewati
+        |                           (WhatsApp tidak dipakai).
+        | - skip_sources          : tidak dikirim sama sekali.
+        | - default_channel       : untuk source yang tidak dikenal.
+        */
+        'wa_sources' => $csv((string) env('CXP_CSAT_WA_SOURCES', 'WhatsApp')),
+        'email_sources' => $csv((string) env('CXP_CSAT_EMAIL_SOURCES', 'Email')),
+        'email_fallback_sources' => $csv((string) env('CXP_CSAT_EMAIL_FALLBACK_SOURCES', 'Instagram,Facebook,Google_business')),
+        'skip_sources' => $csv((string) env('CXP_CSAT_SKIP_SOURCES', 'Call,Outbound Call,WAG')),
+        'default_channel' => in_array(strtolower(trim((string) env('CXP_CSAT_DEFAULT_CHANNEL', 'email'))), ['email', 'whatsapp'], true)
+            ? strtolower(trim((string) env('CXP_CSAT_DEFAULT_CHANNEL', 'email')))
+            : 'email',
+
+        /*
+        | Onboarding workspace production (cxp:csat-onboard).
+        |
+        | projects       : kode project TransCXP => nama workspace. Kode sama
+        |                  dengan id_project, tanpa fallback.
+        | pilot_projects : kode yang boleh autosend lebih dulu. Kosong berarti
+        |                  opsi --pilot harus diisi eksplisit lewat .env.
+        | master_template_id : template CSAT sumber untuk clone. Kosong =
+        |                  pakai template default workspace legacy.
+        */
+        'projects' => array_replace(
+            [
+                '4' => 'ABC',
+                '5' => 'Transcosmos Indonesia',
+                '6' => 'Dipo Star Finance Operating Lease',
+                '8' => 'Pristine8.6+',
+                '9' => 'DKT',
+                '10' => 'Trakindo Utama',
+                '11' => 'PT. Tri Swardana Utama',
+                '12' => 'DANONE',
+                '13' => 'Hisense',
+                '14' => 'Yanmar Jembatani',
+                '15' => 'Mead Jhonson',
+                '16' => 'OMRON',
+                '17' => 'Daikin',
+                '18' => 'AIRA',
+                '19' => 'Official TCID',
+                '20' => 'Danone Bookers',
+                '21' => 'DSF',
+                '22' => 'Indofood',
+                '23' => 'Panasonic',
+                '24' => 'Yanmar Official',
+                '25' => 'Lotte Mart',
+                '26' => 'Danone Telepharma',
+            ],
+            (static function (): array {
+                $raw = trim((string) env('CXP_CSAT_PROJECTS', ''));
+                $decoded = $raw === '' ? null : json_decode($raw, true);
+
+                return is_array($decoded) ? array_map(static fn ($name): string => trim((string) $name), $decoded) : [];
+            })(),
+        ),
+        'pilot_projects' => $csv((string) env('CXP_CSAT_PILOT_PROJECTS', '')),
+        'master_template_id' => (int) env('CXP_CSAT_MASTER_TEMPLATE_ID', 0),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | TransCXP WhatsApp Broadcast API v2 (Fase 6b)
+    |--------------------------------------------------------------------------
+    |
+    | Nomor pengirim berbeda per project, jadi kredensial disimpan sebagai
+    | JSON di .env: {"<kode workspace>": {"username": "...", "password":
+    | "...", "number": "+62811..."}}. Tidak ada akun fallback: project tanpa
+    | akun tidak akan mengirim WhatsApp, supaya tidak salah nomor.
+    |
+    | Satu template dipakai semua project. Urutan parameter body diatur
+    | lewat template_params, contoh: customer_name,survey_url,project_name.
+    |
+    */
+
+    'whatsapp' => [
+        'base_url' => env('CXP_WA_BASE_URL', env('CXP_API_BASE_URL', 'https://transcxp.trans-cosmos.id')),
+        'timeout' => max(5, (int) env('CXP_WA_TIMEOUT', 30)),
+        'login_path' => env('CXP_WA_LOGIN_PATH', '/api/v2/login-user'),
+        'send_path' => env('CXP_WA_SEND_PATH', '/api/v2/messages-template'),
+        'status_path' => env('CXP_WA_STATUS_PATH', '/api/v2/messages-template'),
+        'template_id' => trim((string) env('CXP_WA_TEMPLATE_ID', '')),
+        'template_name' => trim((string) env('CXP_WA_TEMPLATE_NAME', '')),
+        'template_language' => trim((string) env('CXP_WA_TEMPLATE_LANGUAGE', 'id')),
+        'template_params' => $csv((string) env('CXP_WA_TEMPLATE_PARAMS', '')),
+
+        // Parameter tombol URL (opsional). Isi nilai misalnya "survey_url"
+        // bila template memakai tombol URL dinamis.
+        'button_url_param' => trim((string) env('CXP_WA_BUTTON_URL_PARAM', '')),
+
+        // Kunci cache token per akun; token tidak pernah ditulis ke log.
+        'token_cache_prefix' => env('CXP_WA_TOKEN_CACHE_PREFIX', 'cxp:wa:token:'),
+        'token_cache_ttl' => max(300, (int) env('CXP_WA_TOKEN_CACHE_TTL', 43200)),
+
+        'accounts' => env('CXP_WA_ACCOUNTS'),
+        'accounts_file' => env('CXP_WA_ACCOUNTS_FILE'),
     ],
 ];

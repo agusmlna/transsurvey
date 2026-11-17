@@ -6,7 +6,13 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 class AppServiceProvider extends ServiceProvider {
  // One per request/job: the workspace middleware and the model scope share this state.
- public function register(): void {$this->app->scoped(\App\Services\CurrentWorkspace::class);}
+ public function register(): void {
+  $this->app->scoped(\App\Services\CurrentWorkspace::class);
+  // Kredensial/token WhatsApp dibaca dari config saat dipakai, bukan saat boot,
+  // supaya test dan perubahan .env tidak perlu restart container.
+  $this->app->bind(\App\Services\Cxp\CxpWhatsAppAccounts::class,fn()=>\App\Services\Cxp\CxpWhatsAppAccounts::fromConfig());
+  $this->app->bind(\App\Services\Cxp\CxpWhatsAppClient::class,fn()=>\App\Services\Cxp\CxpWhatsAppClient::fromConfig());
+ }
  public function boot(): void {
   RateLimiter::for('login',fn(Request $r)=>[Limit::perMinute(5)->by(mb_strtolower((string)$r->input('email')).'|'.$r->ip()),Limit::perMinute(25)->by($r->ip())]);
   RateLimiter::for('respond',fn(Request $r)=>Limit::perMinute(30)->by($r->ip().'|'.hash('sha256',(string)$r->route('token'))));

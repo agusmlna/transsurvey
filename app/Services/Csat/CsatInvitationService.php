@@ -2,7 +2,7 @@
 
 namespace App\Services\Csat;
 
-use App\Models\{Client, Invitation, Survey, Workspace};
+use App\Models\{Client, Invitation, Survey, WhatsAppDelivery, Workspace};
 use App\Services\DeliveryService;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +19,7 @@ class CsatInvitationService
     public const OUTCOME_QUEUED = 'queued';
     public const OUTCOME_ALREADY_SENT = 'already_sent';
     public const OUTCOME_COMPLETED = 'completed';
+    public const OUTCOME_WHATSAPP_PENDING = 'whatsapp_pending';
 
     public function __construct(private readonly DeliveryService $delivery) {}
 
@@ -63,6 +64,12 @@ class CsatInvitationService
         }
 
         if ($invitation !== null && $invitation->sent_at) {
+            return ['outcome' => self::OUTCOME_ALREADY_SENT, 'invitation' => $invitation];
+        }
+
+        // Jangan kirim email kalau WhatsApp untuk undangan ini sudah terkirim:
+        // customer akan menerima dua tautan untuk tiket yang sama.
+        if ($invitation !== null && $this->whatsAppSettled($invitation)) {
             return ['outcome' => self::OUTCOME_ALREADY_SENT, 'invitation' => $invitation];
         }
 
@@ -177,6 +184,154 @@ class CsatInvitationService
         }
 
         return ['invitation' => $invitation, 'created' => $created, 'completed' => false];
+    }
+
+    /**
+     * Siapkan pengiriman WhatsApp untuk satu tiket.
+     *
+     * Tautan dibuat/dipakai ulang lewat issueLink() supaya aturan "satu tiket
+     * satu tautan" sama dengan jalur email. Pengiriman dilakukan pemanggil
+     * (command) secara sinkron; setelah sukses panggil markWhatsAppSent().
+     *
+     * @param  array{ticket_id: string, ticket_status?: string, channel?: string}  $ticket
+     * @param  array{name?: string, email?: string, wa?: string}  $customer
+     * @return array{outcome: string, invitation: Invitation, delivery: WhatsAppDelivery|null, reason: string}
+     */
+    public function prepareWhatsApp(
+        Workspace $workspace,
+        array $ticket,
+        array $customer,
+        Survey $template,
+        string $senderNumber,
+        string $templateId,
+    ): array {
+        [$ticketId, , , $customerWa] = $this->recipient($ticket, $customer, false);
+
+        if ($customerWa === '') {
+            throw ValidationException::withMessages([
+                'wa' => __('Nomor WhatsApp customer tidak tersedia.'),
+            ]);
+        }
+
+        $invitation = Invitation::withoutGlobalScopes()
+            ->where('workspace_id', $workspace->id)
+            ->where('ticket_id', $ticketId)
+            ->whereHas('survey', fn ($query) => $query->withoutGlobalScopes()->where('type', 'csat'))
+            ->first();
+
+        if ($invitation !== null && $invitation->completed_at) {
+            return ['outcome' => self::OUTCOME_COMPLETED, 'invitation' => $invitation, 'delivery' => null, 'reason' => 'completed'];
+        }
+
+        if ($invitation !== null && $invitation->sent_at) {
+            return ['outcome' => self::OUTCOME_ALREADY_SENT, 'invitation' => $invitation, 'delivery' => null, 'reason' => 'sent'];
+        }
+
+        if ($invitation !== null && $this->whatsAppSettled($invitation)) {
+            return ['outcome' => self::OUTCOME_ALREADY_SENT, 'invitation' => $invitation, 'delivery' => null, 'reason' => 'whatsapp_sent'];
+        }
+
+        if ($invitation !== null && $this->hasPendingEmail($invitation)) {
+            return ['outcome' => self::OUTCOME_ALREADY_SENT, 'invitation' => $invitation, 'delivery' => null, 'reason' => 'email_pending'];
+        }
+
+        $issued = $this->issueLink($workspace, $ticket, $customer, $template);
+        $invitation = $issued['invitation'];
+
+        if ($issued['completed']) {
+            return ['outcome' => self::OUTCOME_COMPLETED, 'invitation' => $invitation, 'delivery' => null, 'reason' => 'completed'];
+        }
+
+        $dedupeKey = 'csat-wa:'.$invitation->id;
+
+        $delivery = WhatsAppDelivery::query()->where('dedupe_key', $dedupeKey)->first();
+
+        if ($delivery !== null && $delivery->status === WhatsAppDelivery::STATUS_PENDING) {
+            return ['outcome' => self::OUTCOME_WHATSAPP_PENDING, 'invitation' => $invitation, 'delivery' => $delivery, 'reason' => 'pending'];
+        }
+
+        if ($delivery !== null && $delivery->isSettled()) {
+            return ['outcome' => self::OUTCOME_ALREADY_SENT, 'invitation' => $invitation, 'delivery' => $delivery, 'reason' => 'whatsapp_sent'];
+        }
+
+        $attributes = [
+            'workspace_id' => $workspace->id,
+            'invitation_id' => $invitation->id,
+            'recipient_number' => '+'.$customerWa,
+            'sender_number' => $senderNumber,
+            'template_id' => $templateId !== '' ? $templateId : null,
+            'status' => WhatsAppDelivery::STATUS_PENDING,
+            'failure_reason' => null,
+            'failed_at' => null,
+        ];
+
+        if ($delivery === null) {
+            $delivery = WhatsAppDelivery::create($attributes + ['dedupe_key' => $dedupeKey]);
+        } else {
+            // Percobaan sebelumnya gagal: pakai baris yang sama supaya
+            // dedupe_key tetap unik dan riwayat tidak hilang.
+            $delivery->forceFill($attributes)->save();
+        }
+
+        return ['outcome' => self::OUTCOME_CREATED, 'invitation' => $invitation, 'delivery' => $delivery, 'reason' => 'ready'];
+    }
+
+    /**
+     * Tandai pesan WhatsApp sudah diterima TransCXP.
+     *
+     * sent_at undangan baru diisi di sini, dan masa berlaku tautan dihitung
+     * dari waktu kirim tersebut.
+     */
+    public function markWhatsAppSent(
+        Workspace $workspace,
+        Invitation $invitation,
+        WhatsAppDelivery $delivery,
+        string $messageId,
+        ?\Carbon\CarbonInterface $sentAt = null,
+    ): void {
+        $sentAt = $sentAt ?? now();
+
+        $delivery->forceFill([
+            'provider_message_id' => $messageId !== '' ? $messageId : $delivery->provider_message_id,
+            'status' => WhatsAppDelivery::STATUS_SENT,
+            'sent_at' => $sentAt,
+            'failed_at' => null,
+            'failure_reason' => null,
+            'last_checked_at' => $sentAt,
+        ])->save();
+
+        $invitation->sent_at = $invitation->sent_at ?? $sentAt;
+        $invitation->expires_at = CsatSettings::expiresAt($workspace, $invitation->sent_at);
+        $invitation->save();
+    }
+
+    public function markWhatsAppFailed(WhatsAppDelivery $delivery, string $reason): void
+    {
+        $delivery->forceFill([
+            'status' => WhatsAppDelivery::STATUS_FAILED,
+            'failed_at' => now(),
+            'failure_reason' => Str::limit(trim($reason), 1000),
+            'last_checked_at' => now(),
+        ])->save();
+    }
+
+    private function whatsAppSettled(Invitation $invitation): bool
+    {
+        return $invitation->whatsapp()
+            ->whereIn('status', [
+                WhatsAppDelivery::STATUS_SENT,
+                WhatsAppDelivery::STATUS_DELIVERED,
+                WhatsAppDelivery::STATUS_READ,
+                'replied',
+            ])
+            ->exists();
+    }
+
+    private function hasPendingEmail(Invitation $invitation): bool
+    {
+        return $invitation->deliveries()
+            ->where('status', 'pending')
+            ->exists();
     }
 
     /**

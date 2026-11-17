@@ -189,6 +189,36 @@
   color: var(--ts-red);
 }
 
+.csat-autosend {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 14px 16px;
+  border: 1px solid #e6e8ec;
+  border-radius: 8px;
+  background: #fafbfc;
+  max-width: 540px;
+  cursor: pointer;
+}
+
+.csat-autosend input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.csat-autosend strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ts-ink, #1f2937);
+}
+
+.csat-autosend small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* Halaman Kirim CSAT. */
 .badge.red {
   background: #fef2f2;
