@@ -58,8 +58,8 @@ class CxpCsatWhatsAppTest extends TestCase
             'cxp.csat.max_pages' => 0,
             'cxp.csat.wa_sources' => ['WhatsApp'],
             'cxp.csat.email_sources' => ['Email'],
-            'cxp.csat.email_fallback_sources' => ['Instagram', 'Facebook', 'Google_business'],
-            'cxp.csat.skip_sources' => ['Call', 'Outbound Call', 'WAG'],
+            'cxp.csat.email_fallback_sources' => ['Instagram', 'Facebook', 'Google_business', 'Twitter', 'Livechat', 'TikTok'],
+            'cxp.csat.skip_sources' => ['Call', 'Outbound Call', 'WAG', 'Whatsapp Call', 'Whatsapp Call Outbound'],
             'cxp.csat.default_channel' => 'email',
             'cxp.whatsapp.base_url' => 'https://wa.example.test',
             'cxp.whatsapp.timeout' => 5,
@@ -80,6 +80,13 @@ class CxpCsatWhatsAppTest extends TestCase
             'cxp.whatsapp.token_cache_ttl' => 3600,
             'survey.email_enabled' => true,
             'mail.default' => 'smtp',
+            'mail.mailers.csat.transport' => 'smtp',
+            'mail.mailers.csat.host' => 'smtp-csat.example.test',
+            'mail.mailers.csat.port' => 587,
+            'mail.mailers.csat.username' => 'csat-user',
+            'mail.mailers.csat.password' => 'csat-password',
+            'mail.mailers.csat.from.address' => 'csat@example.test',
+            'mail.mailers.csat.from.name' => 'CSAT TransSurvey',
         ]);
 
         Queue::fake();
@@ -380,6 +387,38 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame(2, Invitation::withoutGlobalScopes()->count());
     }
 
+    public function test_whatsapp_call_sources_are_skipped_entirely(): void
+    {
+        $this->fakeCxp([
+            $this->ticket('WC-1', ['source' => 'Whatsapp Call', 'email' => 'call@example.test', 'wa' => '0811111111']),
+            $this->ticket('WCO-1', ['source' => 'Whatsapp Call Outbound', 'email' => 'outbound@example.test', 'wa' => '0811111112']),
+        ]);
+        $this->seedSnapshot();
+
+        [$exitCode] = $this->send();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, Invitation::withoutGlobalScopes()->count());
+        $this->assertSame(0, EmailDelivery::query()->count());
+        $this->assertSame(0, WhatsAppDelivery::query()->count());
+    }
+
+    public function test_twitter_livechat_and_tiktok_use_email_fallback(): void
+    {
+        $this->fakeCxp([
+            $this->ticket('TW-1', ['source' => 'Twitter', 'email' => 'twitter@example.test']),
+            $this->ticket('LC-1', ['source' => 'Livechat', 'email' => 'livechat@example.test']),
+            $this->ticket('TT-1', ['source' => 'TikTok', 'email' => 'tiktok@example.test']),
+        ]);
+        $this->seedSnapshot();
+
+        [$exitCode] = $this->send();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $this->countWhatsAppSends());
+        $this->assertSame(3, Invitation::withoutGlobalScopes()->count());
+    }
+
     public function test_repeated_runs_do_not_send_a_second_whatsapp_message(): void
     {
         $this->fakeCxp([$this->ticket('WA-4')]);
@@ -508,6 +547,26 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame(
             CsatChannelRouter::CHANNEL_SKIP,
             $router->route('Outbound Call', 'sari@example.test', null, $this->workspace)['channel'],
+        );
+        $this->assertSame(
+            CsatChannelRouter::CHANNEL_SKIP,
+            $router->route('Whatsapp Call', 'sari@example.test', null, $this->workspace)['channel'],
+        );
+        $this->assertSame(
+            CsatChannelRouter::CHANNEL_SKIP,
+            $router->route('Whatsapp Call Outbound', 'sari@example.test', null, $this->workspace)['channel'],
+        );
+        $this->assertSame(
+            CsatChannelRouter::CHANNEL_EMAIL,
+            $router->route('Twitter', 'sari@example.test', null, $this->workspace)['channel'],
+        );
+        $this->assertSame(
+            CsatChannelRouter::CHANNEL_EMAIL,
+            $router->route('Livechat', 'sari@example.test', null, $this->workspace)['channel'],
+        );
+        $this->assertSame(
+            CsatChannelRouter::CHANNEL_EMAIL,
+            $router->route('TikTok', 'sari@example.test', null, $this->workspace)['channel'],
         );
 
         // Nama source tidak peka huruf besar/spasi/garis bawah.

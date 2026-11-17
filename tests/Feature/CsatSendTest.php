@@ -26,6 +26,13 @@ class CsatSendTest extends TestCase
         config([
             'survey.email_enabled' => true,
             'mail.default' => 'smtp',
+            'mail.mailers.csat.transport' => 'smtp',
+            'mail.mailers.csat.host' => 'smtp-csat.example.test',
+            'mail.mailers.csat.port' => 587,
+            'mail.mailers.csat.username' => 'csat-user',
+            'mail.mailers.csat.password' => 'csat-password',
+            'mail.mailers.csat.from.address' => 'csat@example.test',
+            'mail.mailers.csat.from.name' => 'CSAT TransSurvey',
             'survey.csat_notification_roles' => ['operation', 'superadmin'],
             'cxp.launch_api_key' => 'test-launch-key',
             'cxp.launch_code_ttl' => 120,
@@ -168,7 +175,9 @@ class CsatSendTest extends TestCase
         (new SendSurveyEmail($delivery->id))->handle();
 
         Mail::assertSent(CsatInvitationMail::class, fn ($mail) => $mail->hasTo('sari@example.test')
-            && $mail->invitation->is($invitation));
+            && $mail->invitation->is($invitation)
+            && $mail->usesMailer('csat')
+            && $mail->hasFrom('csat@example.test', 'CSAT TransSurvey'));
         Mail::assertNotSent(SurveyInvitationMail::class);
 
         $invitation->refresh();
@@ -182,6 +191,55 @@ class CsatSendTest extends TestCase
         $this->assertStringNotContainsString('Kode akses', $html);
         $this->assertStringContainsString('Tanpa batas waktu', $html);
         $this->assertStringContainsString('No time limit', $html);
+    }
+
+    public function test_csat_store_refuses_when_csat_smtp_is_not_configured(): void
+    {
+        config([
+            'mail.mailers.csat.host' => null,
+            'mail.mailers.csat.from.address' => null,
+        ]);
+
+        $template = $this->template();
+
+        $this->asOperation($this->context())
+            ->post(route('csat.send.store'), ['template_id' => $template->id])
+            ->assertSessionHasErrors('mail');
+
+        $this->assertSame(0, Invitation::withoutGlobalScopes()->where('ticket_id', 'TCK-1')->count());
+        Mail::assertNothingSent();
+    }
+
+    public function test_queued_csat_job_does_not_fall_back_to_operation_smtp(): void
+    {
+        $template = $this->template();
+
+        $this->asOperation($this->context())
+            ->post(route('csat.send.store'), ['template_id' => $template->id])
+            ->assertSessionHasNoErrors();
+
+        $delivery = Invitation::withoutGlobalScopes()
+            ->where('ticket_id', 'TCK-1')
+            ->sole()
+            ->deliveries()
+            ->sole();
+
+        // SMTP CSAT dicabut setelah antrean dibuat: worker harus menolak, bukan
+        //memakai mailer `smtp` milik Operation.
+        config([
+            'mail.mailers.csat.host' => null,
+            'mail.mailers.csat.from.address' => null,
+        ]);
+
+        try {
+            (new SendSurveyEmail($delivery->id))->handle();
+            $this->fail('CSAT job harus gagal kalau SMTP CSAT belum dikonfigurasi.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('MAIL_CSAT_*', $e->getMessage());
+        }
+
+        $this->assertSame('pending', $delivery->fresh()->status);
+        Mail::assertNothingSent();
     }
 
     public function test_customer_whatsapp_is_saved_on_client_for_broadcast(): void

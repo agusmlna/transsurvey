@@ -47,6 +47,14 @@ class CsatInvitationService
      */
     public function send(Workspace $workspace, array $ticket, array $customer, Survey $template): array
     {
+        // Jalur ini selalu menghasilkan email CSAT. Tolak lebih awal supaya
+        // undangan tidak dibiarkan tanpa delivery saat SMTP CSAT belum diisi.
+        if (! CsatMail::isReady()) {
+            throw ValidationException::withMessages([
+                'mail' => __('Aktifkan SMTP CSAT (MAIL_CSAT_*) dan SURVEY_EMAIL_ENABLED pada konfigurasi server terlebih dahulu.'),
+            ]);
+        }
+
         [$ticketId, $customerEmail, $customerName, $customerWa] = $this->recipient($ticket, $customer);
 
         $client = $this->client($workspace, $customerName, $customerEmail, $customerWa);

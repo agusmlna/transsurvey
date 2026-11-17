@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\{EmailDelivery, Invitation};
 use App\Mail\{CsatInvitationMail, SurveyInvitationMail};
-use App\Services\Csat\CsatSettings;
+use App\Services\Csat\{CsatMail, CsatSettings};
 use App\Services\SurveyAccessService;
 use Illuminate\Contracts\Queue\{ShouldQueue, ShouldBeUnique};
 use Illuminate\Foundation\Queue\Queueable;
@@ -29,10 +29,18 @@ class SendSurveyEmail implements ShouldQueue, ShouldBeUnique
     {
         $existing = EmailDelivery::find($this->deliveryId);
         if (!$existing) return;
-        if (!config('survey.email_enabled') || config('mail.default') !== 'smtp') throw new \RuntimeException('SMTP sending is not enabled.');
+        if (!config('survey.email_enabled')) throw new \RuntimeException('Email sending is not enabled.');
         DB::transaction(function () use ($existing) {
             $inv = Invitation::with('survey')->lockForUpdate()->find($existing->invitation_id);
             if (!$inv) return;
+
+            $isCsat = ($inv->survey->type ?? 'client') === 'csat';
+            if ($isCsat ? ! CsatMail::isReady() : config('mail.default') !== 'smtp') {
+                throw new \RuntimeException($isCsat
+                    ? 'SMTP CSAT belum dikonfigurasi. Isi MAIL_CSAT_* sebelum mengirim undangan CSAT.'
+                    : 'SMTP sending is not enabled.');
+            }
+
             $delivery = EmailDelivery::lockForUpdate()->find($this->deliveryId);
             if (!$delivery || in_array($delivery->status, ['sent', 'skipped'])) return;
             $invalidStatusTemplate = ($delivery->kind === 'not_started' && (!$inv->sent_at || $inv->started_at))
@@ -57,7 +65,11 @@ class SendSurveyEmail implements ShouldQueue, ShouldBeUnique
                     'sent_at' => $sentAt,
                 ])->save();
 
-                Mail::to($inv->recipient_email)->send(new CsatInvitationMail($inv));
+                // Fakultatif `mailer()` pada Mailable saja tidak cukup saat
+                // dikirim lewat Mail::to(): pilih mailer CSAT di facade juga.
+                Mail::mailer(CsatMail::MAILER)
+                    ->to($inv->recipient_email)
+                    ->send(new CsatInvitationMail($inv));
                 $delivery->update(['status' => 'sent', 'sent_at' => $sentAt, 'last_error' => null]);
                 return;
             }

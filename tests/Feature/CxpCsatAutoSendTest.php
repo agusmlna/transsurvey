@@ -46,6 +46,13 @@ class CxpCsatAutoSendTest extends TestCase
             'cxp.csat.max_pages' => 0,
             'survey.email_enabled' => true,
             'mail.default' => 'smtp',
+            'mail.mailers.csat.transport' => 'smtp',
+            'mail.mailers.csat.host' => 'smtp-csat.example.test',
+            'mail.mailers.csat.port' => 587,
+            'mail.mailers.csat.username' => 'csat-user',
+            'mail.mailers.csat.password' => 'csat-password',
+            'mail.mailers.csat.from.address' => 'csat@example.test',
+            'mail.mailers.csat.from.name' => 'CSAT TransSurvey',
         ]);
 
         Queue::fake();
