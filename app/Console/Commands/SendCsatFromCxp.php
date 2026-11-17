@@ -6,6 +6,7 @@ use App\Exceptions\CxpApiException;
 use App\Models\{CxpTicketSeen, Invitation, Survey, WhatsAppDelivery, Workspace};
 use App\Services\Csat\CsatChannelRouter;
 use App\Services\Csat\CsatInvitationService;
+use App\Services\Csat\CsatMail;
 use App\Services\Csat\CsatSettings;
 use App\Services\Csat\CsatWhatsAppTemplate;
 use App\Services\Csat\WhatsAppNumber;
@@ -30,9 +31,11 @@ use Illuminate\Validation\ValidationException;
  *
  * Kanal ditentukan CsatChannelRouter dari kolom source tiket:
  * - WhatsApp  -> API WhatsApp TransCXP, fallback email bila nomor/akun kosong;
- * - Email     -> antrean SMTP TransSurvey;
- * - Instagram/Facebook/Google_business -> email bila ada, kalau tidak dilewati;
- * - Call/Outbound Call/WAG -> dilewati.
+ * - Email     -> antrean mailer `csat` (SMTP kedua);
+ * - Instagram/Facebook/Google_business/Twitter/Livechat/TikTok -> email bila ada, kalau tidak dilewati;
+ * - Call/Outbound Call/WAG/Whatsapp Call/Whatsapp Call Outbound -> dilewati.
+ *
+ * Email CSAT memakai mailer `csat` (MAIL_CSAT_*), bukan SMTP operasi (MAIL_*).
  *
  * Tanpa opsi --send command hanya simulasi: tidak ada baris database yang
  * ditulis, tidak ada email diantrekan, dan tidak ada WhatsApp dikirim.
@@ -82,8 +85,8 @@ class SendCsatFromCxp extends Command
             return self::FAILURE;
         }
 
-        if ($send && (! config('survey.email_enabled') || config('mail.default') !== 'smtp')) {
-            $this->error('SMTP belum aktif. Isi SURVEY_EMAIL_ENABLED=true dan MAIL_MAILER=smtp sebelum memakai --send.');
+        if ($send && ! CsatMail::isReady()) {
+            $this->error('SMTP CSAT belum aktif. Isi SURVEY_EMAIL_ENABLED=true dan MAIL_CSAT_HOST, MAIL_CSAT_PORT, MAIL_CSAT_USERNAME, MAIL_CSAT_PASSWORD, MAIL_CSAT_FROM_ADDRESS sebelum memakai --send.');
 
             return self::FAILURE;
         }

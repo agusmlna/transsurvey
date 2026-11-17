@@ -145,8 +145,8 @@ return [
         */
         'wa_sources' => $csv((string) env('CXP_CSAT_WA_SOURCES', 'WhatsApp')),
         'email_sources' => $csv((string) env('CXP_CSAT_EMAIL_SOURCES', 'Email')),
-        'email_fallback_sources' => $csv((string) env('CXP_CSAT_EMAIL_FALLBACK_SOURCES', 'Instagram,Facebook,Google_business')),
-        'skip_sources' => $csv((string) env('CXP_CSAT_SKIP_SOURCES', 'Call,Outbound Call,WAG')),
+        'email_fallback_sources' => $csv((string) env('CXP_CSAT_EMAIL_FALLBACK_SOURCES', 'Instagram,Facebook,Google_business,Twitter,Livechat,TikTok')),
+        'skip_sources' => $csv((string) env('CXP_CSAT_SKIP_SOURCES', 'Call,Outbound Call,WAG,Whatsapp Call,Whatsapp Call Outbound')),
         'default_channel' => in_array(strtolower(trim((string) env('CXP_CSAT_DEFAULT_CHANNEL', 'email'))), ['email', 'whatsapp'], true)
             ? strtolower(trim((string) env('CXP_CSAT_DEFAULT_CHANNEL', 'email')))
             : 'email',

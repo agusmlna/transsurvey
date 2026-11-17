@@ -4,14 +4,20 @@ namespace App\Services;
 
 use App\Models\{Invitation, EmailDelivery};
 use App\Jobs\SendSurveyEmail;
+use App\Services\Csat\CsatMail;
 use Illuminate\Validation\ValidationException;
 
 class DeliveryService
 {
     public function enqueue(Invitation $invitation, string $kind): EmailDelivery
     {
-        if (!config('survey.email_enabled') || config('mail.default') !== 'smtp')
-            throw ValidationException::withMessages(['mail' => __('Aktifkan SMTP dan SURVEY_EMAIL_ENABLED pada konfigurasi server terlebih dahulu.')]);
+        $isCsat = ($invitation->survey->type ?? 'client') === 'csat';
+
+        if (!config('survey.email_enabled') || ($isCsat ? ! CsatMail::isReady() : config('mail.default') !== 'smtp')) {
+            throw ValidationException::withMessages(['mail' => __($isCsat
+                ? 'Aktifkan SMTP CSAT (MAIL_CSAT_*) dan SURVEY_EMAIL_ENABLED pada konfigurasi server terlebih dahulu.'
+                : 'Aktifkan SMTP dan SURVEY_EMAIL_ENABLED pada konfigurasi server terlebih dahulu.')]);
+        }
         if ($invitation->is_demo)
             throw ValidationException::withMessages(['mail' => __('Pengiriman email untuk data contoh dinonaktifkan.')]);
         if ($invitation->completed_at)

@@ -19,7 +19,7 @@ tiap jam (atau manual)
       tiket yang belum pernah terlihat:
           tentukan kanal dari source tiket
           WhatsApp -> API WhatsApp TransCXP (fallback email)
-          Email    -> antrean SMTP TransSurvey
+          Email    -> antrean mailer `csat` (SMTP kedua, bukan SMTP operasi)
       simpan snapshot tiket yang sudah ditangani
   email masuk antrean -> queue worker mengirim
   cxp:csat-wa-status memeriksa status pesan WhatsApp
@@ -85,8 +85,8 @@ dengan `Google Business`).
 | --- | --- |
 | `WhatsApp` | Kirim WhatsApp bila nomor valid **dan** workspace punya akun WA; kalau tidak, fallback email; kalau email juga tidak ada, dilewati |
 | `Email` | Email TransSurvey; tanpa email dilewati |
-| `Instagram`, `Facebook`, `Google_business` | Email bila ada; tanpa email dilewati (tidak memakai WhatsApp) |
-| `Call`, `Outbound Call`, `WAG` | Dilewati sepenuhnya |
+| `Instagram`, `Facebook`, `Google_business`, `Twitter`, `Livechat`, `TikTok` | Email bila ada; tanpa email dilewati (tidak memakai WhatsApp) |
+| `Call`, `Outbound Call`, `WAG`, `Whatsapp Call`, `Whatsapp Call Outbound` | Dilewati sepenuhnya |
 | Source lain / kosong | Ikut `CXP_CSAT_DEFAULT_CHANNEL` (default `email`) |
 
 Aturan penting:
@@ -102,6 +102,33 @@ Aturan penting:
 - Status pesan disimpan di tabel `csat_whatsapp_messages` dengan dedupe
   `csat-wa:<invitation_id>`, sehingga satu undangan tidak pernah punya dua
   pesan WhatsApp.
+
+### SMTP terpisah untuk CSAT
+
+Email operasi (notifikasi admin, user, undangan non-CSAT) tetap memakai mailer
+`smtp` dengan variabel `MAIL_*`. Email undangan CSAT memakai mailer `csat`
+dengan variabel `MAIL_CSAT_*` dan identitas `From`-nya sendiri.
+
+```env
+MAIL_CSAT_SCHEME=smtp
+MAIL_CSAT_HOST=
+MAIL_CSAT_PORT=587
+MAIL_CSAT_USERNAME=
+MAIL_CSAT_PASSWORD=
+MAIL_CSAT_FROM_ADDRESS=
+MAIL_CSAT_FROM_NAME="CSAT TransSurvey"
+```
+
+Aturan yang harus dijaga:
+
+- `CsatInvitationMail` dipaksa memakai `mailer('csat')`. Jangan dihapus.
+- Kalau `MAIL_CSAT_*` belum lengkap, `cxp:csat-send --send` dan queue worker
+  **gagal dengan pesan yang jelas**. Tidak ada fallback ke SMTP operasi,
+  supaya CSAT tidak pernah keluar dengan alamat email Operation.
+- `MAIL_CSAT_FROM_ADDRESS` wajib diisi. Kalau kosong, CSAT dianggap belum siap
+  walaupun host SMTP-nya sudah ada.
+- Kredensial hanya ditulis di `.env` server. Jangan commit, dan jangan tempel
+  di chat atau tiket.
 
 Alur pengiriman WhatsApp:
 
@@ -204,8 +231,8 @@ CXP_CSAT_MAX_PAGES=0
 # Routing kanal (Fase 6b). Pisahkan dengan koma.
 CXP_CSAT_WA_SOURCES=WhatsApp
 CXP_CSAT_EMAIL_SOURCES=Email
-CXP_CSAT_EMAIL_FALLBACK_SOURCES=Instagram,Facebook,Google_business
-CXP_CSAT_SKIP_SOURCES=Call,Outbound Call,WAG
+CXP_CSAT_EMAIL_FALLBACK_SOURCES="Instagram,Facebook,Google_business,Twitter,Livechat,TikTok"
+CXP_CSAT_SKIP_SOURCES="Call,Outbound Call,WAG,Whatsapp Call,Whatsapp Call Outbound"
 CXP_CSAT_DEFAULT_CHANNEL=email
 
 # WhatsApp Broadcast API v2 (production).
