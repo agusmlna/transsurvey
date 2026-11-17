@@ -3,10 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Exceptions\CxpApiException;
-use App\Models\{CxpTicketSeen, Invitation, Survey, Workspace};
+use App\Models\{CxpTicketSeen, Invitation, Survey, WhatsAppDelivery, Workspace};
+use App\Services\Csat\CsatChannelRouter;
 use App\Services\Csat\CsatInvitationService;
+use App\Services\Csat\CsatSettings;
+use App\Services\Csat\CsatWhatsAppTemplate;
 use App\Services\Csat\WhatsAppNumber;
 use App\Services\Cxp\CxpApiClient;
+use App\Services\Cxp\CxpWhatsAppClient;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -24,12 +28,14 @@ use Illuminate\Validation\ValidationException;
  * - run pertama untuk project hanya mengisi snapshot (baseline), tidak kirim;
  * - run berikutnya mengirim tiket yang belum ada di snapshot.
  *
- * Tiket diarahkan ke workspace yang kodenya sama dengan id_project. Project
- * yang tidak punya workspace tidak pernah dipanggil, sehingga tidak ada
- * fallback diam-diam ke workspace default.
+ * Kanal ditentukan CsatChannelRouter dari kolom source tiket:
+ * - WhatsApp  -> API WhatsApp TransCXP, fallback email bila nomor/akun kosong;
+ * - Email     -> antrean SMTP TransSurvey;
+ * - Instagram/Facebook/Google_business -> email bila ada, kalau tidak dilewati;
+ * - Call/Outbound Call/WAG -> dilewati.
  *
  * Tanpa opsi --send command hanya simulasi: tidak ada baris database yang
- * ditulis dan tidak ada email yang diantrekan.
+ * ditulis, tidak ada email diantrekan, dan tidak ada WhatsApp dikirim.
  */
 class SendCsatFromCxp extends Command
 {
@@ -37,16 +43,22 @@ class SendCsatFromCxp extends Command
     private const MAX_PER_PAGE = 100;
 
     protected $signature = 'cxp:csat-send
-        {--send : Antre email sungguhan; tanpa opsi ini hanya simulasi}
+        {--send : Kirim sungguhan; tanpa opsi ini hanya simulasi}
         {--workspace= : Batasi ke satu kode workspace; default semua workspace bertemplate}
         {--ticket= : Proses satu id_ticket saja, untuk uji (melewati snapshot)}
         {--max-pages= : Batas halaman per project (0 = semua; default CXP_CSAT_MAX_PAGES)}
-        {--limit=0 : Batas email yang diantrekan (0 = semua)}';
+        {--limit=0 : Batas pesan yang dikirim (0 = semua)}
+        {--only-autosend : Hanya workspace dengan settings.csat.autosend = true}
+        {--all-workspaces : Abaikan settings.csat.autosend pada run terjadwal}';
 
-    protected $description = 'Antrekan CSAT untuk tiket TransCXP yang baru masuk status Close.';
+    protected $description = 'Kirim CSAT untuk tiket TransCXP yang baru masuk status Close.';
 
-    public function handle(CsatInvitationService $invitations): int
-    {
+    public function handle(
+        CsatInvitationService $invitations,
+        CsatChannelRouter $router,
+        CxpWhatsAppClient $waClient,
+        CsatWhatsAppTemplate $waTemplate,
+    ): int {
         $client = CxpApiClient::fromConfig();
 
         $send = (bool) $this->option('send');
@@ -76,6 +88,19 @@ class SendCsatFromCxp extends Command
             return self::FAILURE;
         }
 
+        $templateId = $waTemplate->templateId();
+        $waReady = $waClient->isConfigured() && $templateId !== '';
+
+        if ($send && ! $waReady && $router->hasAnyAccount()) {
+            $this->warn('Akun WhatsApp tersedia tetapi CXP_WA_BASE_URL/CXP_WA_TEMPLATE_ID belum lengkap; tiket WhatsApp akan memakai email.');
+        }
+
+        // Gate autosend: saklar global hanya mengatur jadwal. Run manual tetap
+        // memproses semua workspace supaya backfill dan uji satu tiket tidak
+        // tiba-tiba kosong.
+        $gateAutosend = (bool) $this->option('only-autosend')
+            || ((bool) config('cxp.csat.enabled') && ! (bool) $this->option('all-workspaces'));
+
         $workspaces = $this->workspaces();
         if ($workspaces === null) {
             return self::FAILURE;
@@ -91,15 +116,29 @@ class SendCsatFromCxp extends Command
             'tiket_tidak_ditemukan' => 0,
             'tanpa_email' => 0,
             'email_tidak_valid' => 0,
+            'tanpa_nomor_wa' => 0,
             'tanpa_template' => 0,
+            'autosend_off' => 0,
             'project_gagal' => 0,
             'sudah_ada' => 0,
+            'wa_dikirim' => 0,
+            'wa_gagal' => 0,
+            'wa_belum_siap' => 0,
+            'fallback_email' => 0,
+            'dilewati_kanal' => 0,
             'dikirim' => 0,
             'akan_dikirim' => 0,
             'gagal' => 0,
         ];
 
         foreach ($workspaces as $workspace) {
+            if ($gateAutosend && ! CsatSettings::autosend($workspace)) {
+                $counts['autosend_off']++;
+                $this->line('Workspace '.$workspace->code.' dilewati: autosend belum diaktifkan.');
+
+                continue;
+            }
+
             $template = $invitations->defaultTemplate($workspace);
 
             if ($template === null) {
@@ -113,6 +152,12 @@ class SendCsatFromCxp extends Command
         }
 
         if ($targets === []) {
+            if ($counts['autosend_off'] > 0) {
+                $this->line('Tidak ada workspace dengan autosend aktif; tidak ada yang dikirim.');
+
+                return self::SUCCESS;
+            }
+
             $this->error('Tidak ada workspace dengan template CSAT aktif sebagai default.');
 
             return self::FAILURE;
@@ -121,7 +166,13 @@ class SendCsatFromCxp extends Command
         $this->line('Endpoint  : '.$client->statusPath().' (status=Close, per_page='.$perPage.')');
         $this->line('Workspace : '.count($targets).' diproses');
         $this->line('Snapshot  : cxp_ticket_seen (run pertama = baseline, tidak mengirim)');
+        $this->line('WhatsApp  : '.($waReady ? 'siap (template '.$templateId.')' : 'belum siap, memakai email'));
         $this->line('Mode      : '.($send ? 'KIRIM' : 'SIMULASI (tidak menulis database)'));
+
+        if ($gateAutosend) {
+            $this->line('Autosend  : hanya workspace dengan settings.csat.autosend = true');
+        }
+
         $this->newLine();
 
         try {
@@ -146,11 +197,15 @@ class SendCsatFromCxp extends Command
                 $stop = $this->processWorkspace(
                     $client,
                     $invitations,
+                    $router,
+                    $waClient,
+                    $waTemplate,
                     $login['token'],
                     $workspace,
                     $template,
                     $ticketId,
                     $send,
+                    $waReady,
                     $perPage,
                     $maxPages,
                     $limit,
@@ -182,10 +237,17 @@ class SendCsatFromCxp extends Command
                 ['Tiket tidak ditemukan', $counts['tiket_tidak_ditemukan']],
                 ['Tanpa email', $counts['tanpa_email']],
                 ['Email tidak valid', $counts['email_tidak_valid']],
+                ['Tanpa nomor WA', $counts['tanpa_nomor_wa']],
                 ['Workspace tanpa template aktif', $counts['tanpa_template']],
+                ['Workspace autosend OFF', $counts['autosend_off']],
                 ['Project gagal diproses', $counts['project_gagal']],
                 ['Sudah pernah dibuatkan CSAT', $counts['sudah_ada']],
                 [$send ? 'Email diantrekan' : 'Akan diantrekan', $send ? $counts['dikirim'] : $counts['akan_dikirim']],
+                ['WhatsApp dikirim', $counts['wa_dikirim']],
+                ['WhatsApp gagal', $counts['wa_gagal']],
+                ['Fallback ke email', $counts['fallback_email']],
+                ['Dilewati menurut kanal', $counts['dilewati_kanal']],
+                ['WhatsApp belum siap (nomor/akun/template)', $counts['wa_belum_siap']],
                 ['Gagal', $counts['gagal']],
             ],
         );
@@ -197,10 +259,10 @@ class SendCsatFromCxp extends Command
 
         $this->newLine();
         if ($send) {
-            $this->info('CSAT diantrekan untuk '.$counts['dikirim'].' tiket.');
+            $this->info('CSAT dikirim untuk '.($counts['dikirim'] + $counts['wa_dikirim']).' tiket.');
         } else {
-            $this->comment('Simulasi selesai. Tidak ada data yang disimpan dan tidak ada email yang dikirim.');
-            $this->line('Jalankan ulang dengan --send untuk mengantrekan email.');
+            $this->comment('Simulasi selesai. Tidak ada data yang disimpan dan tidak ada pesan yang dikirim.');
+            $this->line('Jalankan ulang dengan --send untuk mengirim CSAT.');
         }
 
         Log::info('cxp.csat-send', [
@@ -222,11 +284,15 @@ class SendCsatFromCxp extends Command
     private function processWorkspace(
         CxpApiClient $client,
         CsatInvitationService $invitations,
+        CsatChannelRouter $router,
+        CxpWhatsAppClient $waClient,
+        CsatWhatsAppTemplate $waTemplate,
         string $token,
         Workspace $workspace,
         Survey $template,
         string $ticketId,
         bool $send,
+        bool $waReady,
         int $perPage,
         int $maxPages,
         int $limit,
@@ -298,18 +364,42 @@ class SendCsatFromCxp extends Command
 
         foreach ($newRows as $rowTicketId => $row) {
             $rowTicketId = (string) $rowTicketId;
-            $email = mb_strtolower($this->value($row, ['customer.email', 'email', 'customer_email']));
+            $rawEmail = mb_strtolower($this->value($row, ['customer.email', 'email', 'customer_email']));
+            $email = $rawEmail;
 
             if ($email === '') {
                 $counts['tanpa_email']++;
-                $toRemember[] = $rowTicketId;
-
-                continue;
+            } elseif (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $counts['email_tidak_valid']++;
+                // Email tidak valid tidak boleh dipakai untuk fallback.
+                $email = '';
             }
 
-            if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $counts['email_tidak_valid']++;
-                $toRemember[] = $rowTicketId;
+            $wa = $this->wa($row);
+
+            if ($wa === '') {
+                $counts['tanpa_nomor_wa']++;
+            }
+
+            $name = $this->value($row, ['customer.name_customer', 'name_customer', 'customer.name', 'customer_name']);
+            $channel = $this->value($row, ['source', 'channel']);
+
+            $route = $router->route($channel, $email, $wa, $workspace);
+
+            if ($route['channel'] === CsatChannelRouter::CHANNEL_WHATSAPP && ! $waReady) {
+                $route = $email !== ''
+                    ? ['channel' => CsatChannelRouter::CHANNEL_EMAIL, 'reason' => 'fallback_email', 'account' => null, 'number' => '']
+                    : ['channel' => CsatChannelRouter::CHANNEL_SKIP, 'reason' => 'wa_not_ready', 'account' => null, 'number' => ''];
+                $counts['wa_belum_siap']++;
+            }
+
+            if ($route['channel'] === CsatChannelRouter::CHANNEL_SKIP) {
+                $counts['dilewati_kanal']++;
+                // Kekurangan konfigurasi (akun/template) tidak disimpan ke
+                // snapshot supaya bisa dicoba lagi setelah diperbaiki.
+                if (! in_array($route['reason'], ['skip_no_account', 'wa_not_ready'], true)) {
+                    $toRemember[] = $rowTicketId;
+                }
 
                 continue;
             }
@@ -326,6 +416,10 @@ class SendCsatFromCxp extends Command
             if (! $send) {
                 $counts['akan_dikirim']++;
 
+                if ($route['channel'] === CsatChannelRouter::CHANNEL_EMAIL && $route['reason'] === 'fallback_email') {
+                    $counts['fallback_email']++;
+                }
+
                 if ($limit > 0 && $counts['akan_dikirim'] >= $limit) {
                     return true;
                 }
@@ -333,21 +427,45 @@ class SendCsatFromCxp extends Command
                 continue;
             }
 
-            try {
-                $result = $invitations->send(
+            $ticket = [
+                'ticket_id' => $rowTicketId,
+                'ticket_status' => $this->value($row, ['status_name', 'status_ticket', 'status']),
+                'channel' => $channel,
+            ];
+            $customer = ['name' => $name, 'email' => $email, 'wa' => $wa];
+
+            if ($route['channel'] === CsatChannelRouter::CHANNEL_WHATSAPP) {
+                $outcome = $this->sendWhatsApp(
+                    $invitations,
+                    $waClient,
+                    $waTemplate,
                     $workspace,
-                    [
-                        'ticket_id' => $rowTicketId,
-                        'ticket_status' => $this->value($row, ['status_name', 'status_ticket', 'status']),
-                        'channel' => $this->value($row, ['source', 'channel']),
-                    ],
-                    [
-                        'name' => $this->value($row, ['customer.name_customer', 'name_customer', 'customer.name', 'customer_name']),
-                        'email' => $email,
-                        'wa' => $this->wa($row),
-                    ],
+                    $ticket,
+                    $customer,
                     $template,
+                    $route,
+                    $counts,
                 );
+
+                if ($outcome === 'remember') {
+                    $toRemember[] = $rowTicketId;
+                }
+
+                if ($limit > 0 && ($counts['dikirim'] + $counts['wa_dikirim']) >= $limit) {
+                    $this->remember($projectKey, $toRemember);
+
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($route['reason'] === 'fallback_email') {
+                $counts['fallback_email']++;
+            }
+
+            try {
+                $result = $invitations->send($workspace, $ticket, $customer, $template);
 
                 if (in_array($result['outcome'], [
                     CsatInvitationService::OUTCOME_CREATED,
@@ -373,7 +491,7 @@ class SendCsatFromCxp extends Command
                 $this->warn('Tiket '.$rowTicketId.' gagal diproses. Detail aman ada di log server.');
             }
 
-            if ($limit > 0 && $counts['dikirim'] >= $limit) {
+            if ($limit > 0 && ($counts['dikirim'] + $counts['wa_dikirim']) >= $limit) {
                 $this->remember($projectKey, $toRemember);
 
                 return true;
@@ -385,6 +503,137 @@ class SendCsatFromCxp extends Command
         }
 
         return false;
+    }
+
+    /**
+     * Kirim satu pesan WhatsApp dan catat hasilnya.
+     *
+     * @param  array{ticket_id: string, ticket_status?: string, channel?: string}  $ticket
+     * @param  array{name?: string, email?: string, wa?: string}  $customer
+     * @param  array{channel: string, reason: string, account: array<string, mixed>|null, number: string}  $route
+     * @param  array<string, int>  $counts
+     * @return string "remember" bila tiket harus masuk snapshot
+     */
+    private function sendWhatsApp(
+        CsatInvitationService $invitations,
+        CxpWhatsAppClient $waClient,
+        CsatWhatsAppTemplate $waTemplate,
+        Workspace $workspace,
+        array $ticket,
+        array $customer,
+        Survey $template,
+        array $route,
+        array &$counts,
+    ): string {
+        $account = $route['account'];
+
+        if (! is_array($account)) {
+            $counts['wa_belum_siap']++;
+
+            return 'retry';
+        }
+
+        try {
+            $prepared = $invitations->prepareWhatsApp(
+                $workspace,
+                $ticket,
+                $customer,
+                $template,
+                (string) ($account['number'] ?? ''),
+                $waTemplate->templateId(),
+            );
+
+            if (in_array($prepared['outcome'], [
+                CsatInvitationService::OUTCOME_COMPLETED,
+                CsatInvitationService::OUTCOME_ALREADY_SENT,
+                CsatInvitationService::OUTCOME_WHATSAPP_PENDING,
+            ], true)) {
+                $counts['sudah_ada']++;
+
+                return 'remember';
+            }
+
+            $delivery = $prepared['delivery'];
+            $invitation = $prepared['invitation'];
+
+            if ($delivery === null) {
+                $counts['wa_gagal']++;
+
+                return 'retry';
+            }
+
+            $components = $waTemplate->components($invitation, $workspace);
+
+            $result = $waClient->sendTemplate(
+                $account,
+                $waTemplate->templateId(),
+                (string) $invitation->recipient_name,
+                $route['number'],
+                $components,
+            );
+
+            $invitations->markWhatsAppSent($workspace, $invitation, $delivery, $result['message_id']);
+            $counts['wa_dikirim']++;
+
+            return 'remember';
+        } catch (CxpApiException $e) {
+            $counts['wa_gagal']++;
+
+            if (isset($delivery) && $delivery instanceof WhatsAppDelivery) {
+                $invitations->markWhatsAppFailed($delivery, $e->getMessage());
+            }
+
+            if ($this->isTransient($e)) {
+                $this->warn('WhatsApp tiket '.$ticket['ticket_id'].' gagal sementara: '.$e->getMessage());
+
+                // Tidak dimasukkan snapshot: run berikutnya mencoba lagi.
+                return 'retry';
+            }
+
+            $this->warn('WhatsApp tiket '.$ticket['ticket_id'].' ditolak: '.$e->getMessage());
+
+            // Penolakan permanen: kalau ada email, kirim lewat email sebagai
+            // cadangan supaya customer tetap menerima tautan.
+            if (($customer['email'] ?? '') !== '') {
+                try {
+                    $result = $invitations->send($workspace, $ticket, $customer, $template);
+                    if (in_array($result['outcome'], [
+                        CsatInvitationService::OUTCOME_CREATED,
+                        CsatInvitationService::OUTCOME_QUEUED,
+                    ], true)) {
+                        $counts['dikirim']++;
+                        $counts['fallback_email']++;
+                    }
+                } catch (\Throwable $mailError) {
+                    report($mailError);
+                    $counts['gagal']++;
+                }
+            }
+
+            return 'remember';
+        } catch (ValidationException $e) {
+            $counts['gagal']++;
+            $this->warn('Tiket '.$ticket['ticket_id'].' dilewati: '.$e->validator->errors()->first());
+
+            return 'remember';
+        } catch (\Throwable $e) {
+            report($e);
+            $counts['wa_gagal']++;
+            $this->warn('WhatsApp tiket '.$ticket['ticket_id'].' gagal diproses. Detail aman ada di log server.');
+
+            return 'retry';
+        }
+    }
+
+    /**
+     * Gangguan jaringan/5xx/rate limit boleh dicoba ulang pada run berikutnya.
+     */
+    private function isTransient(CxpApiException $e): bool
+    {
+        return $e->reason === 'connection'
+            || $e->status === 0
+            || $e->status === 429
+            || $e->status >= 500;
     }
 
     /**
@@ -509,7 +758,12 @@ class SendCsatFromCxp extends Command
     }
 
     /**
-     * Kumpulkan id_ticket yang sudah punya undangan CSAT di workspace ini.
+     * Kumpulkan id_ticket yang sudah selesai diproses di workspace ini.
+     *
+     * Undangan yang dibuat tetapi belum terkirim (tidak punya sent_at dan
+     * tidak punya delivery aktif) sengaja tidak dihitung supaya bisa dicoba
+     * ulang setelah gangguan sementara. Delivery berstatus failed juga tidak
+     * dihitung: belum ada pesan yang diterima customer.
      *
      * @param  array<int, string>  $ticketIds
      * @return array<string, true>
@@ -522,13 +776,35 @@ class SendCsatFromCxp extends Command
             return [];
         }
 
-        return Invitation::withoutGlobalScopes()
+        $invitations = Invitation::withoutGlobalScopes()
             ->where('workspace_id', $workspaceId)
             ->whereIn('ticket_id', $ticketIds)
             ->whereHas('survey', fn ($query) => $query->withoutGlobalScopes()->where('type', 'csat'))
-            ->pluck('ticket_id')
-            ->mapWithKeys(fn ($id) => [(string) $id => true])
-            ->all();
+            ->withExists([
+                'deliveries as active_email_exists' => fn ($query) => $query->whereIn('status', ['pending', 'sent']),
+                'whatsapp as settled_whatsapp_exists' => fn ($query) => $query->whereIn('status', [
+                    WhatsAppDelivery::STATUS_SENT,
+                    WhatsAppDelivery::STATUS_DELIVERED,
+                    WhatsAppDelivery::STATUS_READ,
+                    'replied',
+                ]),
+            ])
+            ->get();
+
+        $existing = [];
+
+        foreach ($invitations as $invitation) {
+            if (
+                $invitation->completed_at !== null
+                || $invitation->sent_at !== null
+                || (bool) $invitation->active_email_exists
+                || (bool) $invitation->settled_whatsapp_exists
+            ) {
+                $existing[(string) $invitation->ticket_id] = true;
+            }
+        }
+
+        return $existing;
     }
 
     /**

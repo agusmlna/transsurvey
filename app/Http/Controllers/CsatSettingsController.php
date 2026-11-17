@@ -17,6 +17,7 @@ class CsatSettingsController
             'workspace' => $workspace,
             'expiryUnit' => $csat['expiry_unit'] ?? 'unlimited',
             'expiryValue' => $csat['expiry_value'] ?? null,
+            'autosend' => filter_var($csat['autosend'] ?? false, FILTER_VALIDATE_BOOL),
         ]);
     }
 
@@ -25,16 +26,22 @@ class CsatSettingsController
         $data = $request->validate([
             'expiry_unit' => 'required|in:minutes,hours,days,unlimited',
             'expiry_value' => 'nullable|integer|min:1|max:525600|required_unless:expiry_unit,unlimited',
+            'autosend' => 'nullable|boolean',
         ]);
 
         $workspace = $this->workspace();
         $settings = $workspace->settings ?? [];
 
-        // Keep other workspace settings untouched.
-        $settings['csat'] = [
-            'expiry_unit' => $data['expiry_unit'],
-            'expiry_value' => $data['expiry_unit'] === 'unlimited' ? null : (int) $data['expiry_value'],
-        ];
+        // Keep other workspace settings untouched (send_mode, dan kunci lain
+        // yang mungkin ditambahkan fase berikutnya).
+        $settings['csat'] = array_merge(
+            is_array($settings['csat'] ?? null) ? $settings['csat'] : [],
+            [
+                'expiry_unit' => $data['expiry_unit'],
+                'expiry_value' => $data['expiry_unit'] === 'unlimited' ? null : (int) $data['expiry_value'],
+                'autosend' => (bool) ($data['autosend'] ?? false),
+            ],
+        );
 
         $workspace->settings = $settings;
         $workspace->save();

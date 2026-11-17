@@ -11,6 +11,7 @@ class Invitation extends Model {
  public function client(){return $this->belongsTo(Client::class);}
  public function response(){return $this->hasOne(SurveyResponse::class);}
  public function deliveries(){return $this->hasMany(EmailDelivery::class);}
+ public function whatsapp(){return $this->hasMany(WhatsAppDelivery::class);}
  // An invitation always lives in its survey's workspace.
  protected function inheritedWorkspaceId(): ?int {return Survey::withoutGlobalScopes()->whereKey($this->survey_id)->value('workspace_id');}
  public function surveyUrl(): string {return route('survey.public',$this->token);}

@@ -19,7 +19,7 @@
             $expiryUnit === 'unlimited'
                 ? __('Tanpa batas waktu.')
                 : __(
-                    'Berlaku selama :value :unit sejak email terkirim.',
+                    'Berlaku selama :value :unit sejak pesan terkirim.',
                     ['value' => $expiryValue, 'unit' => $unitLabels[$expiryUnit] ?? $expiryUnit],
                 );
     @endphp
@@ -28,7 +28,7 @@
         <div class="panel-heading">
             <div>
                 <h2>{{ __('Masa berlaku tautan') }}</h2>
-                <p>{{ __('Dihitung sejak email CSAT berhasil terkirim ke customer.') }}</p>
+                <p>{{ __('Dihitung sejak pesan CSAT berhasil terkirim ke customer.') }}</p>
             </div>
             <span class="badge blue">{{ $workspace->name }}</span>
         </div>
@@ -84,6 +84,15 @@
                 </p>
             </div>
 
+            <label class="csat-autosend">
+                <input type="hidden" name="autosend" value="0">
+                <input type="checkbox" name="autosend" value="1" @checked(old('autosend', $autosend))>
+                <span>
+                    <strong>{{ __('Kirim otomatis untuk tiket baru') }}</strong>
+                    <small>{{ __('Ikut jadwal otomatis bila CXP_CSAT_AUTOSEND aktif di server.') }}</small>
+                </span>
+            </label>
+
             <div class="form-actions">
                 <a class="btn" href="{{ route('csat.templates.index') }}">{{ __('Batal') }}</a>
                 <button class="btn primary">{{ __('Simpan pengaturan') }}</button>
@@ -111,7 +120,7 @@
 
                 preview.textContent = unlimited
                     ? window.TransSurveyI18n.t('Tanpa batas waktu.')
-                    : window.TransSurveyI18n.t('Berlaku selama :value :unit sejak email terkirim.', {
+                    : window.TransSurveyI18n.t('Berlaku selama :value :unit sejak pesan terkirim.', {
                         value: value.value || '…',
                         unit: unitLabels[unit.value] || unit.value,
                     });

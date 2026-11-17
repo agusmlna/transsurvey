@@ -16,7 +16,7 @@ class CsatSettings
     public const UNITS = ['minutes', 'hours', 'days', 'unlimited'];
 
     /**
-     * @return array{expiry_unit: string, expiry_value: int|null, send_mode: string}
+     * @return array{expiry_unit: string, expiry_value: int|null, send_mode: string, autosend: bool}
      */
     public static function for(Workspace $workspace): array
     {
@@ -36,7 +36,15 @@ class CsatSettings
             'send_mode' => in_array($csat['send_mode'] ?? null, ['manual', 'auto'], true)
                 ? $csat['send_mode']
                 : 'manual',
+            // Izin per workspace untuk ikut jadwal otomatis. Pengaturan
+            // global CXP_CSAT_AUTOSEND tetap menjadi saklar utama.
+            'autosend' => filter_var($csat['autosend'] ?? false, FILTER_VALIDATE_BOOL),
         ];
+    }
+
+    public static function autosend(Workspace $workspace): bool
+    {
+        return self::for($workspace)['autosend'];
     }
 
     public static function expiresAt(Workspace $workspace, CarbonInterface $sentAt): ?CarbonInterface
@@ -65,7 +73,7 @@ class CsatSettings
             'days' => __('hari'),
         ];
 
-        return __(':value :unit sejak email terkirim', [
+        return __(':value :unit sejak pesan terkirim', [
             'value' => $settings['expiry_value'],
             'unit' => $units[$settings['expiry_unit']] ?? $settings['expiry_unit'],
         ]);
