@@ -257,6 +257,38 @@ class CxpApiClient
     }
 
     /**
+     * Baca akun WhatsApp per id_project.
+     *
+     * Response TransCXP: {"status": true, "data": [{"id": 95,
+     * "source": "whatsapp", "active": "yes",
+     * "whatsapp_number": "628111660770", ...}]}
+     *
+     * Endpoint ini berada di host WhatsApp (bukan host tiket), jadi base URL
+     * dan path bisa diatur lewat config tanpa mengubah klien.
+     *
+     * @return array<string, mixed>
+     */
+    public function accountWaProjects(string $token, string|int $idProject, string $path, ?string $baseUrl = null): array
+    {
+        $id = trim((string) $idProject);
+
+        if ($id === '' || ! preg_match('/^[A-Za-z0-9_-]+$/', $id)) {
+            throw new CxpApiException(
+                'invalid_argument',
+                'id_project tidak valid.',
+                0,
+                ['id_project' => $id],
+            );
+        }
+
+        $path = self::normalizePath($path, '/api/v1/accountWaProject/{id_project}');
+        $path = str_replace('{id_project}', rawurlencode($id), $path);
+        $base = rtrim((string) ($baseUrl ?: $this->baseUrl), '/');
+
+        return $this->getUrl($base.$path, $token, [], $path);
+    }
+
+    /**
      * GET read-only ke path bebas untuk menebak endpoint yang tersedia.
      * Tidak melempar exception saat status bukan 2xx: status dan field
      * dikembalikan apa adanya supaya bisa ditampilkan sebagai hasil probe.
@@ -290,14 +322,24 @@ class CxpApiClient
 
     private function get(string $path, string $token, array $query): array
     {
+        return $this->getUrl($this->baseUrl.$path, $token, $query, $path);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function getUrl(string $url, string $token, array $query = [], ?string $path = null): array
+    {
+        $path ??= $url;
+
         try {
-            $response = $this->request($token)->get($this->baseUrl.$path, $query);
+            $response = $this->request($token)->get($url, $query);
         } catch (ConnectionException $e) {
             throw new CxpApiException(
                 'connection',
                 'Tidak bisa terhubung ke API TransCXP.',
                 0,
-                ['path' => $path, 'base_url' => $this->baseUrl],
+                ['path' => $path, 'url' => $url],
             );
         }
 
@@ -310,7 +352,7 @@ class CxpApiClient
                 'invalid_response',
                 'Response API TransCXP bukan JSON objek.',
                 $response->status(),
-                ['path' => $path],
+                ['path' => $path, 'url' => $url],
             );
         }
 

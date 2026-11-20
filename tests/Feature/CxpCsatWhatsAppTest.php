@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\{CxpTicketSeen, EmailDelivery, Invitation, Question, Survey, User, WhatsAppDelivery, Workspace};
+use App\Services\Cxp\CxpWhatsAppAccounts;
 use App\Services\Csat\CsatChannelRouter;
 use App\Services\Csat\CsatSettings;
 use App\Services\CurrentWorkspace;
@@ -772,5 +773,66 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame($first->id, $second->id);
         $this->assertSame($first->surveyUrl(), $second->surveyUrl());
         $this->assertNotNull(Str::after($first->surveyUrl(), '/s/'));
+    }
+
+    public function test_whatsapp_account_keeps_account_id_as_audit_metadata(): void
+    {
+        config(['cxp.whatsapp.accounts' => json_encode([
+            '23' => [
+                'username' => 'wa-user',
+                'password' => 'wa-password',
+                'number' => '628111660770',
+                'account_id' => 95,
+            ],
+        ])]);
+
+        $account = CxpWhatsAppAccounts::fromConfig()->forWorkspace('23');
+
+        $this->assertNotNull($account);
+        $this->assertSame('+628111660770', $account['number']);
+        $this->assertSame('95', $account['account_id']);
+    }
+
+    public function test_whatsapp_accounts_use_only_active_channels_and_inherit_credentials(): void
+    {
+        config(['cxp.whatsapp.accounts' => json_encode([
+            '9' => [
+                'username' => 'dkt@trans-cosmos.co.id',
+                'password' => 'rahasia',
+                'channels' => [
+                    [
+                        'account_id' => '20',
+                        'number' => '62811139005271',
+                        'active' => 'no',
+                    ],
+                    [
+                        'id' => 110,
+                        'number' => '6281113900527',
+                        'whatsapp_name' => 'Berani Berencana',
+                        'active' => 'yes',
+                    ],
+                    [
+                        'id' => 107,
+                        'number' => '6281119726459',
+                        'whatsapp_name' => 'DKT News',
+                        'active' => 'yes',
+                    ],
+                ],
+            ],
+        ])]);
+
+        $accounts = CxpWhatsAppAccounts::fromConfig();
+
+        $primary = $accounts->forWorkspace('9');
+        $this->assertNotNull($primary);
+        $this->assertSame('dkt@trans-cosmos.co.id', $primary['username']);
+        $this->assertSame('+6281113900527', $primary['number']);
+        $this->assertSame('110', $primary['account_id']);
+        $this->assertSame('Berani Berencana', $primary['name']);
+
+        $channels = $accounts->channelsForWorkspace('9');
+        $this->assertCount(2, $channels);
+        $this->assertSame('+6281119726459', $channels[1]['number']);
+        $this->assertSame('107', $channels[1]['account_id']);
     }
 }
