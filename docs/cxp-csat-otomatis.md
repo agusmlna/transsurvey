@@ -91,10 +91,17 @@ dengan `Google Business`).
 
 Aturan penting:
 
-- **Nomor pengirim berbeda per project.** Kredensial WhatsApp per workspace
-  disimpan di `.env` (`CXP_WA_ACCOUNTS`). Tidak ada akun fallback: project tanpa
-  akun tidak akan mengirim WhatsApp supaya pesan tidak keluar dari nomor
-  project lain.
+- **Nomor pengirim berbeda per project.** Kredensial User API v2
+  (email + password) per workspace disimpan di `.env` (`CXP_WA_ACCOUNTS`) atau
+  di file server (`CXP_WA_ACCOUNTS_FILE`). Login memakai
+  `/api/v2/login-user`; token-nya dipakai `/api/v2/messages-template`.
+  Tidak ada akun fallback: project tanpa akun tidak akan mengirim WhatsApp
+  supaya pesan tidak keluar dari nomor project lain.
+- Satu project boleh punya banyak channel aktif. Daftar channel disimpan di
+  `channels`; akun dengan `active: no` diabaikan. Kredensial bisa ditaruh di
+  level project dan diwariskan ke semua channel. Karena endpoint v2 tidak punya
+  pemilih channel, nomor yang keluar tetap ditentukan oleh akun login project
+  tersebut.
 - Satu template WhatsApp dipakai semua project. Nama project bisa muncul di
   dalam template lewat parameter body, jadi tidak perlu template per project.
 - Tautan tetap satu per tiket. Jalur WhatsApp memakai aturan yang sama dengan
@@ -147,6 +154,47 @@ Endpoint kirim yang dipakai adalah `POST /api/v2/messages-template` sesuai
 dokumen WhatsApp Broadcast API v2. Dokumen yang sama juga memuat contoh curl
 `/api/v2/messages-broadcast`; kalau TransCXP mengonfirmasi path lain, ganti
 `CXP_WA_SEND_PATH` tanpa mengubah kode.
+
+#### Sumber nomor pengirim per project
+
+`whatsapp_number`, `id`, dan daftar akun aktif dari
+`/api/v1/accountWaProject/{id_project}` bisa diisi otomatis ke
+`CXP_WA_ACCOUNTS_FILE`:
+
+```bash
+php artisan cxp:csat-wa-accounts-sync --projects=23 --dry-run
+php artisan cxp:csat-wa-accounts-sync --projects=23
+```
+
+Per project yang tersinkron: `number` <- `whatsapp_number` (diawali `+`) dan
+`account_id` <- field `id`. Bila ada lebih dari satu akun aktif, semua akun
+ditulis ke `channels` (berisi `account_id`, `number`, `name`, `active`). Akun
+dengan `active != yes` dilewati. Username/password API v2 tidak pernah ditimpa;
+kredensial bisa ditaruh di level project dan dipakai untuk semua channel.
+
+Contoh untuk project dengan banyak channel (DKT):
+
+```json
+{
+  "9": {
+    "username": "dkt@trans-cosmos.co.id",
+    "password": "<password asli di server>",
+    "number": "+6281113900527",
+    "account_id": "110",
+    "channels": [
+      {"account_id": "110", "number": "+6281113900527", "name": "Berani Berencana", "active": "yes"},
+      {"account_id": "107", "number": "+6281119726459", "name": "DKT News", "active": "yes"},
+      {"account_id": "106", "number": "+628111326459", "name": "Halo DKT", "active": "yes"}
+    ]
+  }
+}
+```
+
+**Batasan penting:** `messages-template` tidak punya parameter pengirim, jadi
+`channels` hanya metadata/audit. Nomor yang muncul di WA ditentukan oleh akun
+User API yang dipakai login. Kalau satu project perlu mengirim dari beberapa
+nomor berbeda, TransCXP harus menyediakan endpoint/field pemilih channel;
+endpoint lama tidak diubah.
 
 Status pesan (`sent` -> `delivered` -> `read`, atau `failed`) tidak punya
 webhook, jadi diperiksa oleh command terjadwal:
@@ -254,15 +302,17 @@ CXP_WA_TOKEN_CACHE_TTL=43200
 CXP_API_STATUS_PATH=/api/v1/dataTicketByStatus
 ```
 
-`CXP_WA_ACCOUNTS` berisi JSON objek dengan kode workspace sebagai key:
+`CXP_WA_ACCOUNTS` berisi JSON objek dengan kode workspace sebagai key. Format
+singkat satu akun:
 
 ```json
-{"22":{"username":"user-project-22","password":"rahasia","number":"+62811xxxxxxx"}}
+{"22":{"username":"indofood@trans-cosmos.co.id","password":"...","number":"+628891122888"}}
 ```
 
-Kalau JSON lebih nyaman disimpan sebagai file, isi `CXP_WA_ACCOUNTS_FILE` dengan
-path file di server. Hanya salah satu yang perlu diisi. Password/token tidak
-pernah ditulis ke log.
+Format dengan banyak channel aktif ada di bagian "Sumber nomor pengirim per
+project". Kalau JSON lebih nyaman disimpan sebagai file, isi
+`CXP_WA_ACCOUNTS_FILE` dengan path file di server. Hanya salah satu yang perlu
+diisi. Password/token tidak pernah ditulis ke log.
 
 `CXP_API_TICKET_PATH` dan `CXP_API_DETAIL_PATH` tidak dipakai command CSAT;
 keduanya dipertahankan untuk `cxp:inspect` dan probe.
@@ -397,8 +447,10 @@ hanya project itu yang dipanggil.
   tidak bisa diubah bebas dari kode; ubah template di TransCXP lalu sesuaikan
   `CXP_WA_TEMPLATE_ID`/`CXP_WA_TEMPLATE_PARAMS`.
 - Tidak ada webhook status WhatsApp; status diambil lewat `cxp:csat-wa-status`.
-- Nomor pengirim harus terdaftar pada akun project masing-masing. Tidak ada
-  akun/nomor fallback.
+- Nomor pengirim mengikuti akun User API project masing-masing. Tidak ada
+  akun/nomor fallback lintas project. Channel `active: no` tidak dipakai.
+- Untuk project dengan beberapa channel aktif, daftar `channels` tersimpan sebagai
+  metadata. Memilih nomor antar-channel membutuhkan endpoint khusus TransCXP.
 - Kode workspace harus sama dengan `id_project` TransCXP.
 - Kalau tiket berubah dari Close → Open → Close lagi, tiket itu tidak dikirim
   ulang karena sudah ada di snapshot. Ini disengaja (satu tiket satu CSAT).

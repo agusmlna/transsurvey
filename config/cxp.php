@@ -202,19 +202,35 @@ return [
     | TransCXP WhatsApp Broadcast API v2 (Fase 6b)
     |--------------------------------------------------------------------------
     |
-    | Nomor pengirim berbeda per project, jadi kredensial disimpan sebagai
-    | JSON di .env: {"<kode workspace>": {"username": "...", "password":
-    | "...", "number": "+62811..."}}. Tidak ada akun fallback: project tanpa
-    | akun tidak akan mengirim WhatsApp, supaya tidak salah nomor.
+    | Kredensial User API v2 (email + password) disimpan per project di
+    | CXP_WA_ACCOUNTS / CXP_WA_ACCOUNTS_FILE. Hasil /api/v2/login-user
+    | dipakai untuk /api/v2/messages-template.
+    |
+    | Endpoint v2 TIDAK punya parameter pengirim, jadi nomor pengirim
+    | ditentukan oleh akun yang dipakai login. Tiap project memakai
+    | email+password sendiri; tidak ada fallback lintas project.
+    |
+    | `number` HANYA catatan audit (sender_number). `account_id` dan
+    | `channels` dari /api/v1/accountWaProject/{id_project} disimpan sebagai
+    | metadata channel aktif. Akun `active: no` dilewati. Untuk project dengan
+    | banyak channel, kredensial bisa ditaruh di level project dan diwariskan
+    | ke semua channel. Pemilihan nomor antar-channel dalam satu project masih
+    | memerlukan endpoint/field khusus dari TransCXP.
     |
     | Satu template dipakai semua project. Urutan parameter body diatur
-    | lewat template_params, contoh: customer_name,survey_url,project_name.
+    | lewat template_params, contoh: customer_name,survey_url.
     |
     */
 
     'whatsapp' => [
         'base_url' => env('CXP_WA_BASE_URL', env('CXP_API_BASE_URL', 'https://transcxp.trans-cosmos.id')),
         'timeout' => max(5, (int) env('CXP_WA_TIMEOUT', 30)),
+
+        // Sumber nomor pengirim (sender_number) + account_id per project.
+        // Dipakai cxp:csat-wa-accounts-sync untuk mengisi CXP_WA_ACCOUNTS_FILE.
+        'account_base_url' => env('CXP_WA_ACCOUNT_BASE_URL', env('CXP_WA_BASE_URL', env('CXP_API_BASE_URL', 'https://transcxp.trans-cosmos.id'))),
+        'account_path' => env('CXP_WA_ACCOUNT_PATH', '/api/v1/accountWaProject/{id_project}'),
+
         'login_path' => env('CXP_WA_LOGIN_PATH', '/api/v2/login-user'),
         'send_path' => env('CXP_WA_SEND_PATH', '/api/v2/messages-template'),
         'status_path' => env('CXP_WA_STATUS_PATH', '/api/v2/messages-template'),

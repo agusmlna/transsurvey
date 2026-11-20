@@ -513,7 +513,7 @@ class SendCsatFromCxp extends Command
      *
      * @param  array{ticket_id: string, ticket_status?: string, channel?: string}  $ticket
      * @param  array{name?: string, email?: string, wa?: string}  $customer
-     * @param  array{channel: string, reason: string, account: array<string, mixed>|null, number: string}  $route
+     * @param  array{channel: string, reason: string, account: array<string, mixed>|null, number: string}  $route number di sini = nomor PENERIMA
      * @param  array<string, int>  $counts
      * @return string "remember" bila tiket harus masuk snapshot
      */
@@ -529,6 +529,8 @@ class SendCsatFromCxp extends Command
         array &$counts,
     ): string {
         $account = $route['account'];
+        $senderAuditNumber = is_array($account) ? (string) ($account['number'] ?? '') : '';
+        $recipientNumber = $route['number'];
 
         if (! is_array($account)) {
             $counts['wa_belum_siap']++;
@@ -542,7 +544,7 @@ class SendCsatFromCxp extends Command
                 $ticket,
                 $customer,
                 $template,
-                (string) ($account['number'] ?? ''),
+                $senderAuditNumber,
                 $waTemplate->templateId(),
             );
 
@@ -571,7 +573,7 @@ class SendCsatFromCxp extends Command
                 $account,
                 $waTemplate->templateId(),
                 (string) $invitation->recipient_name,
-                $route['number'],
+                $recipientNumber,
                 $components,
             );
 
