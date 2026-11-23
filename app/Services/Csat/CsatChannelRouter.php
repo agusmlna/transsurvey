@@ -26,6 +26,8 @@ class CsatChannelRouter
     private array $emailFallbackSources;
     /** @var array<int, string> */
     private array $skipSources;
+    /** @var array<int, string> */
+    private array $emailOnlyProjects;
     private string $defaultChannel;
 
     public function __construct(private readonly CxpWhatsAppAccounts $accounts)
@@ -34,6 +36,7 @@ class CsatChannelRouter
         $this->emailSources = self::normalizeList((array) config('cxp.csat.email_sources', ['Email']));
         $this->emailFallbackSources = self::normalizeList((array) config('cxp.csat.email_fallback_sources', []));
         $this->skipSources = self::normalizeList((array) config('cxp.csat.skip_sources', []));
+        $this->emailOnlyProjects = self::normalizeCodes((array) config('cxp.csat.email_only_projects', []));
         $this->defaultChannel = (string) config('cxp.csat.default_channel', 'email') === self::CHANNEL_WHATSAPP
             ? self::CHANNEL_WHATSAPP
             : self::CHANNEL_EMAIL;
@@ -56,6 +59,14 @@ class CsatChannelRouter
 
         if (in_array($sourceKey, $this->skipSources, true)) {
             return $this->result(self::CHANNEL_SKIP, 'skip_source');
+        }
+
+        // Project email-only (mis. Trakindo) tidak memakai WA walaupun source
+        // dan nomornya tersedia. Tanpa email tetap dilewati.
+        if (in_array(self::workspaceCode($workspace), $this->emailOnlyProjects, true)) {
+            return $hasEmail
+                ? $this->result(self::CHANNEL_EMAIL, 'email_only')
+                : $this->result(self::CHANNEL_SKIP, 'skip_no_email');
         }
 
         $preferWhatsApp = in_array($sourceKey, $this->waSources, true);
@@ -105,6 +116,30 @@ class CsatChannelRouter
     public function hasAnyAccount(): bool
     {
         return $this->accounts->codes() !== [];
+    }
+
+    private static function workspaceCode(Workspace|string|int|null $workspace): string
+    {
+        return trim((string) ($workspace instanceof Workspace ? $workspace->code : $workspace));
+    }
+
+    /**
+     * @param  array<int, mixed>  $values
+     * @return array<int, string>
+     */
+    private static function normalizeCodes(array $values): array
+    {
+        $codes = [];
+
+        foreach ($values as $value) {
+            $code = trim((string) $value);
+
+            if ($code !== '') {
+                $codes[] = $code;
+            }
+        }
+
+        return array_values(array_unique($codes));
     }
 
     public static function normalizeSource(?string $source): string

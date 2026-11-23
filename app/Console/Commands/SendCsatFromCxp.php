@@ -707,6 +707,13 @@ class SendCsatFromCxp extends Command
     private function workspaces(): ?Collection
     {
         $code = trim((string) ($this->option('workspace') ?: config('cxp.csat.workspace')));
+        $disabled = $this->disabledProjects();
+
+        if (in_array($code, $disabled, true)) {
+            $this->error('Workspace dengan kode '.$code.' sudah dinonaktifkan untuk CSAT TransCXP.');
+
+            return null;
+        }
 
         if ($code !== '') {
             $workspace = Workspace::query()
@@ -728,8 +735,20 @@ class SendCsatFromCxp extends Command
             ->whereNotNull('code')
             ->where('code', '<>', '')
             ->whereNotNull('default_csat_survey_id')
+            ->whereNotIn('code', $disabled)
             ->orderBy('code')
             ->get();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function disabledProjects(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn ($code): string => trim((string) $code),
+            (array) config('cxp.csat.disabled_projects', []),
+        ), static fn (string $code): bool => $code !== ''));
     }
 
     /**

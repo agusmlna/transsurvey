@@ -335,6 +335,22 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame('wamid-1', $delivery->provider_message_id);
     }
 
+    public function test_email_only_workspace_never_sends_whatsapp(): void
+    {
+        config(['cxp.csat.email_only_projects' => ['brand-a']]);
+
+        $this->fakeCxp([$this->ticket('EO-1', ['email' => 'sari@example.test'])]);
+        $this->seedSnapshot();
+
+        [$exitCode] = $this->send();
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame(0, $this->countWhatsAppSends());
+        $this->assertSame(0, WhatsAppDelivery::query()->count());
+        $this->assertSame('sari@example.test', Invitation::withoutGlobalScopes()->where('ticket_id', 'EO-1')->value('recipient_email'));
+        $this->assertSame(1, EmailDelivery::query()->count());
+    }
+
     public function test_whatsapp_source_without_account_falls_back_to_email(): void
     {
         config(['cxp.whatsapp.accounts' => json_encode([])]);
@@ -391,6 +407,30 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame(0, Invitation::withoutGlobalScopes()->count());
         $this->assertSame(0, EmailDelivery::query()->count());
         $this->assertSame(0, WhatsAppDelivery::query()->count());
+    }
+
+    public function test_disabled_project_is_excluded_from_csat_send(): void
+    {
+        config(['cxp.csat.disabled_projects' => ['brand-a']]);
+
+        $this->fakeCxp([$this->ticket('OFF-1', ['email' => 'sari@example.test'])]);
+        $this->seedSnapshot();
+
+        [$exitCode, $output] = $this->send();
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Tidak ada workspace dengan template CSAT aktif', $output);
+        $this->assertSame(0, Invitation::withoutGlobalScopes()->count());
+    }
+
+    public function test_disabled_project_is_rejected_when_requested_explicitly(): void
+    {
+        config(['cxp.csat.disabled_projects' => ['brand-a']]);
+
+        [$exitCode, $output] = $this->send(['--send' => true, '--workspace' => 'brand-a']);
+
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('sudah dinonaktifkan', $output);
     }
 
     public function test_instagram_and_google_business_use_email_fallback(): void
@@ -608,6 +648,27 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame('fallback_email', $route['reason']);
     }
 
+    public function test_router_sends_email_only_project_via_email_and_skips_without_email(): void
+    {
+        config(['cxp.csat.email_only_projects' => ['brand-a']]);
+        $router = app(CsatChannelRouter::class);
+
+        $withEmail = $router->route('WhatsApp', 'sari@example.test', '0811-1087-7088', $this->workspace);
+        $this->assertSame(CsatChannelRouter::CHANNEL_EMAIL, $withEmail['channel']);
+        $this->assertSame('email_only', $withEmail['reason']);
+        $this->assertNull($withEmail['account']);
+        $this->assertSame('', $withEmail['number']);
+
+        $withoutEmail = $router->route('WhatsApp', null, '0811-1087-7088', $this->workspace);
+        $this->assertSame(CsatChannelRouter::CHANNEL_SKIP, $withoutEmail['channel']);
+        $this->assertSame('skip_no_email', $withoutEmail['reason']);
+
+        // Prioritas skip source tetap berlaku untuk project email-only.
+        $skipSource = $router->route('Outbound Call', 'sari@example.test', null, $this->workspace);
+        $this->assertSame(CsatChannelRouter::CHANNEL_SKIP, $skipSource['channel']);
+        $this->assertSame('skip_source', $skipSource['reason']);
+    }
+
     public function test_autosend_setting_keeps_other_csat_settings(): void
     {
         $this->workspace->settings = ['other_setting' => 'dipertahankan', 'csat' => [
@@ -681,6 +742,25 @@ class CxpCsatWhatsAppTest extends TestCase
         $this->assertSame($before, Workspace::query()->count());
         $this->assertSame(0, Workspace::query()->whereIn('code', ['4', '5'])->count());
         $this->assertStringContainsString('DRY-RUN', $output->fetch());
+    }
+
+    public function test_onboard_skips_disabled_projects(): void
+    {
+        config([
+            'cxp.csat.projects' => ['4' => 'ABC', '5' => 'Transcosmos Indonesia'],
+            'cxp.csat.disabled_projects' => ['5'],
+            'cxp.csat.master_template_id' => 0,
+        ]);
+
+        $output = new BufferedOutput();
+        $exitCode = Artisan::call('cxp:csat-onboard', [
+            '--projects' => '4,5',
+            '--from' => $this->template->id,
+        ], $output);
+
+        $this->assertSame(0, $exitCode, $output->fetch());
+        $this->assertNotNull(Workspace::query()->where('code', '4')->first());
+        $this->assertNull(Workspace::query()->where('code', '5')->first());
     }
 
     public function test_onboard_creates_workspace_and_clones_csat_template(): void

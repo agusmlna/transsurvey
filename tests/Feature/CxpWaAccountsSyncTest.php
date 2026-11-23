@@ -129,6 +129,21 @@ class CxpWaAccountsSyncTest extends TestCase
         $this->assertStringNotContainsString('password-rahasia', $text);
     }
 
+    public function test_disabled_projects_are_not_synced_even_when_requested(): void
+    {
+        config(['cxp.csat.disabled_projects' => ['23']]);
+
+        $output = new BufferedOutput();
+        $exitCode = Artisan::call('cxp:csat-wa-accounts-sync', ['--projects' => '23,6'], $output);
+
+        $this->assertSame(0, $exitCode, $output->fetch());
+
+        $accounts = $this->readAccounts();
+        $this->assertSame('+620000000000', $accounts['23']['number']);
+        $this->assertArrayNotHasKey('account_id', $accounts['23']);
+        $this->assertSame('+628111660770', $accounts['6']['number']);
+    }
+
     public function test_dry_run_does_not_write_file(): void
     {
         $before = (string) file_get_contents($this->file);

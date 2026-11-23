@@ -85,10 +85,15 @@ class SyncCxpWaAccounts extends Command
                     $projects[$code] = $code;
                 }
             }
-
-            return $projects;
+        } else {
+            $projects = (array) config('cxp.csat.projects', []);
         }
 
-        return (array) config('cxp.csat.projects', []);
+        $disabled = array_values(array_filter(array_map(
+            static fn ($code): string => trim((string) $code),
+            (array) config('cxp.csat.disabled_projects', []),
+        ), static fn (string $code): bool => $code !== ''));
+
+        return array_diff_key($projects, array_flip($disabled));
     }
 }
