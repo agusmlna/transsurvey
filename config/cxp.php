@@ -217,8 +217,10 @@ return [
     | ke semua channel. Pemilihan nomor antar-channel dalam satu project masih
     | memerlukan endpoint/field khusus dari TransCXP.
     |
-    | Satu template dipakai semua project. Urutan parameter body diatur
-    | lewat template_params, contoh: customer_name,survey_url.
+    | CXP_WA_TEMPLATE_ID dipakai semua project, kecuali project yang punya
+    | entri di CXP_WA_TEMPLATE_IDS (JSON objek: kode project => id template).
+    | Urutan parameter body diatur lewat template_params, contoh:
+    | customer_name,survey_url.
     |
     */
 
@@ -235,6 +237,20 @@ return [
         'send_path' => env('CXP_WA_SEND_PATH', '/api/v2/messages-template'),
         'status_path' => env('CXP_WA_STATUS_PATH', '/api/v2/messages-template'),
         'template_id' => trim((string) env('CXP_WA_TEMPLATE_ID', '')),
+
+        // Override template per kode project, mis. {"9":"1608466900594387"}.
+        // Kode yang tidak ada di sini memakai template_id di atas.
+        'template_ids' => (static function (): array {
+            $raw = trim((string) env('CXP_WA_TEMPLATE_IDS', ''));
+            $decoded = $raw === '' ? null : json_decode($raw, true);
+
+            if (! is_array($decoded)) {
+                return [];
+            }
+
+            return array_map(static fn ($id): string => trim((string) $id), $decoded);
+        })(),
+
         'template_name' => trim((string) env('CXP_WA_TEMPLATE_NAME', '')),
         'template_language' => trim((string) env('CXP_WA_TEMPLATE_LANGUAGE', 'id')),
         'template_params' => $csv((string) env('CXP_WA_TEMPLATE_PARAMS', '')),

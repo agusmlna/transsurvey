@@ -55,8 +55,21 @@ class CsatWhatsAppTemplate
         return $components;
     }
 
-    public function templateId(): string
+    public function templateId(Workspace|string|int|null $workspace = null): string
     {
+        $code = $workspace instanceof Workspace
+            ? (string) $workspace->code
+            : trim((string) $workspace);
+
+        if ($code !== '') {
+            $overrides = (array) config('cxp.whatsapp.template_ids', []);
+            $override = trim((string) ($overrides[$code] ?? ''));
+
+            if ($override !== '') {
+                return $override;
+            }
+        }
+
         return trim((string) config('cxp.whatsapp.template_id', ''));
     }
 

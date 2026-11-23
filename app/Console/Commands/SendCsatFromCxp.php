@@ -545,7 +545,7 @@ class SendCsatFromCxp extends Command
                 $customer,
                 $template,
                 $senderAuditNumber,
-                $waTemplate->templateId(),
+                $waTemplate->templateId($workspace),
             );
 
             if (in_array($prepared['outcome'], [
@@ -571,7 +571,7 @@ class SendCsatFromCxp extends Command
 
             $result = $waClient->sendTemplate(
                 $account,
-                $waTemplate->templateId(),
+                $waTemplate->templateId($workspace),
                 (string) $invitation->recipient_name,
                 $recipientNumber,
                 $components,

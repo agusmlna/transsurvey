@@ -315,6 +315,26 @@ class CxpCsatWhatsAppTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_workspace_template_override_is_used_for_whatsapp_send(): void
+    {
+        config(['cxp.whatsapp.template_ids' => ['brand-a' => 'tpl-csat-brand-a']]);
+
+        $this->fakeCxp([$this->ticket('WA-OVERRIDE')]);
+        $this->seedSnapshot();
+
+        [$exitCode, $output] = $this->send();
+
+        $this->assertSame(0, $exitCode, $output);
+
+        $request = $this->lastWhatsAppRequest();
+        $this->assertNotNull($request);
+        $this->assertSame('tpl-csat-brand-a', $request['template_id']);
+
+        $invitation = Invitation::withoutGlobalScopes()->where('ticket_id', 'WA-OVERRIDE')->firstOrFail();
+        $delivery = WhatsAppDelivery::query()->where('invitation_id', $invitation->id)->firstOrFail();
+        $this->assertSame('wamid-1', $delivery->provider_message_id);
+    }
+
     public function test_whatsapp_source_without_account_falls_back_to_email(): void
     {
         config(['cxp.whatsapp.accounts' => json_encode([])]);

@@ -287,6 +287,9 @@ CXP_CSAT_DEFAULT_CHANNEL=email
 CXP_WA_BASE_URL=https://transcxp.trans-cosmos.id
 CXP_WA_TIMEOUT=30
 CXP_WA_TEMPLATE_ID=
+# Override template per kode project, mis. {"9":"1608466900594387"}.
+# Project yang tidak tercantum memakai CXP_WA_TEMPLATE_ID.
+CXP_WA_TEMPLATE_IDS=
 CXP_WA_TEMPLATE_NAME=
 CXP_WA_TEMPLATE_LANGUAGE=id
 # Urutan parameter body template, contoh: customer_name,survey_url,project_name
@@ -445,7 +448,8 @@ hanya project itu yang dipanggil.
 - Tidak ada backfill tiket lama: run pertama per project adalah baseline.
 - WhatsApp hanya mengirim **template yang sudah disetujui Meta**. Isi pesan
   tidak bisa diubah bebas dari kode; ubah template di TransCXP lalu sesuaikan
-  `CXP_WA_TEMPLATE_ID`/`CXP_WA_TEMPLATE_PARAMS`.
+  `CXP_WA_TEMPLATE_ID`/`CXP_WA_TEMPLATE_PARAMS`. ID template boleh berbeda
+  per project lewat `CXP_WA_TEMPLATE_IDS`.
 - Tidak ada webhook status WhatsApp; status diambil lewat `cxp:csat-wa-status`.
 - Nomor pengirim mengikuti akun User API project masing-masing. Tidak ada
   akun/nomor fallback lintas project. Channel `active: no` tidak dipakai.
