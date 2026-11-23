@@ -195,6 +195,12 @@ class CsatOnboard extends Command
             $codes = array_keys($defaults);
         }
 
+        $disabled = array_values(array_filter(array_map(
+            static fn ($code): string => trim((string) $code),
+            (array) config('cxp.csat.disabled_projects', []),
+        ), static fn (string $code): bool => $code !== ''));
+        $codes = array_values(array_filter($codes, static fn (string $code): bool => ! in_array($code, $disabled, true)));
+
         if ($this->option('pilot') && $codes === []) {
             $this->error('CXP_CSAT_PILOT_PROJECTS masih kosong. Isi 2-3 kode project pilot terlebih dahulu.');
 

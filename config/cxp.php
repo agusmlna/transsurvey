@@ -6,6 +6,10 @@ $csv = static fn (string $value): array => array_values(array_filter(array_map(
     explode(',', $value),
 ), static fn (string $item): bool => $item !== ''));
 
+// Project yang sudah tidak ada di TransCXP. Dikeluarkan dari daftar project
+// supaya tidak di-onboard/disinkron, dan juga ditolak saat kirim manual.
+$disabledProjects = $csv((string) env('CXP_CSAT_DISABLED_PROJECTS', '12,13,18,20,26'));
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -123,6 +127,14 @@ return [
         // non-legacy yang punya template CSAT default.
         'workspace' => env('CXP_CSAT_WORKSPACE'),
 
+        // Project yang sudah tidak ada di TransCXP: tidak di-onboard,
+        // tidak disinkron, dan tidak diproses walaupun dipanggil manual.
+        'disabled_projects' => $disabledProjects,
+
+        // Project yang CSAT-nya selalu lewat email. Source WhatsApp tidak
+        // memakai WA; tanpa email tetap dilewati (bukan dikirim WA).
+        'email_only_projects' => $csv((string) env('CXP_CSAT_EMAIL_ONLY_PROJECTS', '10')),
+
         // Server membatasi per_page di 100, walaupun nilai lebih besar dikirim.
         'per_page' => min(100, max(1, (int) env('CXP_CSAT_PER_PAGE', 100))),
 
@@ -161,37 +173,35 @@ return [
         | master_template_id : template CSAT sumber untuk clone. Kosong =
         |                  pakai template default workspace legacy.
         */
-        'projects' => array_replace(
-            [
-                '4' => 'ABC',
-                '5' => 'Transcosmos Indonesia',
-                '6' => 'Dipo Star Finance Operating Lease',
-                '8' => 'Pristine8.6+',
-                '9' => 'DKT',
-                '10' => 'Trakindo Utama',
-                '11' => 'PT. Tri Swardana Utama',
-                '12' => 'DANONE',
-                '13' => 'Hisense',
-                '14' => 'Yanmar Jembatani',
-                '15' => 'Mead Jhonson',
-                '16' => 'OMRON',
-                '17' => 'Daikin',
-                '18' => 'AIRA',
-                '19' => 'Official TCID',
-                '20' => 'Danone Bookers',
-                '21' => 'DSF',
-                '22' => 'Indofood',
-                '23' => 'Panasonic',
-                '24' => 'Yanmar Official',
-                '25' => 'Lotte Mart',
-                '26' => 'Danone Telepharma',
-            ],
-            (static function (): array {
-                $raw = trim((string) env('CXP_CSAT_PROJECTS', ''));
-                $decoded = $raw === '' ? null : json_decode($raw, true);
+        'projects' => array_diff_key(
+            array_replace(
+                [
+                    '4' => 'ABC',
+                    '5' => 'Transcosmos Indonesia',
+                    '6' => 'Dipo Star Finance Operating Lease',
+                    '8' => 'Pristine8.6+',
+                    '9' => 'DKT',
+                    '10' => 'Trakindo Utama',
+                    '11' => 'PT. Tri Swardana Utama',
+                    '14' => 'Yanmar Jembatani',
+                    '15' => 'Mead Jhonson',
+                    '16' => 'OMRON',
+                    '17' => 'Daikin',
+                    '19' => 'Official TCID',
+                    '21' => 'DSF',
+                    '22' => 'Indofood',
+                    '23' => 'Panasonic',
+                    '24' => 'Yanmar Official',
+                    '25' => 'Lotte Mart',
+                ],
+                (static function (): array {
+                    $raw = trim((string) env('CXP_CSAT_PROJECTS', ''));
+                    $decoded = $raw === '' ? null : json_decode($raw, true);
 
-                return is_array($decoded) ? array_map(static fn ($name): string => trim((string) $name), $decoded) : [];
-            })(),
+                    return is_array($decoded) ? array_map(static fn ($name): string => trim((string) $name), $decoded) : [];
+                })(),
+            ),
+            array_flip($disabledProjects),
         ),
         'pilot_projects' => $csv((string) env('CXP_CSAT_PILOT_PROJECTS', '')),
         'master_template_id' => (int) env('CXP_CSAT_MASTER_TEMPLATE_ID', 0),

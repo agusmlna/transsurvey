@@ -283,6 +283,12 @@ CXP_CSAT_EMAIL_FALLBACK_SOURCES="Instagram,Facebook,Google_business,Twitter,Live
 CXP_CSAT_SKIP_SOURCES="Call,Outbound Call,WAG,Whatsapp Call,Whatsapp Call Outbound"
 CXP_CSAT_DEFAULT_CHANNEL=email
 
+# Project yang sudah tidak ada di TransCXP. Tidak di-onboard/disinkron dan
+# ditolak walaupun dipanggil lewat --workspace.
+CXP_CSAT_DISABLED_PROJECTS=12,13,18,20,26
+# Project yang CSAT-nya selalu lewat email. Tanpa email tetap dilewati.
+CXP_CSAT_EMAIL_ONLY_PROJECTS=10
+
 # WhatsApp Broadcast API v2 (production).
 CXP_WA_BASE_URL=https://transcxp.trans-cosmos.id
 CXP_WA_TIMEOUT=30
@@ -456,6 +462,10 @@ hanya project itu yang dipanggil.
 - Untuk project dengan beberapa channel aktif, daftar `channels` tersimpan sebagai
   metadata. Memilih nomor antar-channel membutuhkan endpoint khusus TransCXP.
 - Kode workspace harus sama dengan `id_project` TransCXP.
+- Project di `CXP_CSAT_DISABLED_PROJECTS` dianggap tidak ada: tidak diproses
+  walau masih tersisa workspace/template di database.
+- Project di `CXP_CSAT_EMAIL_ONLY_PROJECTS` tidak pernah memakai WA. Source Call/
+  WAG tetap dilewati; tiket tanpa email dilewati dengan alasan `skip_no_email`.
 - Kalau tiket berubah dari Close → Open → Close lagi, tiket itu tidak dikirim
   ulang karena sudah ada di snapshot. Ini disengaja (satu tiket satu CSAT).
 - Schedule baru aman dinyalakan setelah staging terbukti dan kode workspace
