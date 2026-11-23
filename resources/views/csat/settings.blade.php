@@ -2,7 +2,7 @@
 
 @section('title', __('Pengaturan CSAT'))
 @section('heading', __('Pengaturan CSAT'))
-@section('subtitle', __('Atur berapa lama tautan CSAT tetap bisa dibuka customer.'))
+@section('subtitle', __('Atur metode kirim, status tiket, kanal, dan masa berlaku tautan CSAT per workspace.'))
 
 @section('actions')
     <a class="btn" href="{{ route('csat.templates.index') }}">{{ __('← Kembali ke template') }}</a>
@@ -14,6 +14,9 @@
 
 @section('content')
     @php
+        $modeLabels = ['manual' => __('Manual dari tiket'), 'auto' => __('Otomatis saat tiket berstatus'), 'both' => __('Manual + otomatis')];
+        $channelLabels = ['email' => __('Email'), 'whatsapp' => __('WhatsApp')];
+        $oldChannels = old('auto_channels', $autoChannels);
         $unitLabels = ['minutes' => __('menit'), 'hours' => __('jam'), 'days' => __('hari')];
         $initialPreview =
             $expiryUnit === 'unlimited'
@@ -32,6 +35,13 @@
             </div>
             <span class="badge blue">{{ $workspace->name }}</span>
         </div>
+
+        @if ($disabled)
+            <div class="notice" role="status">{{ __('Workspace ini dinonaktifkan untuk CSAT TransCXP lewat CXP_CSAT_DISABLED_PROJECTS. Pengiriman manual dan otomatis tetap diblokir di server.') }}</div>
+        @endif
+        @if ($emailOnly)
+            <div class="notice" role="status">{{ __('Workspace ini hanya memakai email sesuai CXP_CSAT_EMAIL_ONLY_PROJECTS. Pilihan WhatsApp tidak tersedia.') }}</div>
+        @endif
 
         <form method="post" action="{{ route('csat.settings.update') }}" class="csat-settings-form" data-csat-expiry>
             @csrf
@@ -84,12 +94,62 @@
                 </p>
             </div>
 
+            <div class="csat-method-section">
+                <p class="csat-eyebrow">{{ __('Metode pengiriman CSAT') }}</p>
+                <div class="form-grid">
+                    <label>
+                        {{ __('Metode') }}
+                        <select name="send_mode">
+                            @foreach ($modeLabels as $value => $label)
+                                <option value="{{ $value }}" @selected(old('send_mode', $sendMode) === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('send_mode')
+                            <small class="form-error">{{ $message }}</small>
+                        @enderror
+                    </label>
+
+                    <label>
+                        {{ __('Status tiket otomatis') }}
+                        <input type="text" name="auto_statuses" list="csat-status-options"
+                            value="{{ old('auto_statuses', $autoStatuses) }}"
+                            placeholder="Close, Resolved">
+                        <datalist id="csat-status-options">
+                            @foreach (['Close', 'Resolved', 'Solved', 'Completed', 'Open', 'Pending'] as $status)
+                                <option value="{{ $status }}"></option>
+                            @endforeach
+                        </datalist>
+                        <small class="form-help">{{ __('Pisahkan beberapa status dengan koma. Status tiket dibaca persis dari TransCXP.') }}</small>
+                        @error('auto_statuses')
+                            <small class="form-error">{{ $message }}</small>
+                        @enderror
+                    </label>
+                </div>
+
+                <fieldset class="csat-channel-options">
+                    <legend>{{ __('Kanal pengiriman') }}</legend>
+                    <input type="hidden" name="auto_channels[]" value="">
+                    @foreach ($channelLabels as $value => $label)
+                        <label class="csat-channel-choice">
+                            <input type="checkbox" name="auto_channels[]" value="{{ $value }}"
+                                @checked(is_array($oldChannels) && in_array($value, $oldChannels, true))
+                                @disabled($emailOnly && $value === 'whatsapp')>
+                            <span>{{ $label }}</span>
+                        </label>
+                    @endforeach
+                    @error('auto_channels')
+                        <small class="form-error">{{ $message }}</small>
+                    @enderror
+                    <small class="form-help">{{ __('Source tiket TransCXP tetap dipertimbangkan; kanal di sini membatasi pilihan yang boleh dipakai workspace ini.') }}</small>
+                </fieldset>
+            </div>
+
             <label class="csat-autosend">
                 <input type="hidden" name="autosend" value="0">
                 <input type="checkbox" name="autosend" value="1" @checked(old('autosend', $autosend))>
                 <span>
-                    <strong>{{ __('Kirim otomatis untuk tiket baru') }}</strong>
-                    <small>{{ __('Ikut jadwal otomatis bila CXP_CSAT_AUTOSEND aktif di server.') }}</small>
+                    <strong>{{ __('Izinkan autosend untuk workspace ini') }}</strong>
+                    <small>{{ __('Jadwal hanya berjalan bila metode Auto/Keduanya dipilih dan CXP_CSAT_AUTOSEND aktif di server.') }}</small>
                 </span>
             </label>
 

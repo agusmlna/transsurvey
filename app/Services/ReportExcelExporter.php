@@ -135,6 +135,45 @@ class ReportExcelExporter
         }
         $detail->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($headerRow, $headerRow);
         $detail->getPageSetup()->setPrintArea("A1:M$row");
+
+        $csat = $book->createSheet()->setTitle(__('Status CSAT'));
+        $this->base($csat, [18, 26, 22, 22, 30, 14, 16, 58, 20, 20]);
+        $this->heading($csat, __('Status pengisian CSAT'), 10);
+        $row = $this->metadata($csat, $data, 10);
+        $csat->mergeCells("A$row:J$row");
+        $this->text($csat, "A$row", __('Satu baris mewakili satu undangan CSAT. Sudah diisi berarti customer telah mengirim jawaban; belum diisi berarti tautan sudah dikirim tetapi belum dijawab.'));
+        $row += 2;
+        $headerRow = $row;
+        $this->header($csat, $row++, [__('Tiket'), __('Klien'), __('PIC'), __('Proyek'), __('Template'), __('Kanal'), __('Status'), __('Tautan'), __('Waktu kirim (WIB)'), __('Waktu isi (WIB)')]);
+        foreach ($data['csatInvitations'] as $invitation) {
+            $statusLabels = [
+                'completed' => __('Sudah diisi'),
+                'pending' => __('Belum diisi'),
+                'draft' => __('Belum dikirim'),
+            ];
+            $status = $invitation->csatStatus();
+            $cells = [
+                'A' => $invitation->ticket_id, 'B' => $invitation->client?->name,
+                'C' => $invitation->recipient_name ?: $invitation->client?->contact,
+                'D' => $invitation->client?->project, 'E' => $invitation->survey?->title,
+                'F' => $invitation->csatChannel() === 'whatsapp' ? __('WhatsApp') : __('Email'),
+                'G' => $statusLabels[$status] ?? $status, 'H' => $invitation->surveyUrl(),
+                'I' => $invitation->sent_at?->copy()->timezone('Asia/Jakarta')->format('d/m/Y H:i'),
+                'J' => $invitation->completed_at?->copy()->timezone('Asia/Jakarta')->format('d/m/Y H:i'),
+            ];
+            foreach ($cells as $column => $value) {
+                $this->text($csat, "$column$row", $value);
+            }
+            $this->stripe($csat, $row++, 10);
+        }
+        $csat->setAutoFilter("A$headerRow:J".max($headerRow, $row - 1));
+        if ($row === $headerRow + 1) {
+            $csat->mergeCells("A$row:J$row");
+            $this->text($csat, "A$row", __('Belum ada undangan CSAT yang sesuai dengan filter laporan ini.'));
+        }
+        $csat->getPageSetup()->setRowsToRepeatAtTopByStartAndEnd($headerRow, $headerRow);
+        $csat->getPageSetup()->setPrintArea("A1:J$row");
+
         $book->setActiveSheetIndex(0);
         return $book;
     }

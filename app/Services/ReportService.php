@@ -25,6 +25,43 @@ class ReportService
         return $q;
     }
     /**
+     * Undangan CSAT untuk halaman Respons/Laporan. Status dihitung dari
+     * completed_at, sent_at, dan delivery yang sudah settled.
+     */
+    public function csatInvitations(Request $r)
+    {
+        $q = Invitation::query()->with([
+            'client', 'survey', 'response', 'deliveries', 'whatsapp',
+        ])->whereHas('survey', fn ($s) => $s->where('type', 'csat'));
+        $this->applyClientFilters($q, $r);
+        if ($r->filled('survey_id')) $q->where('survey_id', $r->integer('survey_id'));
+        if ($r->filled('from')) $q->where('created_at', '>=', $r->date('from')->startOfDay());
+        if ($r->filled('to')) $q->where('created_at', '<=', $r->date('to')->endOfDay());
+        if (in_array($r->input('source'), ['real', 'demo'], true)) {
+            $q->where('is_demo', $r->input('source') === 'demo');
+        }
+
+        $status = (string) $r->input('csat_status', 'all');
+        if ($status === 'completed') {
+            $q->whereNotNull('completed_at');
+        } elseif ($status === 'pending') {
+            $q->whereNull('completed_at')->where(function ($query) {
+                $query->whereNotNull('sent_at')
+                    ->orWhereHas('response')
+                    ->orWhereHas('whatsapp', fn ($w) => $w->whereIn('status', ['sent', 'delivered', 'read', 'replied']))
+                    ->orWhereHas('deliveries', fn ($d) => $d->whereIn('status', ['sent', 'delivered', 'read']));
+            });
+        } elseif ($status === 'draft') {
+            $q->whereNull('completed_at')->whereNull('sent_at')
+                ->whereDoesntHave('response')
+                ->whereDoesntHave('whatsapp', fn ($w) => $w->whereIn('status', ['sent', 'delivered', 'read', 'replied']))
+                ->whereDoesntHave('deliveries', fn ($d) => $d->whereIn('status', ['sent', 'delivered', 'read']));
+        }
+
+        return $q;
+    }
+
+    /**
      * Client name (one company can have several PIC rows), PIC (one client row) and project filters.
      * Works for any query with a client_id column: responses and invitations.
      */
@@ -109,6 +146,6 @@ class ReportService
     }
     public function validateFilters(Request $r): void
     {
-        $r->validate(['client' => 'nullable|string|max:255', 'client_id' => ['nullable', 'integer', app(CurrentWorkspace::class)->existsRule('clients')], 'survey_id' => ['nullable', 'integer', app(CurrentWorkspace::class)->existsRule('surveys')], 'category' => 'nullable|string|max:100', 'project' => 'nullable|string|max:255', 'from' => 'nullable|date_format:Y-m-d', 'to' => array_filter(['nullable', 'date_format:Y-m-d', $r->filled('from') ? 'after_or_equal:from' : null]), 'source' => 'nullable|in:real,demo']);
+        $r->validate(['client' => 'nullable|string|max:255', 'client_id' => ['nullable', 'integer', app(CurrentWorkspace::class)->existsRule('clients')], 'survey_id' => ['nullable', 'integer', app(CurrentWorkspace::class)->existsRule('surveys')], 'category' => 'nullable|string|max:100', 'project' => 'nullable|string|max:255', 'from' => 'nullable|date_format:Y-m-d', 'to' => array_filter(['nullable', 'date_format:Y-m-d', $r->filled('from') ? 'after_or_equal:from' : null]), 'source' => 'nullable|in:real,demo', 'csat_status' => 'nullable|in:all,completed,pending,draft']);
     }
 }

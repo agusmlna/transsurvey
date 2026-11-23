@@ -18,9 +18,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Kirim CSAT otomatis untuk tiket TransCXP yang BARU masuk status Close.
+ * Kirim CSAT otomatis untuk tiket TransCXP yang BARU masuk status pilihan
+ * workspace (default: Close).
  *
- * Sumber data: GET /api/v1/dataTicketByStatus?status=Close&project=<kode>.
+ * Sumber data: GET /api/v1/dataTicketByStatus?status=<status>&project=<kode>.
  * Endpoint ini menyaring status dan project di server (dibuktikan pada probe
  * production 12 Nov 2026), jadi command tidak lagi membaca 1 juta baris.
  *
@@ -54,7 +55,7 @@ class SendCsatFromCxp extends Command
         {--only-autosend : Hanya workspace dengan settings.csat.autosend = true}
         {--all-workspaces : Abaikan settings.csat.autosend pada run terjadwal}';
 
-    protected $description = 'Kirim CSAT untuk tiket TransCXP yang baru masuk status Close.';
+    protected $description = 'Kirim CSAT untuk tiket TransCXP yang baru masuk status pilihan workspace.';
 
     public function handle(
         CsatInvitationService $invitations,
@@ -166,7 +167,7 @@ class SendCsatFromCxp extends Command
             return self::FAILURE;
         }
 
-        $this->line('Endpoint  : '.$client->statusPath().' (status=Close, per_page='.$perPage.')');
+        $this->line('Endpoint  : '.$client->statusPath().' (status per workspace, per_page='.$perPage.')');
         $this->line('Workspace : '.count($targets).' diproses');
         $this->line('Snapshot  : cxp_ticket_seen (run pertama = baseline, tidak mengirim)');
         $this->line('WhatsApp  : '.($waReady ? 'siap (template '.$templateId.')' : 'belum siap, memakai email'));
@@ -233,8 +234,8 @@ class SendCsatFromCxp extends Command
             ['Hasil', 'Jumlah'],
             [
                 ['Project dibaca', $counts['project']],
-                ['Tiket Close dibaca', $counts['dibaca']],
-                ['Bukan status Close', $counts['bukan_close']],
+                ['Tiket sesuai status dibaca', $counts['dibaca']],
+                ['Status tidak sesuai pilihan', $counts['bukan_close']],
                 ['Tanpa id_ticket', $counts['tanpa_id']],
                 ['Baseline (snapshot awal)', $counts['baseline']],
                 ['Tiket tidak ditemukan', $counts['tiket_tidak_ditemukan']],
@@ -309,7 +310,10 @@ class SendCsatFromCxp extends Command
             return false;
         }
 
-        $rows = $this->closeRows($client, $token, $project, $perPage, $maxPages, $counts);
+        $statuses = CsatSettings::statuses($workspace);
+        $this->line('Project '.$project.': status '.implode(', ', $statuses));
+
+        $rows = $this->rowsForStatuses($client, $token, $project, $statuses, $perPage, $maxPages, $counts);
 
         $hasSnapshot = CxpTicketSeen::query()
             ->where('project_code', $projectKey)
@@ -357,9 +361,15 @@ class SendCsatFromCxp extends Command
             $newRows = [$ticketId => $rows[$ticketId]];
         }
 
+        $statusKeys = array_map(static fn (string $status): string => mb_strtolower(trim($status)), $statuses);
+
         $newRows = array_filter(
             $newRows,
-            fn (array $row) => strcasecmp($this->value($row, ['status_name', 'status_ticket', 'status']), 'Close') === 0,
+            fn (array $row) => in_array(
+                mb_strtolower(trim($this->value($row, ['status_name', 'status_ticket', 'status']))),
+                $statusKeys,
+                true,
+            ),
         );
 
         $existing = $this->existingTicketIds($workspace->id, array_keys($newRows));
@@ -388,6 +398,13 @@ class SendCsatFromCxp extends Command
             $channel = $this->value($row, ['source', 'channel']);
 
             $route = $router->route($channel, $email, $wa, $workspace);
+            $route = $this->applyChannelPreference(
+                $router,
+                $workspace,
+                $route,
+                $email,
+                $wa,
+            );
 
             if ($route['channel'] === CsatChannelRouter::CHANNEL_WHATSAPP && ! $waReady) {
                 $route = $email !== ''
@@ -631,6 +648,54 @@ class SendCsatFromCxp extends Command
     }
 
     /**
+     * Batasi hasil routing kanal berdasarkan pilihan di pengaturan workspace.
+     * Source tiket tetap dipakai; pengaturan hanya menentukan kanal yang boleh
+     * dipakai workspace tersebut.
+     *
+     * @param  array{channel: string, reason: string, account: array<string, mixed>|null, number: string}  $route
+     * @return array{channel: string, reason: string, account: array<string, mixed>|null, number: string}
+     */
+    private function applyChannelPreference(
+        CsatChannelRouter $router,
+        Workspace $workspace,
+        array $route,
+        string $email,
+        string $wa,
+    ): array {
+        $allowed = CsatSettings::channels($workspace);
+
+        if ($route['channel'] === CsatChannelRouter::CHANNEL_SKIP || in_array($route['channel'], $allowed, true)) {
+            return $route;
+        }
+
+        $emailRoute = static fn (): array => [
+            'channel' => CsatChannelRouter::CHANNEL_EMAIL,
+            'reason' => 'fallback_email',
+            'account' => null,
+            'number' => '',
+        ];
+
+        if (in_array('email', $allowed, true) && CsatChannelRouter::isValidEmail($email)) {
+            return $emailRoute();
+        }
+
+        if (in_array('whatsapp', $allowed, true)) {
+            $forced = $router->route('WhatsApp', $email, $wa, $workspace);
+
+            if ($forced['channel'] === CsatChannelRouter::CHANNEL_WHATSAPP) {
+                return $forced;
+            }
+        }
+
+        return [
+            'channel' => CsatChannelRouter::CHANNEL_SKIP,
+            'reason' => 'channel_not_allowed',
+            'account' => null,
+            'number' => '',
+        ];
+    }
+
+    /**
      * Gangguan jaringan/5xx/rate limit boleh dicoba ulang pada run berikutnya.
      */
     private function isTransient(CxpApiException $e): bool
@@ -642,57 +707,67 @@ class SendCsatFromCxp extends Command
     }
 
     /**
-     * Baca semua halaman status Close untuk satu project.
+     * Baca semua halaman untuk setiap status pilihan workspace pada satu project.
      *
      * Kalau satu halaman gagal, seluruh project dianggap gagal (exception naik
      * ke handle) supaya snapshot tidak terisi dari data yang tidak lengkap.
      *
+     * @param  array<int, string>  $statuses
      * @param  array<string, int>  $counts
      * @return array<string, array<string, mixed>>
      */
-    private function closeRows(
+    private function rowsForStatuses(
         CxpApiClient $client,
         string $token,
         string $project,
+        array $statuses,
         int $perPage,
         int $maxPages,
         array &$counts,
     ): array {
         $rows = [];
-        $page = 1;
-        $lastPage = 1;
+        $statusKeys = array_map(static fn (string $status): string => mb_strtolower(trim($status)), $statuses);
 
-        do {
-            $response = $client->ticketsByStatus($token, $project, 'Close', $page, $perPage);
-            $lastPage = max($page, $this->lastPage($response, $page));
+        foreach ($statuses as $status) {
+            $page = 1;
+            $lastPage = 1;
 
-            foreach ((array) ($response['data'] ?? []) as $row) {
-                if (! is_array($row)) {
-                    continue;
+            do {
+                $response = $client->ticketsByStatus($token, $project, $status, $page, $perPage);
+                $lastPage = max($page, $this->lastPage($response, $page));
+
+                foreach ((array) ($response['data'] ?? []) as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
+
+                    $counts['dibaca']++;
+                    $id = trim((string) ($row['id_ticket'] ?? ''));
+
+                    if ($id === '') {
+                        $counts['tanpa_id']++;
+
+                        continue;
+                    }
+
+                    if (! in_array(
+                        mb_strtolower(trim($this->value($row, ['status_name', 'status_ticket', 'status']))),
+                        $statusKeys,
+                        true,
+                    )) {
+                        $counts['bukan_close']++;
+
+                        continue;
+                    }
+
+                    // Kunci per id_ticket: duplikat antar status/halaman tidak
+                    // pernah memicu dua undangan.
+                    $rows[$id] = $row;
                 }
 
-                $counts['dibaca']++;
-                $id = trim((string) ($row['id_ticket'] ?? ''));
-
-                if ($id === '') {
-                    $counts['tanpa_id']++;
-
-                    continue;
-                }
-
-                if (strcasecmp($this->value($row, ['status_name', 'status_ticket', 'status']), 'Close') !== 0) {
-                    $counts['bukan_close']++;
-
-                    continue;
-                }
-
-                // Kunci per id_ticket: duplikat antar halaman (kalau ada)
-                // tidak memicu dua undangan.
-                $rows[$id] = $row;
-            }
-
-            $page++;
-        } while ($page <= $lastPage && ($maxPages === 0 || $page <= $maxPages));
+                $page++;
+            } while ($page <= $lastPage && ($maxPages === 0 || $page <= $maxPages));
+        }
 
         return $rows;
     }

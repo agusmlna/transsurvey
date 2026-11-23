@@ -10,6 +10,8 @@ class ReportPresentation
     public function data(Request $request, ReportService $reports): array
     {
         $data = $reports->summary($request);
+        $data['csatInvitations'] = $reports->csatInvitations($request)->latest()->get();
+        $data['csatStatus'] = (string) $request->input('csat_status', 'all');
         $pic = $request->filled('client_id') ? Client::findOrFail($request->integer('client_id')) : null;
         $data['generatedAt'] = now('Asia/Jakarta');
         $data['reportFilters'] = [

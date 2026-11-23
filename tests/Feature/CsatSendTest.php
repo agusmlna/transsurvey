@@ -324,7 +324,7 @@ class CsatSendTest extends TestCase
 
         $this->asOperation($this->context(['customer' => ['email' => null]]))
             ->post(route('csat.send.store'), ['template_id' => $template->id])
-            ->assertSessionHasErrors('context');
+            ->assertSessionHasErrors('customer_email');
 
         $this->assertSame(0, Invitation::withoutGlobalScopes()->where('ticket_id', 'TCK-1')->count());
     }

@@ -139,7 +139,7 @@ class LanguageSwitchTest extends TestCase
         $this->assertStringContainsString('Responses matching the selected filters', $data['summaryText']);
         $book = app(ReportExcelExporter::class)->workbook($data);
         try {
-            $this->assertSame(['Summary', 'Answer Details'], $book->getSheetNames());
+            $this->assertSame(['Summary', 'Answer Details', 'CSAT Status'], $book->getSheetNames());
             $flat = json_encode($book->getSheet(1)->toArray());
             $this->assertStringContainsString('Pertanyaan asli klien?', $flat);
             $this->assertStringContainsString('Komentar asli', $flat);

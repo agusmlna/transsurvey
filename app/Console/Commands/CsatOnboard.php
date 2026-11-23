@@ -127,9 +127,15 @@ class CsatOnboard extends Command
 
             if ($pilot) {
                 // --pilot dengan --projects: hanya project pilot yang autosend.
-                $csat['autosend'] = in_array((string) $code, array_map('strval', (array) config('cxp.csat.pilot_projects', [])), true);
-            } elseif (! array_key_exists('autosend', $csat)) {
-                $csat['autosend'] = false;
+                $pilotProject = in_array((string) $code, array_map('strval', (array) config('cxp.csat.pilot_projects', [])), true);
+                $csat['autosend'] = $pilotProject;
+                $csat['send_mode'] = $pilotProject ? 'auto' : 'manual';
+            } else {
+                $csat['send_mode'] ??= 'manual';
+
+                if (! array_key_exists('autosend', $csat)) {
+                    $csat['autosend'] = false;
+                }
             }
 
             $settings['csat'] = $csat;

@@ -14,7 +14,14 @@ class ResponseController
     {
         $reports->validateFilters($r);
         if ($r->boolean('_table')) return $tables->respond($r, $reports->responses($r)->latest('submitted_at'), 'responses');
-        return view('responses.index', ['responses' => $reports->responses($r)->latest('submitted_at')->paginate(20)->withQueryString(), 'clients' => Client::orderBy('name')->get(), 'surveys' => Survey::where('type', 'client')->latest()->get()]);
+
+        return view('responses.index', [
+            'responses' => $reports->responses($r)->latest('submitted_at')->paginate(20)->withQueryString(),
+            'csatInvitations' => $reports->csatInvitations($r)->latest()->paginate(20, ['*'], 'csat_page')->withQueryString(),
+            'csatStatus' => (string) $r->input('csat_status', 'all'),
+            'clients' => Client::orderBy('name')->get(),
+            'surveys' => Survey::where('type', 'client')->latest()->get(),
+        ]);
     }
     public function show(SurveyResponse $response)
     {
