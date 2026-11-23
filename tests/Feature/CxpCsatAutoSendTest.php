@@ -611,7 +611,7 @@ class CxpCsatAutoSendTest extends TestCase
         [$exitCode, $output] = $this->runCommand(['--send' => true]);
 
         $this->assertSame(0, $exitCode);
-        $this->assertStringContainsString('Bukan status Close', $output);
+        $this->assertStringContainsString('Status tidak sesuai pilihan', $output);
         $this->assertSame(['000002'], Invitation::withoutGlobalScopes()->pluck('ticket_id')->all());
         $this->assertFalse(CxpTicketSeen::where('ticket_id', '000001')->exists());
     }

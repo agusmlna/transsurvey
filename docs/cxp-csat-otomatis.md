@@ -1,11 +1,17 @@
 # CSAT otomatis dari tiket TransCXP
 
 Fase 5: command `cxp:csat-send` membaca tiket TransCXP yang **baru masuk status
-Close**, lalu mengirim CSAT memakai template default workspace.
+pilihan workspace** (default: `Close`), lalu mengirim CSAT memakai template
+default workspace.
 
 Fase 6b menambahkan **kanal WhatsApp** lewat API WhatsApp Broadcast TransCXP.
-Kanal ditentukan dari kolom `source` tiket, dan email TransSurvey tetap dipakai
-sebagai fallback. Detail ada di bagian 3 dan 7.
+Kanal dipilih dari kolom `source` tiket lalu dibatasi oleh pengaturan kanal per
+workspace; email TransSurvey tetap dipakai sebagai fallback. Detail ada di
+bagian 3 dan 7.
+
+UI CSAT (menu **CSAT**) menyediakan pengiriman manual, template, dan pengaturan
+per workspace: metode (`manual`, `auto`, atau keduanya), status tiket yang
+dipantau, serta kanal yang diizinkan.
 
 ## 1. Cara kerja
 
@@ -13,7 +19,7 @@ sebagai fallback. Detail ada di bagian 3 dan 7.
 tiap jam (atau manual)
   login ke API TransCXP
   untuk tiap workspace (kode = id_project):
-      GET /api/v1/dataTicketByStatus?status=Close&project=<kode>&per_page=100
+      GET /api/v1/dataTicketByStatus?status=<status>&project=<kode>&per_page=100
       baca semua halaman
       bandingkan dengan snapshot cxp_ticket_seen
       tiket yang belum pernah terlihat:
@@ -56,11 +62,11 @@ Endpoint lama tidak dipakai lagi untuk CSAT otomatis:
 ## 2. Snapshot dan baseline
 
 Tabel `cxp_ticket_seen` menyimpan pasangan `project_code + ticket_id` yang
-pernah terlihat berstatus Close.
+pernah terlihat pada status pilihan workspace.
 
 | Kondisi | Perilaku |
 | --- | --- |
-| Project belum punya snapshot | Run pertama hanya **baseline**: simpan semua tiket Close, tidak mengirim |
+| Project belum punya snapshot | Run pertama hanya **baseline**: simpan semua tiket pada status pilihan, tidak mengirim |
 | Project sudah punya snapshot | Kirim hanya tiket yang belum ada di snapshot |
 | Tiket sudah punya undangan CSAT | Dilewati (unique `workspace + ticket_id`) |
 | Tiket tidak punya email / email tidak valid | Dilewati, tetap dicatat di snapshot |
@@ -68,8 +74,8 @@ pernah terlihat berstatus Close.
 | Project gagal | Project lain tetap diproses |
 
 Baseline mencegah ratusan tiket lama terkirim saat pertama kali dijalankan.
-Tiket yang saat baseline masih `Open` dan nanti berubah menjadi `Close` **akan**
-terkirim, karena belum ada di snapshot.
+Tiket yang saat baseline belum masuk status pilihan dan nanti berubah ke status
+itu **akan** terkirim, karena belum ada di snapshot.
 
 Tanpa `--send`, command hanya simulasi: tidak menulis snapshot, tidak membuat
 undangan, dan tidak mengantrekan email. Karena itu simulasi pada project baru
@@ -102,8 +108,9 @@ Aturan penting:
   level project dan diwariskan ke semua channel. Karena endpoint v2 tidak punya
   pemilih channel, nomor yang keluar tetap ditentukan oleh akun login project
   tersebut.
-- Satu template WhatsApp dipakai semua project. Nama project bisa muncul di
-  dalam template lewat parameter body, jadi tidak perlu template per project.
+- ID template WhatsApp bisa berbeda per project lewat `CXP_WA_TEMPLATE_IDS`.
+  Project yang tidak tercantum memakai `CXP_WA_TEMPLATE_ID`. Urutan parameter
+  body tetap diatur bersama di `CXP_WA_TEMPLATE_PARAMS`.
 - Tautan tetap satu per tiket. Jalur WhatsApp memakai aturan yang sama dengan
   email (`CsatInvitationService::prepareWhatsApp()` -> `issueLink()`).
 - Status pesan disimpan di tabel `csat_whatsapp_messages` dengan dedupe
@@ -249,7 +256,7 @@ php artisan cxp:csat-onboard --projects=4,5,6,8 --pilot
 | `--from=<id>` | ID template CSAT sumber (default `CXP_CSAT_MASTER_TEMPLATE_ID` atau template legacy) |
 | `--template=` | Judul template baru; `:name` dan `:code` diganti otomatis |
 | `--expiry-days=7` | Masa berlaku tautan CSAT |
-| `--pilot` | Aktifkan `settings.csat.autosend` hanya untuk kode pilot |
+| `--pilot` | Aktifkan `settings.csat.autosend` + `send_mode=auto` hanya untuk kode pilot; project lain `manual` |
 | `--activate` | Jadikan template hasil clone sebagai default |
 | `--force` | Clone ulang dan jadikan default walaupun workspace sudah punya |
 | `--sync-names` | Samakan nama workspace dengan daftar project |
@@ -329,6 +336,19 @@ keduanya dipertahankan untuk `cxp:inspect` dan probe.
 Workspace wajib punya **template CSAT aktif** yang dijadikan default
 (menu CSAT → Template).
 
+Pengaturan per workspace dibuka di menu **CSAT → Pengaturan CSAT**:
+
+| Pengaturan | Fungsi |
+| --- | --- |
+| Metode | `Manual dari tiket`, `Otomatis saat tiket berstatus`, atau keduanya |
+| Status tiket otomatis | Daftar status TransCXP yang dipantau, pisahkan dengan koma (default `Close`) |
+| Kanal pengiriman | Membatasi email/WhatsApp yang boleh dipakai workspace; source tiket tetap dipertimbangkan |
+| Izinkan autosend | Izin lokal; jadwal tetap bergantung pada `CXP_CSAT_AUTOSEND` dan metode `auto`/keduanya |
+| Masa berlaku tautan | Berlaku sejak pesan berhasil dikirim |
+
+Project pada `CXP_CSAT_EMAIL_ONLY_PROJECTS` tidak bisa memilih WhatsApp lewat UI,
+dan project pada `CXP_CSAT_DISABLED_PROJECTS` tetap diblokir di server.
+
 Setelah mengubah `.env`:
 
 ```bash
@@ -380,7 +400,7 @@ php artisan cxp:csat-send --send --max-pages=1
 | `--ticket=<id>` | Proses satu tiket; melewati snapshot |
 | `--max-pages=0` | Batas halaman per project (0 = semua) |
 | `--limit=0` | Batas pesan yang dikirim/diantrekan (0 = semua) |
-| `--only-autosend` | Hanya workspace dengan `settings.csat.autosend = true` |
+| `--only-autosend` | Hanya workspace dengan autosend aktif dan metode `auto`/keduanya |
 | `--all-workspaces` | Abaikan filter autosend per workspace |
 
 Run manual (tanpa `--only-autosend`) tetap memproses semua workspace, termasuk
@@ -392,7 +412,7 @@ yang autosend-nya mati. Filter per workspace hanya berlaku saat
 `routes/console.php` mendaftarkan:
 
 ```php
-Schedule::command('cxp:csat-send --send')->hourly()->withoutOverlapping()
+Schedule::command('cxp:csat-send --send --only-autosend')->hourly()->withoutOverlapping()
     ->when(fn () => (bool) config('cxp.csat.enabled'));
 Schedule::command('cxp:csat-wa-status --limit=100')->everyFifteenMinutes()->withoutOverlapping()
     ->when(fn () => (bool) config('cxp.csat.enabled'));
@@ -405,8 +425,10 @@ CXP_CSAT_AUTOSEND=true
 ```
 
 Saat jadwal aktif, hanya workspace dengan `settings.csat.autosend = true`
-(menu CSAT -> Pengaturan) yang diproses. Ini memungkinkan pilot 2-3 project
-lebih dulu tanpa mematikan project lain secara manual.
+**dan** metode `auto`/keduanya (menu CSAT → Pengaturan CSAT) yang diproses.
+Ini memungkinkan pilot 2-3 project lebih dulu tanpa mematikan project lain
+secara manual. Workspace lama yang sudah `autosend=true` tetapi belum punya
+`send_mode` tetap ikut jadwal sampai pengaturannya disimpan ulang.
 
 Pastikan scheduler server berjalan (cron `php artisan schedule:run` tiap menit)
 dan queue worker aktif. `withoutOverlapping` mencegah dua proses berjalan

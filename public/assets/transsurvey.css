@@ -130,6 +130,31 @@ h3 {
   color: #cdd4df;
   font-size: 13px;
 }
+.nav-label-group {
+  margin-top: 16px;
+  color: #f5a3ae;
+}
+.nav-item-sub {
+  height: 36px;
+  padding-left: 22px;
+  font-size: 12px;
+}
+.csat-status-filter {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 0 20px 16px;
+}
+.csat-status-filter label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.csat-status-filter select {
+  min-width: 180px;
+}
 .nav-icon {
   width: 19px;
   display: flex;

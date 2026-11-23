@@ -33,9 +33,17 @@
             @endforeach
             @php($csatWorkspaceId = app(\App\Services\CurrentWorkspace::class)->filterId())
             @if (in_array(auth()->user()->role, ['operation', 'superadmin'], true) && $csatWorkspaceId !== null && $csatWorkspaceId > 0)
-                <a class="nav-item {{ request()->routeIs('csat.*') ? 'active' : '' }}" href="{{ route('csat.templates.index') }}" @if(request()->routeIs('csat.*')) aria-current="page" @endif>
-                    <span class="nav-icon">@include('layouts.icon', ['name' => 'survey'])</span>{{ __('Template CSAT') }}
-                </a>
+                <div class="nav-label nav-label-group">{{ __('CSAT') }}</div>
+                @php($csatMenu = [
+                    ['csat.send.index', 'mail', __('Kirim CSAT manual')],
+                    ['csat.templates.index', 'survey', __('Template CSAT')],
+                    ['csat.settings.edit', 'report', __('Pengaturan CSAT')],
+                ])
+                @foreach ($csatMenu as [$csatRoute, $csatIcon, $csatLabel])
+                    <a class="nav-item nav-item-sub {{ request()->routeIs($csatRoute) ? 'active' : '' }}" href="{{ route($csatRoute) }}" @if(request()->routeIs($csatRoute)) aria-current="page" @endif>
+                        <span class="nav-icon">@include('layouts.icon', ['name' => $csatIcon])</span>{{ $csatLabel }}
+                    </a>
+                @endforeach
             @endif
         </nav>
         <div class="ts-sidebar-footer"><span class="ts-sidebar-dot"></span> Client Satisfaction Management</div>

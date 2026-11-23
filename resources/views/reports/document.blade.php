@@ -73,6 +73,12 @@
             @endforelse
         </tbody>
     </table>
+    <h2 class="rs-section-title">{{ __('Status pengisian CSAT') }}</h2>
+    @include('csat.status-table', [
+        'csatInvitations' => $csatInvitations,
+        'csatStatus' => $csatStatus,
+        'interactiveTables' => $interactiveTables ?? false,
+    ])
     <h2 class="rs-section-title">{{ __('Skor per kategori') }}</h2>
     <table class="rs-table rs-categories" @if($interactiveTables ?? false) data-ts-table @endif>
         <thead>

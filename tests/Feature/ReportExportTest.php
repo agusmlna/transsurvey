@@ -71,7 +71,7 @@ class ReportExportTest extends TestCase
         $path = $response->baseResponse->getFile()->getPathname();
         try {
             $book = IOFactory::load($path);
-            $this->assertSame(['Ringkasan', 'Detail Jawaban'], $book->getSheetNames());
+            $this->assertSame(['Ringkasan', 'Detail Jawaban', 'Status CSAT'], $book->getSheetNames());
             $sheet = $book->getSheetByName('Detail Jawaban');
             $this->assertSame('PIC', $sheet->getCell('C16')->getValue());
             $this->assertSame('Testing 3', $sheet->getCell('B17')->getValue());
