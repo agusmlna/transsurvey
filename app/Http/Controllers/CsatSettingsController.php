@@ -31,6 +31,7 @@ class CsatSettingsController
             'autoChannels' => $settings['channels'],
             'emailOnly' => CsatSettings::isEmailOnly($workspace),
             'disabled' => CsatSettings::isDisabled($workspace),
+            'serverAutosend' => (bool) config('cxp.csat.enabled', false),
         ]);
     }
 

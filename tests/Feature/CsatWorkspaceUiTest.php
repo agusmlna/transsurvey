@@ -113,6 +113,22 @@ class CsatWorkspaceUiTest extends TestCase
             ->assertSee('name="auto_channels[]"', false);
     }
 
+    public function test_settings_page_shows_server_autosend_state_and_test_action(): void
+    {
+        config(['cxp.csat.enabled' => false]);
+
+        $this->acting()->get(route('csat.settings.edit'))
+            ->assertOk()
+            ->assertSee('Autosend server nonaktif')
+            ->assertSee('Test kirim CSAT');
+
+        config(['cxp.csat.enabled' => true]);
+
+        $this->acting()->get(route('csat.settings.edit'))
+            ->assertOk()
+            ->assertSee('Autosend server aktif');
+    }
+
     public function test_operation_can_save_method_status_and_channels(): void
     {
         $this->acting()->put(route('csat.settings.update'), [
