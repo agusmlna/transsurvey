@@ -54,6 +54,10 @@ class SyncCxpWaAccounts extends Command
             $this->warn(sprintf('project=%s dilewati: akun WhatsApp aktif tidak ditemukan', $code));
         }
 
+        foreach ($result['errors'] as $code => $message) {
+            $this->warn(sprintf('project=%s dilewati: %s', $code, $message));
+        }
+
         foreach ($result['missing_credentials'] as $code) {
             $this->warn(sprintf('project=%s belum punya username/password API v2 di file akun', $code));
         }
@@ -62,7 +66,7 @@ class SyncCxpWaAccounts extends Command
             '%s: %d project tersinkron, %d dilewati.',
             $dryRun ? 'Dry-run' : 'Selesai',
             count($result['updated']),
-            count($result['skipped']),
+            count($result['skipped']) + count($result['errors']),
         ));
 
         return self::SUCCESS;

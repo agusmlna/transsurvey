@@ -2,6 +2,7 @@
 
 namespace App\Services\Cxp;
 
+use App\Exceptions\CxpApiException;
 use App\Services\Csat\WhatsAppNumber;
 
 /**
@@ -43,12 +44,12 @@ class CxpWaAccountSyncer
 
     /**
      * @param  array<int|string, mixed>  $projects
-     * @return array{updated: array<int, string>, skipped: array<int, string>, missing_credentials: array<int, string>}
+     * @return array{updated: array<int, string>, skipped: array<int, string>, missing_credentials: array<int, string>, errors: array<string, string>}
      */
     public function sync(array $projects, bool $dryRun = false): array
     {
         $accounts = $this->load();
-        $result = ['updated' => [], 'skipped' => [], 'missing_credentials' => []];
+        $result = ['updated' => [], 'skipped' => [], 'missing_credentials' => [], 'errors' => []];
 
         if (! $this->client->isConfigured()) {
             throw new \InvalidArgumentException('CXP_API_EMAIL / CXP_API_PASSWORD belum diisi di .env.');
@@ -63,12 +64,20 @@ class CxpWaAccountSyncer
                 continue;
             }
 
-            $response = $this->client->accountWaProjects(
-                $token,
-                $code,
-                $this->accountPath,
-                $this->accountBaseUrl,
-            );
+            try {
+                $response = $this->client->accountWaProjects(
+                    $token,
+                    $code,
+                    $this->accountPath,
+                    $this->accountBaseUrl,
+                );
+            } catch (CxpApiException $e) {
+                // Project tanpa akun WhatsApp di TransCXP tidak boleh menggagalkan
+                // sinkronisasi project lain. Kredensial yang sudah ada dibiarkan.
+                $result['errors'][$code] = $e->getMessage();
+
+                continue;
+            }
 
             $activeAccounts = $this->extract($response);
 

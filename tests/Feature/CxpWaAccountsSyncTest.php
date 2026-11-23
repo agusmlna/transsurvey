@@ -25,6 +25,8 @@ class CxpWaAccountsSyncTest extends TestCase
     /** @var array<string, mixed> */
     private array $accountResponse;
 
+    private ?string $errorProject = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -86,6 +88,13 @@ class CxpWaAccountsSyncTest extends TestCase
             }
 
             if (str_contains($request->url(), '/api/v1/accountWaProject/')) {
+                if ($this->errorProject !== null && str_ends_with($request->url(), '/'.$this->errorProject)) {
+                    return Http::response([
+                        'status' => false,
+                        'message' => 'Data account WhatsApp tidak ditemukan.',
+                    ], 404);
+                }
+
                 return Http::response($this->accountResponse, 200);
             }
 
@@ -160,6 +169,41 @@ class CxpWaAccountsSyncTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertSame('+620000000000', $this->readAccounts()['23']['number']);
         $this->assertStringContainsString('dilewati', $output->fetch());
+    }
+
+    public function test_sync_continues_when_one_project_returns_api_error(): void
+    {
+        config(['cxp.csat.projects' => ['11' => 'TSU', '23' => 'Panasonic']]);
+
+        $this->writeAccounts([
+            '11' => [
+                'username' => 'wa-user-11',
+                'password' => 'wa-password-11',
+            ],
+            '23' => [
+                'username' => 'wa-user-23',
+                'password' => 'wa-password-23',
+                'number' => '+620000000000',
+            ],
+        ]);
+
+        $this->errorProject = '11';
+
+        $output = new BufferedOutput();
+        $exitCode = Artisan::call('cxp:csat-wa-accounts-sync', [], $output);
+        $text = $output->fetch();
+
+        $this->assertSame(0, $exitCode, $text);
+        $this->assertStringContainsString('project=11 dilewati: Data account WhatsApp tidak ditemukan.', $text);
+        $this->assertStringContainsString('1 project tersinkron, 1 dilewati.', $text);
+
+        $accounts = $this->readAccounts();
+        $this->assertSame('+628111660770', $accounts['23']['number']);
+        $this->assertSame('95', $accounts['23']['account_id']);
+        $this->assertSame('wa-user-11', $accounts['11']['username']);
+        $this->assertSame('wa-password-11', $accounts['11']['password']);
+        $this->assertArrayNotHasKey('account_id', $accounts['11']);
+        $this->assertStringNotContainsString('wa-password-11', $text);
     }
 
     public function test_sync_writes_all_active_channels_and_ignores_inactive_accounts(): void
