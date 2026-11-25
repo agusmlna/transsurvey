@@ -248,6 +248,11 @@ return [
         'status_path' => env('CXP_WA_STATUS_PATH', '/api/v2/messages-template'),
         'template_id' => trim((string) env('CXP_WA_TEMPLATE_ID', '')),
 
+        // Override sementara untuk uji pengiriman WA saat APP_URL masih privat.
+        // Isi dengan URL publik penuh, mis. https://transsurvey.trans-cosmos.id/.
+        // Kosong berarti pesan WA memakai URL undangan dari APP_URL seperti biasa.
+        'test_survey_url' => trim((string) env('CXP_WA_TEST_SURVEY_URL', '')),
+
         // Override template per kode project, mis. {"9":"1608466900594387"}.
         // Kode yang tidak ada di sini memakai template_id di atas.
         'template_ids' => (static function (): array {
