@@ -315,6 +315,30 @@ class CxpCsatWhatsAppTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_test_survey_url_override_is_used_in_whatsapp_template_body(): void
+    {
+        config(['cxp.whatsapp.test_survey_url' => 'https://transsurvey.trans-cosmos.id/']);
+
+        $this->fakeCxp([$this->ticket('WA-TEST-URL')]);
+        $this->seedSnapshot();
+
+        [$exitCode, $output] = $this->send();
+
+        $this->assertSame(0, $exitCode, $output);
+
+        $request = $this->lastWhatsAppRequest();
+        $this->assertNotNull($request);
+
+        $body = collect($request['recipient_contact']['components'])
+            ->firstWhere('type', 'body');
+        $this->assertNotNull($body);
+        $this->assertSame('https://transsurvey.trans-cosmos.id/', $body['parameters'][1]['text']);
+
+        // Link di dalam aplikasi tetap memakai APP_URL, bukan override WA.
+        $invitation = Invitation::withoutGlobalScopes()->where('ticket_id', 'WA-TEST-URL')->firstOrFail();
+        $this->assertStringContainsString('/s/', $invitation->surveyUrl());
+    }
+
     public function test_workspace_template_override_is_used_for_whatsapp_send(): void
     {
         config(['cxp.whatsapp.template_ids' => ['brand-a' => 'tpl-csat-brand-a']]);

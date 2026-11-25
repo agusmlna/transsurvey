@@ -74,13 +74,24 @@ class CsatWhatsAppTemplate
     }
 
     /**
+     * Override sementara untuk uji pengiriman WA. Saat kosong, URL tetap
+     * berasal dari APP_URL lewat surveyUrl() seperti alur normal.
+     */
+    private function surveyUrl(Invitation $invitation): string
+    {
+        $override = trim((string) config('cxp.whatsapp.test_survey_url', ''));
+
+        return $override !== '' ? $override : $invitation->surveyUrl();
+    }
+
+    /**
      * @return array<string, string>
      */
     private function values(Invitation $invitation, Workspace $workspace): array
     {
         return [
             'customer_name' => (string) ($invitation->recipient_name ?: $invitation->client?->name ?: ''),
-            'survey_url' => $invitation->surveyUrl(),
+            'survey_url' => $this->surveyUrl($invitation),
             'project_name' => (string) $workspace->name,
             'project_code' => (string) $workspace->code,
             'ticket_id' => (string) $invitation->ticket_id,
